@@ -1,0 +1,81 @@
+/**
+ * Igual que examenesComplementarios.ts: las recetas se crean únicamente
+ * como parte del payload combinado en POST /historial_clinico/registro-completo.
+ * Este archivo define los tipos que usa ese payload y lo que el backend
+ * devuelve. Agrega funciones de lectura/descarga cuando tengas las
+ * rutas reales del módulo de recetas.
+ */
+
+// --- Ítems que el frontend arma para cada bloque de receta ---
+
+export interface RecetaMedicamentoItemPayload {
+  medicamento: string;
+  dosis: string;
+  via_administracion?: string | null;
+  frecuencia: string;
+  duracion?: string | null;
+  cantidad?: string | null;
+  indicaciones?: string | null;
+}
+
+export interface RecetaFormulaMagistralItemPayload {
+  nombre_formula: string;
+  ingredientes: string;
+  forma_farmaceutica?: string | null;
+  cantidad_preparar?: string | null;
+  via_administracion?: string | null;
+  indicaciones?: string | null;
+}
+
+export interface RecetaExamenItemPayload {
+  nombre_examen: string;
+  tipo_examen: string;
+  urgencia?: string; // load_default="Rutina" en el backend
+  indicaciones_previas?: string | null;
+}
+
+/** Un bloque de receta: mismas indicaciones generales para todos sus ítems. */
+export interface RecetaBloquePayload<T> {
+  indicaciones_generales?: string | null;
+  items: T[];
+}
+
+/**
+ * Las tres recetas son independientes entre sí — cada clave presente
+ * (con al menos un ítem) genera una fila `Receta` separada en el backend.
+ */
+export interface RecetasPayload {
+  medicamentos?: RecetaBloquePayload<RecetaMedicamentoItemPayload>;
+  examenes?: RecetaBloquePayload<RecetaExamenItemPayload>;
+  formulas?: RecetaBloquePayload<RecetaFormulaMagistralItemPayload>;
+}
+
+// --- Lo que devuelve el backend al leer una receta ya guardada ---
+
+export interface RecetaMedicamento extends RecetaMedicamentoItemPayload {
+  id: number;
+  receta_id: number;
+}
+export interface RecetaFormulaMagistral extends RecetaFormulaMagistralItemPayload {
+  id: number;
+  receta_id: number;
+}
+export interface RecetaExamen extends RecetaExamenItemPayload {
+  id: number;
+  receta_id: number;
+}
+
+export interface Receta {
+  id: number;
+  registro_clinico_id: number;
+  tipo_receta_id: number;
+  medico_id: number;
+  fecha: string;
+  indicaciones_generales?: string | null;
+  estado: boolean;
+  medicamentos: RecetaMedicamento[];
+  formulas_magistrales: RecetaFormulaMagistral[];
+  examenes: RecetaExamen[];
+  created_at?: string;
+  updated_at?: string;
+}

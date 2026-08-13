@@ -1,0 +1,453 @@
+/* VerPaciente.module.css */
+:global(:root) {
+  --primary: #2F6FB8;
+  --secondary: #D73232;
+  --accent: #5AAEFF;
+  --background: #0B1320;
+  --surface: #102A43;
+  --white: #FFFFFF;
+  --silver: #C8D0DA;
+  --gray: #5F6E7A;
+}
+
+.container {
+  max-width: 1100px;
+  width: 100%;
+  background: var(--surface);
+  border-radius: 28px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 2.5rem 2.8rem;
+  transition: all 0.2s ease;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.06);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  border-radius: 12px;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+
+.header:hover {
+  transform: scale(1.03);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.headerIcon {
+  font-size: 2rem;
+  color: var(--accent);
+  background: rgba(90, 174, 255, 0.12);
+  padding: 0.6rem;
+  border-radius: 14px;
+}
+
+.header h1 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: var(--white);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.header span {
+  font-size: 0.8rem;
+  color: var(--silver);
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.3rem 1rem;
+  border-radius: 40px;
+  font-weight: 500;
+}
+
+.clinicalRecordBox {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 20px;
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+}
+
+.recordHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--white);
+  margin-bottom: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.recordHeader i {
+  color: var(--accent);
+  font-size: 1.2rem;
+  width: 1.6rem;
+  text-align: center;
+}
+
+.titleGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.actionsBar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.btnAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--silver);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              background 0.2s ease,
+              border-color 0.2s ease;
+  will-change: transform;
+}
+
+.btnAction i {
+  font-size: 0.9rem;
+  color: var(--accent);
+}
+
+.btnAction:hover {
+  transform: scale(1.03);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+  color: var(--white);
+}
+
+.btnAction.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.recordsScrollContainer {
+  max-height: 550px;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.recordsScrollContainer::-webkit-scrollbar {
+  width: 6px;
+}
+.recordsScrollContainer::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+.recordsScrollContainer::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+}
+.recordsScrollContainer::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.recordsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.recordCard {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: border-color 0.2s,
+              transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+  display: flex;
+  flex-direction: column;
+  transform-origin: top center;
+}
+
+.recordCard:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.03);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+}
+
+.recordCardTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--white);
+  margin-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 0.4rem;
+}
+
+.recordCardTitle i {
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+.emptyStateCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.6rem;
+  border: 2px dashed rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 1.5rem 1rem;
+  color: var(--gray);
+  text-align: center;
+}
+
+.emptyStateCard i {
+  font-size: 2rem;
+  color: rgba(255, 255, 255, 0.06);
+}
+
+.emptyStateCard p {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--silver);
+  opacity: 0.5;
+}
+
+.clinicalData {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+  justify-content: center;
+}
+
+.dataRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.dataRow:last-child {
+  border-bottom: none;
+}
+
+.label {
+  color: var(--silver);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.8;
+}
+
+.value {
+  color: var(--white);
+  font-size: 0.75rem;
+  font-weight: 400;
+  text-align: right;
+  max-width: 65%;
+  word-break: break-word;
+}
+
+.cardActions {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 1rem;
+  justify-content: flex-end;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 0.8rem;
+}
+
+.btnCard {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--silver);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              background 0.2s ease,
+              border-color 0.2s ease;
+  will-change: transform;
+}
+
+.btnCard i {
+  font-size: 0.8rem;
+}
+
+.btnCard:hover {
+  transform: scale(1.03);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
+  color: var(--white);
+}
+
+.btnView i {
+  color: var(--accent);
+}
+
+.btnDownload i {
+  color: var(--secondary);
+}
+
+/* Modal backdrop and content (shared with other modals) */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.backdropContent {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 2rem;
+  max-width: 760px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+}
+
+.backdropContentWide {
+  composes: backdropContent;
+  max-width: 1400px;
+  width: min(100%, 1400px);
+}
+
+.closeBtn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--silver);
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: color 0.2s;
+  z-index: 10;
+}
+
+.closeBtn:hover {
+  color: var(--white);
+}
+
+/* Responsive */
+@media (max-width: 700px) {
+  .container {
+    padding: 1.5rem;
+  }
+  .header h1 {
+    font-size: 1.3rem;
+  }
+  .header span {
+    display: none;
+  }
+  .clinicalRecordBox {
+    padding: 1.2rem;
+  }
+  .recordHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .actionsBar {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .recordsScrollContainer {
+    max-height: 550px; /* O el valor que tengas */
+    overflow-y: auto;
+  /* Cambia esto: dale un buen espacio a ambos lados */
+    padding-left: 2rem;   /* <-- Esto arregla el problema de la izquierda */
+    padding-right: 1.5rem; 
+  }
+  .recordsGrid {
+    grid-template-columns: 1fr;
+  }
+  .recordCard {
+    padding: 1rem;
+    transform-origin: center center;
+  }
+  .cardActions {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 1rem;
+  }
+  .actionsBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .btnAction {
+    justify-content: center;
+  }
+}
+/* Editar - color ámbar */
+.btnEdit i {
+  color: var(--amber, #E8A94B);
+}
+
+/* Eliminar - color rojo */
+.btnDelete i {
+  color: var(--secondary, #D73232);
+}
+
+/* (opcional) Si quieres que al pasar el mouse cambie el fondo o el color */
+.btnEdit:hover {
+  background: rgba(232, 169, 75, 0.15);
+  border-color: var(--amber);
+}
+.btnEdit:hover i {
+  color: var(--amber);
+}
+
+.btnDelete:hover {
+  background: rgba(215, 50, 50, 0.15);
+  border-color: var(--secondary);
+}
+.btnDelete:hover i {
+  color: var(--secondary);
+}

@@ -1,0 +1,810 @@
+import React, {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  forwardRef,
+} from "react";
+import "./Receta.css";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faCakeCandles,
+  faCalendarDay,
+  faFileMedical,
+  faFlaskVial,
+  faMortarPestle,
+  faNotesMedical,
+  faPills,
+  faPlus,
+  faPrescriptionBottle,
+  faPrint,
+  faSignature,
+  faTrash,
+  faTriangleExclamation,
+  faUser,
+  faXmark,
+} from '@fortawesome/free-solid-svg-icons';
+/* ============================================================
+   Tipos
+   ============================================================ */
+
+type Tab = "medicamentos" | "examenes" | "formulas";
+
+interface DBItem {
+  n: string;
+  s: string;
+}
+
+export interface RecetaBloque<T> {
+  indicaciones_generales: string | null;
+  items: T[];
+}
+
+export interface RecetaPayloadSalida {
+  medicamentos?: RecetaBloque<{
+    medicamento: string; dosis: string; via_administracion: string | null;
+    frecuencia: string; duracion: string | null; cantidad: string | null; indicaciones: string | null;
+  }>;
+  examenes?: RecetaBloque<{
+    nombre_examen: string; tipo_examen: string; urgencia: string; indicaciones_previas: string | null;
+  }>;
+  formulas?: RecetaBloque<{
+    nombre_formula: string; ingredientes: string; forma_farmaceutica: string | null;
+    cantidad_preparar: string | null; via_administracion: string | null; indicaciones: string | null;
+  }>;
+}
+
+export interface RecetaHandle {
+  /** Devuelve solo los bloques que tienen al menos un ítem. `null` si no hay nada. */
+  getPayload: () => RecetaPayloadSalida | null;
+  /** Limpia todo — llamar después de un guardado exitoso. */
+  reset: () => void;
+}
+
+interface MedItem {
+  id: number;
+  nombre: string;
+  dosis: string;
+  via: string;
+  frecuencia: string;
+  duracion: string;
+  horario: string[] | null;
+  raw: string;
+}
+
+interface ExamItem {
+  id: number;
+  nombre: string;
+  urgencia: "urgente" | "normal";
+  raw: string;
+}
+
+interface FormItem {
+  id: number;
+  nombre: string;
+  ingredientes: string;
+  via: string;
+  freqDur: string;
+  raw: string;
+}
+
+type AnyItem = MedItem | ExamItem | FormItem;
+
+interface ToastState {
+  msg: string;
+  undo?: () => void;
+}
+
+/* ============================================================
+   Datos estáticos
+   ============================================================ */
+
+const MED_DB: DBItem[] = [
+  { n: "Paracetamol", s: "Paracetamol 500mg VO c/8h x5d" },
+  { n: "Ibuprofeno", s: "Ibuprofeno 400mg VO c/8h x5d" },
+  { n: "Amoxicilina", s: "Amoxicilina 500mg VO c/8h x7d" },
+  { n: "Amoxicilina/Clavulánico", s: "Amoxicilina/Clavulánico 875/125mg VO c/12h x7d" },
+  { n: "Omeprazol", s: "Omeprazol 20mg VO c/24h x14d" },
+  { n: "Loratadina", s: "Loratadina 10mg VO c/24h x7d" },
+  { n: "Metformina", s: "Metformina 850mg VO c/12h continuo" },
+  { n: "Losartán", s: "Losartán 50mg VO c/24h continuo" },
+  { n: "Diclofenaco", s: "Diclofenaco 50mg VO c/8h x3d" },
+  { n: "Azitromicina", s: "Azitromicina 500mg VO c/24h x3d" },
+  { n: "Ciprofloxacino", s: "Ciprofloxacino 500mg VO c/12h x7d" },
+  { n: "Salbutamol inhalador", s: "Salbutamol inhalador 2puff c/6h SOS" },
+  { n: "Dexametasona", s: "Dexametasona 4mg IM dosis única" },
+  { n: "Ranitidina", s: "Ranitidina 150mg VO c/12h x10d" },
+  { n: "Ácido fólico", s: "Ácido fólico 5mg VO c/24h x30d" },
+  { n: "Complejo B", s: "Complejo B 1amp IM c/24h x5d" },
+  { n: "Cetirizina", s: "Cetirizina 10mg VO c/24h x10d" },
+  { n: "Metoclopramida", s: "Metoclopramida 10mg VO c/8h x3d" },
+];
+const MED_CHIPS = [ "Diclofenaco", "Azitromicina", "Complejo B"];
+
+const EXAM_DB: DBItem[] = [
+  { n: "Hemograma completo", s: "Hemograma completo" },
+  { n: "Glicemia en ayunas", s: "Glicemia en ayunas" },
+  { n: "Perfil lipídico", s: "Perfil lipídico" },
+  { n: "Examen general de orina", s: "Examen general de orina" },
+  { n: "Perfil hepático", s: "Perfil hepático" },
+  { n: "Perfil renal", s: "Perfil renal" },
+  { n: "Radiografía de tórax", s: "Radiografía de tórax" },
+  { n: "Electrocardiograma", s: "Electrocardiograma" },
+  { n: "Ecografía abdominal", s: "Ecografía abdominal" },
+  { n: "PCR (Proteína C Reactiva)", s: "PCR (Proteína C Reactiva)" },
+  { n: "VSG", s: "VSG" },
+  { n: "Prueba de embarazo", s: "Prueba de embarazo" },
+  { n: "Cultivo de orina", s: "Cultivo de orina" },
+  { n: "TSH", s: "TSH" },
+  { n: "Coproparasitológico", s: "Coproparasitológico" },
+];
+const EXAM_CHIPS = ["Hemograma completo", "Glicemia en ayunas", "Examen general de orina", "Radiografía de tórax", "Perfil lipídico", "Electrocardiograma", "Ecografía abdominal", "PCR (Proteína C Reactiva)"];
+
+const FORM_DB: DBItem[] = [
+  { n: "Crema Betametasona + Ác. Salicílico", s: "Crema Betametasona 0.1% + Ácido salicílico 3% — vehículo c.s.p. 30g | tópico | c/12h x10d" },
+  { n: "Solución para nebulizar", s: "Solución para nebulizar: Salbutamol + Bromuro de ipratropio — c.s.p. 4ml | inhalatoria | c/6h x3d" },
+  { n: "Jarabe pediátrico compuesto", s: "Jarabe pediátrico: Paracetamol + Clorfenamina — c.s.p. 100ml | VO | c/8h x5d" },
+  { n: "Loción capilar compuesta", s: "Loción capilar: Minoxidil 5% + Finasteride 0.1% — c.s.p. 60ml | tópico | c/24h" },
+];
+const FORM_CHIPS = FORM_DB.map((f) => f.n);
+
+const DB: Record<Tab, DBItem[]> = { medicamentos: MED_DB, examenes: EXAM_DB, formulas: FORM_DB };
+const CHIPS: Record<Tab, string[]> = { medicamentos: MED_CHIPS, examenes: EXAM_CHIPS, formulas: FORM_CHIPS };
+const PLACEHOLDER: Record<Tab, string> = {
+  medicamentos: "Paracetamol 500 c/8h x5d VO",
+  examenes: "Hemograma completo, urgente",
+  formulas: "Crema betametasona 0.1% + ác. salicílico 3% c.s.p 30g, tópico c/12h x10d",
+};
+const TITLES: Record<Tab, string> = { medicamentos: "Medicamentos", examenes: "Exámenes complementarios", formulas: "Fórmulas magistrales" };
+const TIPO_ID: Record<Tab, number> = { medicamentos: 1, examenes: 2, formulas: 3 };
+
+const CLINICA = { nombre: "Centro Médico Oruro", direccion: "Av. 6 de Agosto · Oruro, Bolivia" };
+
+/* ============================================================
+   Helpers de parseo
+   ============================================================ */
+
+function scheduleFromFrequency(frecuencia: string): string[] | null {
+  if (!frecuencia) return null;
+  const m = frecuencia.match(/cada (\d+) horas/i);
+  if (!m) return null;
+  const interval = parseInt(m[1], 10);
+  if (!interval || interval <= 0 || interval > 24) return null;
+  const startHour = 8;
+  const times: string[] = [];
+  for (let h = startHour; h < startHour + 24; h += interval) {
+    times.push(String(h % 24).padStart(2, "0") + ":00");
+  }
+  return times;
+}
+
+function normalizeVia(v: string): string {
+  const s = v.toLowerCase().replace(/\./g, "");
+  if (s === "oral" || s === "vo") return "VO";
+  if (s === "iv") return "IV";
+  if (s === "im") return "IM";
+  if (s === "sc") return "SC";
+  if (s === "sl") return "SL";
+  if (s.startsWith("inhal")) return "Inhalatoria";
+  if (s.startsWith("top") || s.startsWith("tóp")) return "Tópica";
+  return v.toUpperCase();
+}
+
+function parseMed(raw: string): Omit<MedItem, "id"> {
+  const text = raw.trim();
+  let work = text;
+
+  const viaMatch = work.match(/\b(VO|v\.?o\.?|oral|IV|i\.v\.?|IM|i\.m\.?|SC|SL|inhalador|inhalatoria|t[oó]pic[oa])\b/i);
+  let via = "";
+  if (viaMatch) { via = normalizeVia(viaMatch[0]); work = work.replace(viaMatch[0], " "); }
+
+  const dosisMatch = work.match(/(\d+\s?\/\s?\d+\s?(mg|g|ml|mcg|ui|%)|\d+\.?\d*\s?%|\d+\.?\d*\s?(mg|g|ml|mcg|ui|puff|amp))/i);
+  let dosis = "";
+  if (dosisMatch) { dosis = dosisMatch[0].replace(/\s+/g, ""); work = work.replace(dosisMatch[0], " "); }
+
+  let frecuencia = "";
+  const fm = work.match(/c\s?\/\s?(\d+)\s?h/i) || work.match(/cada\s+(\d+)\s+horas?/i);
+  if (fm) { frecuencia = `cada ${fm[1]} horas`; work = work.replace(fm[0], " "); }
+  else if (/\bsos\b/i.test(work)) { frecuencia = "SOS (según necesidad)"; work = work.replace(/\bsos\b/i, " "); }
+  else if (/\bcontinuo\b/i.test(work)) { frecuencia = "continuo"; work = work.replace(/\bcontinuo\b/i, " "); }
+
+  let duracion = "";
+  const dm = work.match(/x\s?(\d+)\s?d(?:[ií]as)?/i) || work.match(/por\s?(\d+)\s?d[ií]as/i);
+  if (dm) { duracion = `${dm[1]} días`; work = work.replace(dm[0], " "); }
+  else if (/dosis\s?[úu]nica/i.test(work)) { duracion = "Dosis única"; work = work.replace(/dosis\s?[úu]nica/i, " "); }
+
+  let nombre = work.replace(/[+|,/-]+/g, " ").replace(/\s{2,}/g, " ").trim();
+  if (!nombre) nombre = text;
+
+  const horario = scheduleFromFrequency(frecuencia);
+  return { nombre, dosis, via, frecuencia, duracion, horario, raw: text };
+}
+
+function parseExam(raw: string): Omit<ExamItem, "id"> {
+  const text = raw.trim();
+  const urgente = /\burgente\b|\bstat\b/i.test(text);
+  const nombre = text.replace(/,?\s*\burgente\b/i, "").replace(/,?\s*\bstat\b/i, "").trim() || text;
+  return { nombre, urgencia: urgente ? "urgente" : "normal", raw: text };
+}
+
+function parseFormula(raw: string): Omit<FormItem, "id"> {
+  const text = raw.trim();
+  const parts = text.split("|").map((p) => p.trim());
+  const nombreIng = parts[0] || text;
+  const via = parts[1] || (text.match(/\b(t[oó]pic[oa]|VO|inhalatoria|IM|IV)\b/i) || [])[0] || "";
+  const freqDur = parts[2] || "";
+  const [first, ...ingRest] = nombreIng.split("—").map((s) => s.trim());
+  let nombre = first;
+  const ingredientes = ingRest.join(" — ") || nombreIng;
+  if (!nombre) nombre = nombreIng;
+  return { nombre, ingredientes, via, freqDur, raw: text };
+}
+
+/* ============================================================
+   Componente
+   ============================================================ */
+
+interface RecetaProps {
+  isOpen: boolean;
+  onClose: () => void;
+  pacienteNombre?: string;
+  pacienteEdad?: string;
+  pacienteCi?: string;
+  alergias?: string;
+  medicoNombre?: string;
+}
+
+const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
+  {
+    isOpen,
+    onClose,
+    pacienteNombre = "—",
+    pacienteEdad = "—",
+    pacienteCi = "—",
+    alergias = "",
+    medicoNombre = "Dr. Miguel",
+  }: RecetaProps,
+  ref
+): React.ReactElement {
+  const [tab, setTab] = useState<Tab>("medicamentos");
+  const [seq, setSeq] = useState(1);
+
+  const [medicamentos, setMedicamentos] = useState<MedItem[]>([]);
+  const [examenes, setExamenes] = useState<ExamItem[]>([]);
+  const [formulas, setFormulas] = useState<FormItem[]>([]);
+
+  const [inputValue, setInputValue] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [filtered, setFiltered] = useState<DBItem[]>([]);
+  const [highlighted, setHighlighted] = useState(-1);
+
+  const [indicaciones, setIndicaciones] = useState("Tomar agua y descansar");
+
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const fecha = useMemo(
+    () => new Date().toLocaleDateString("es-BO", { day: "2-digit", month: "long", year: "numeric" }),
+    []
+  );
+
+  const itemsOfTab = useCallback(
+    (t: Tab): AnyItem[] => (t === "medicamentos" ? medicamentos : t === "examenes" ? examenes : formulas),
+    [medicamentos, examenes, formulas]
+  );
+
+  /* ---------- handle expuesto al padre (getPayload / reset) ---------- */
+  useImperativeHandle(ref, () => ({
+    getPayload: () => {
+      const payload: RecetaPayloadSalida = {};
+
+      if (medicamentos.length) {
+        payload.medicamentos = {
+          indicaciones_generales: indicaciones.trim() || null,
+          items: medicamentos.map((m) => ({
+            medicamento: m.nombre,
+            dosis: m.dosis || "—",
+            via_administracion: m.via || null,
+            frecuencia: m.frecuencia || "—",
+            duracion: m.duracion || null,
+            cantidad: null,
+            indicaciones: null,
+          })),
+        };
+      }
+
+      if (examenes.length) {
+        payload.examenes = {
+          indicaciones_generales: indicaciones.trim() || null,
+          items: examenes.map((e) => ({
+            nombre_examen: e.nombre,
+            tipo_examen: "General",
+            urgencia: e.urgencia === "urgente" ? "Urgente" : "Rutina",
+            indicaciones_previas: null,
+          })),
+        };
+      }
+
+      if (formulas.length) {
+        payload.formulas = {
+          indicaciones_generales: indicaciones.trim() || null,
+          items: formulas.map((f) => ({
+            nombre_formula: f.nombre,
+            ingredientes: f.ingredientes || f.raw,
+            forma_farmaceutica: null,
+            cantidad_preparar: null,
+            via_administracion: f.via || null,
+            indicaciones: null,
+          })),
+        };
+      }
+
+      return Object.keys(payload).length ? payload : null;
+    },
+    reset: () => {
+      setMedicamentos([]);
+      setExamenes([]);
+      setFormulas([]);
+      setIndicaciones("Tomar agua y descansar");
+    },
+  }));
+
+  /* ---------- toast ---------- */
+  const showToast = (msg: string, undoFn?: () => void) => {
+    setToast({ msg, undo: undoFn });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3200);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
+
+  /* ---------- comandos de items ---------- */
+  const commitItem = (rawText?: string) => {
+    const raw = (rawText !== undefined ? rawText : inputValue).trim();
+    if (!raw) return;
+    const id = seq;
+    setSeq((s) => s + 1);
+
+    if (tab === "medicamentos") {
+      const obj: MedItem = { id, ...parseMed(raw) };
+      setMedicamentos((list) => [...list, obj]);
+    } else if (tab === "examenes") {
+      const obj: ExamItem = { id, ...parseExam(raw) };
+      setExamenes((list) => [...list, obj]);
+    } else {
+      const obj: FormItem = { id, ...parseFormula(raw) };
+      setFormulas((list) => [...list, obj]);
+    }
+
+    setInputValue("");
+    setShowSuggestions(false);
+    showToast("Agregado a " + TITLES[tab].toLowerCase(), () => {
+      if (tab === "medicamentos") setMedicamentos((list) => list.filter((x) => x.id !== id));
+      else if (tab === "examenes") setExamenes((list) => list.filter((x) => x.id !== id));
+      else setFormulas((list) => list.filter((x) => x.id !== id));
+    });
+  };
+
+  const removeItem = (t: Tab, id: number) => {
+    const list = itemsOfTab(t);
+    const idx = list.findIndex((x) => x.id === id);
+    if (idx < 0) return;
+    const removed = list[idx];
+
+    const apply = (updater: (l: any[]) => any[]) => {
+      if (t === "medicamentos") setMedicamentos((l) => updater(l) as MedItem[]);
+      else if (t === "examenes") setExamenes((l) => updater(l) as ExamItem[]);
+      else setFormulas((l) => updater(l) as FormItem[]);
+    };
+
+    apply((l) => l.filter((x) => x.id !== id));
+    showToast("Línea eliminada", () => {
+      apply((l) => {
+        const copy = [...l];
+        copy.splice(idx, 0, removed);
+        return copy;
+      });
+    });
+  };
+
+  const toggleUrgency = (id: number) => {
+    setExamenes((list) => list.map((it) => (it.id === id ? { ...it, urgencia: it.urgencia === "urgente" ? "normal" : "urgente" } : it)));
+  };
+
+  const undoLast = () => {
+    const list = itemsOfTab(tab);
+    if (list.length) removeItem(tab, list[list.length - 1].id);
+  };
+
+  /* ---------- sugerencias ---------- */
+  const renderSuggestions = (value: string) => {
+    const q = value.trim().toLowerCase();
+    if (!q) {
+      setShowSuggestions(false);
+      setFiltered([]);
+      return;
+    }
+    const list = DB[tab].filter((d) => d.n.toLowerCase().includes(q)).slice(0, 6);
+    setFiltered(list);
+    if (!list.length) {
+      setShowSuggestions(false);
+      return;
+    }
+    setHighlighted(0);
+    setShowSuggestions(true);
+  };
+
+  const acceptSuggestion = (i: number) => {
+    const item = filtered[i];
+    if (!item) return;
+    setInputValue(item.s);
+    setShowSuggestions(false);
+    inputRef.current?.focus();
+  };
+
+  const moveHighlight = (delta: number) => {
+    if (!filtered.length) return;
+    setHighlighted((h) => (h + delta + filtered.length) % filtered.length);
+  };
+
+  const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+    renderSuggestions(e.target.value);
+  };
+
+  const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); moveHighlight(1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); moveHighlight(-1); }
+    else if (e.key === "Tab" && showSuggestions) { e.preventDefault(); acceptSuggestion(highlighted < 0 ? 0 : highlighted); }
+    else if (e.key === "Enter") { e.preventDefault(); commitItem(); }
+    else if (e.key === "Escape") { setInputValue(""); setShowSuggestions(false); }
+    else if (e.key === "Backspace" && !inputValue) {
+      const list = itemsOfTab(tab);
+      if (list.length) removeItem(tab, list[list.length - 1].id);
+    }
+  };
+
+  /* ---------- cambio de pestaña ---------- */
+  const switchTab = (t: Tab) => {
+    setTab(t);
+    setInputValue("");
+    setShowSuggestions(false);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  /* ---------- cerrar drawer (abrirlo ahora lo controla el padre) ---------- */
+  const closeDrawer = () => {
+    const total = medicamentos.length + examenes.length + formulas.length;
+    if (total && !window.confirm("¿Cerrar sin guardar la receta?")) return;
+    onClose();
+  };
+
+  // cuando isOpen pasa a true, enfoca el input (como antes hacía openDrawer)
+  useEffect(() => {
+    if (isOpen) {
+      const t = setTimeout(() => inputRef.current?.focus(), 260);
+      return () => clearTimeout(t);
+    }
+  }, [isOpen]);
+
+  /* ---------- atajos de teclado (solo funcionan si el drawer ya está abierto) ---------- */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+      if (e.key === "Escape") { closeDrawer(); }
+      if (e.altKey && ["1", "2", "3"].includes(e.key)) {
+        e.preventDefault();
+        const t = (["medicamentos", "examenes", "formulas"] as Tab[])[Number(e.key) - 1];
+        switchTab(t);
+      }
+      if (e.ctrlKey && e.key.toLowerCase() === "z") { e.preventDefault(); undoLast(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); handleFinish(); }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, tab, medicamentos, examenes, formulas, inputValue]);
+
+  /* ---------- acciones finales ---------- */
+  const handlePrint = () => window.print();
+
+  const handleFinish = () => {
+    const total = medicamentos.length + examenes.length + formulas.length;
+    if (!total) { showToast("Agrega al menos una línea antes de guardar"); return; }
+    window.print();
+  };
+
+  const handleChipClick = (label: string) => {
+    const dbItem = DB[tab].find((d) => d.n === label);
+    if (dbItem) commitItem(dbItem.s);
+  };
+
+  /* ---------- render de línea del ticket ---------- */
+  const renderTicketLine = (it: AnyItem, i: number) => {
+    let t1 = "";
+    let t2 = "";
+    if (tab === "medicamentos") {
+      const med = it as MedItem;
+      t1 = med.nombre + (med.dosis ? " · " + med.dosis : "");
+      const partes = [med.via, med.frecuencia, med.duracion].filter(Boolean);
+      t2 = partes.join(" · ") || med.raw;
+      if (med.horario) t2 += (t2 ? "  ·  " : "") + "🕐 " + med.horario.join(" - ");
+    } else if (tab === "examenes") {
+      t1 = (it as ExamItem).nombre;
+    } else {
+      const f = it as FormItem;
+      t1 = f.nombre;
+      t2 = [f.ingredientes, f.via, f.freqDur].filter(Boolean).join(" · ");
+    }
+    return (
+      <div className="ticket-line" key={it.id}>
+        <div className="num">{i + 1}</div>
+        <div className="body">
+          <div className="t1">{t1}</div>
+          {t2 && <div className="t2">{t2}</div>}
+        </div>
+        {tab === "examenes" && (
+          <div
+            className={`urgency-badge ${(it as ExamItem).urgencia}`}
+            onClick={() => toggleUrgency(it.id)}
+          >
+            {(it as ExamItem).urgencia}
+          </div>
+        )}
+        <button type="button" className="rm" title="Eliminar" onClick={() => removeItem(tab, it.id)}>
+          <FontAwesomeIcon icon={faTrash} />
+        </button>
+      </div>
+    );
+  };
+
+  /* ---------- render de sección del papel ---------- */
+  const renderPaperMed = () =>
+    medicamentos.length ? (
+      medicamentos.map((it, i) => {
+        const t1 = it.nombre + (it.dosis ? " " + it.dosis : "");
+        const meta = [it.via, it.frecuencia, it.duracion].filter(Boolean).join(" · ");
+        return (
+          <div className="rx-item" key={it.id}>
+            <span className="idx">{i + 1}.</span>
+            {t1}
+            {meta && <div className="meta">{meta}</div>}
+            {it.horario && <div className="meta">Horario sugerido: {it.horario.join(" · ")}</div>}
+          </div>
+        );
+      })
+    ) : (
+      <div className="paper-empty">Sin ítems aún</div>
+    );
+
+  const renderPaperExam = () =>
+    examenes.length ? (
+      examenes.map((it, i) => (
+        <div className="rx-item" key={it.id}>
+          <span className="idx">{i + 1}.</span>
+          {it.nombre}
+          {it.urgencia === "urgente" && (
+            <span style={{ color: "var(--secondary)", fontWeight: 700 }}> (URGENTE)</span>
+          )}
+        </div>
+      ))
+    ) : (
+      <div className="paper-empty">Sin ítems aún</div>
+    );
+
+  const renderPaperForm = () =>
+    formulas.length ? (
+      formulas.map((it, i) => {
+        const meta = [it.ingredientes, it.via, it.freqDur].filter(Boolean).join(" · ");
+        return (
+          <div className="rx-item" key={it.id}>
+            <span className="idx">{i + 1}.</span>
+            {it.nombre}
+            {meta && <div className="meta">{meta}</div>}
+          </div>
+        );
+      })
+    ) : (
+      <div className="paper-empty">Sin ítems aún</div>
+    );
+
+  const tieneAlergias = Boolean(alergias && alergias.trim());
+
+  return (
+    <div className="receta-widget">
+      <div className={`overlay ${isOpen ? "show" : ""}`} onClick={closeDrawer} />
+
+      {/* ================= DRAWER: RECETA ================= */}
+      <div className={`drawer ${isOpen ? "show" : ""}`}>
+        <div className="drawer-head">
+          <div className="ico"><FontAwesomeIcon icon={faPrescriptionBottle} /></div>
+          <div className="titles">
+            <h3>Receta médica</h3>
+            <p className={`drawer-alergias ${tieneAlergias ? "tiene" : ""}`}>
+              <FontAwesomeIcon icon={faTriangleExclamation} /> Alergias: {tieneAlergias ? alergias : "No"}
+            </p>
+          </div>
+          <div className="badge">tipo_receta_id: {TIPO_ID[tab]}</div>
+          <div className="drawer-close" onClick={closeDrawer}>
+            <FontAwesomeIcon icon={faXmark} />
+          </div>
+        </div>
+
+        <div className="drawer-body">
+          
+
+          <div className="rx-grid">
+            {/* ================= EDITOR ================= */}
+            <div>
+              <div className="field">
+                <div className="flabel"><FontAwesomeIcon icon={faFileMedical} className="ficon" />Tipo de receta</div>
+
+                <div className="type-chips">
+                  <button
+                    type="button"
+                    className={`type-chip tab-med ${tab === "medicamentos" ? "active" : ""}`}
+                    onClick={() => switchTab("medicamentos")}
+                  >
+                    <FontAwesomeIcon icon={faPills} /> Medicamentos <span className="k">Alt+1</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`type-chip tab-exam ${tab === "examenes" ? "active" : ""}`}
+                    onClick={() => switchTab("examenes")}
+                  >
+                    <FontAwesomeIcon icon={faFlaskVial} /> Exámenes <span className="k">Alt+2</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`type-chip tab-form ${tab === "formulas" ? "active" : ""}`}
+                    onClick={() => switchTab("formulas")}
+                  >
+                    <FontAwesomeIcon icon={faMortarPestle} /> Fórmulas <span className="k">Alt+3</span>
+                  </button>
+                </div>
+
+                <div className="chips">
+                  {CHIPS[tab].map((label) => (
+                    <button type="button" className="chip-quick" key={label} onClick={() => handleChipClick(label)}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="row-entry">
+                  <div className="smart-row">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      placeholder={PLACEHOLDER[tab]}
+                      autoComplete="off"
+                      value={inputValue}
+                      onChange={onInputChange}
+                      onKeyDown={onInputKeyDown}
+                    />
+                    <button type="button" className="icon-btn primary" title="Agregar (Enter)" onClick={() => commitItem()}>
+                      <FontAwesomeIcon icon={faPlus} />
+                    </button>
+                  </div>
+
+                  {showSuggestions && (
+                    <div className="suggestions">
+                      {filtered.map((item, i) => (
+                        <div
+                          key={item.n}
+                          className={`sugg-item ${i === highlighted ? "hi" : ""}`}
+                          onMouseDown={(e) => { e.preventDefault(); acceptSuggestion(i); }}
+                        >
+                          <span className="name">{item.n}</span>
+                          <span className="preview">{item.s}<span className="sugg-tabhint">Tab</span></span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="kbd-hints">
+                    <span><kbd>Enter</kbd> agregar</span>
+                    <span><kbd>Tab</kbd> autocompletar</span>
+                    <span><kbd>↑↓</kbd> navegar</span>
+                    <span><kbd>Backspace</kbd> vacío borra la última</span>
+                    <span><kbd>Ctrl</kbd>+<kbd>Z</kbd> deshacer</span>
+                  </div>
+                </div>
+
+                <div className="ticket">
+                  {itemsOfTab(tab).length === 0 ? (
+                    <div className="ticket-empty">Aún no agregaste ninguna línea. Escribe arriba o toca un frecuente.</div>
+                  ) : (
+                    itemsOfTab(tab).map((it, i) => renderTicketLine(it, i))
+                  )}
+                </div>
+              </div>
+
+              <div className="field">
+                <div className="flabel">
+                  <FontAwesomeIcon icon={faNotesMedical} className="ficon" />Indicaciones generales
+                  <small>Enter la refleja en la hojita</small>
+                </div>
+                <textarea
+                  rows={3}
+                  placeholder="Ej. Tomar abundante agua y reposo relativo por 48h..."
+                  value={indicaciones}
+                  onChange={(e) => setIndicaciones(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* ================= PAPEL ================= */}
+            <div className="paper-wrap">
+              <div className="paper">
+                <div className="paper-margin" />
+                <div className="paper-inner">
+                  <div className="paper-head">
+                    <div>
+                      <div className="clinic">{CLINICA.nombre}</div>
+                      <div className="clinic-sub">{CLINICA.direccion}</div>
+                    </div>
+                    <div className="rx-mark">℞</div>
+                  </div>
+                  <div className="paper-meta">
+                    <div><span>Paciente: </span><b>{pacienteNombre}</b></div>
+                    <div><span>Fecha: </span><b>{fecha}</b></div>
+                    <div><span>Edad: </span><b>{pacienteEdad}</b></div>
+                    <div><span>Doc: </span><b>{pacienteCi}</b></div>
+                  </div>
+
+                  <div className="paper-section-title">Medicamentos</div>
+                  <div>{renderPaperMed()}</div>
+
+                  <div className="paper-section-title">Exámenes complementarios</div>
+                  <div>{renderPaperExam()}</div>
+
+                  <div className="paper-section-title">Fórmulas magistrales</div>
+                  <div>{renderPaperForm()}</div>
+
+                  <div className="paper-section-title">Indicaciones generales</div>
+                  <div>
+                    {indicaciones.trim() ? (
+                      <div className="paper-indicaciones-text">{indicaciones.trim()}</div>
+                    ) : (
+                      <div className="paper-empty">Sin indicaciones</div>
+                    )}
+                  </div>
+
+                  <div className="paper-sign">
+                    <div className="line">{medicoNombre}</div>
+                    <div className="date">{fecha}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={`toast ${toast ? "show" : ""}`}>
+        <span>{toast?.msg}</span>
+        {toast?.undo && (
+          <button
+            onClick={() => {
+              toast.undo?.();
+              setToast(null);
+            }}
+          >
+            Deshacer
+          </button>
+        )}
+      </div>
+    </div>
+  );
+});
+
+export default Receta;

@@ -1,0 +1,112 @@
+/* ── Pagos hoy: mini monitor de pulso (esquina inferior derecha) ── */
+.pulse-widget {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999;
+  width: 190px;
+  padding: 14px 18px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(78, 163, 255, 0.25);
+  box-shadow: var(--shadow-card);
+  color: var(--text-primary);
+}
+
+.pulse-widget-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pulse-widget-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--status-active);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.7);
+  animation: pulse-dot 2s infinite;
+  flex-shrink: 0;
+}
+
+.pulse-widget-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+}
+
+.pulse-widget-strip {
+  height: 22px;
+  margin: 6px 0 2px;
+  opacity: 0.9;
+}
+
+.pulse-widget-strip svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.pulse-widget-path {
+  fill: none;
+  stroke: var(--status-active);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 600;
+  stroke-dashoffset: 600;
+  animation: pulse-widget-draw 2.4s linear infinite;
+  filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.5));
+}
+
+@keyframes pulse-widget-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.pulse-widget-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.pulse-widget-currency {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--cmo-accent);
+}
+
+.pulse-widget-value {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.pulse-widget-loading {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.pulse-widget-sub {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
+@media (max-width: 768px) {
+  .pulse-widget {
+    bottom: 16px;
+    right: 16px;
+    left: 16px;
+    width: auto;
+  }
+}
