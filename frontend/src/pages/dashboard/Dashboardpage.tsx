@@ -17,7 +17,7 @@ import PacientesExternosTab from './tabs/Pacientesexternostab';
 import ModelosTab from './tabs/Modelostab';
 import ReportesTab from './tabs/Reportestab';
 import './Dashboardpage.css';
-import '../../components/CrearCita.css';
+import '../../components/CrearCita.module.css';
 /**
  * Reemplaza CMODashboard.tsx. Solo coordina: qué tab está activo,
  * qué modal está abierto, y pasa los datos de los hooks hacia los
@@ -123,7 +123,10 @@ const DashboardPage: React.FC = () => {
       )}
 
       {selectedPaciente && (
-        <Modal onClose={() => setSelectedPaciente(null)}>
+        <Modal
+          onClose={() => setSelectedPaciente(null)}
+          contentClassName="paciente-modal-content"
+        >
           <div style={{ position: 'relative' }}>
             <button
               className="close-btn"

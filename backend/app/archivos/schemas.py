@@ -1,16 +1,20 @@
-"""Schemas Marshmallow del módulo archivos."""
-from marshmallow import fields, validate
-from app.extensions import ma
+"""Schema del módulo archivos."""
+from marshmallow import Schema, fields
 
 
-class ArchivoSchema(ma.Schema):
-    id = fields.Int(dump_only=True)
-    registro_clinico_id = fields.Int(allow_none=True)
-    informe_id = fields.Int(allow_none=True)
-    tipo_archivo_id = fields.Int(required=True)
-    nombre_archivo = fields.Str(required=True)
-    ruta_almacenamiento = fields.Str(required=True)
-    tamano_bytes = fields.Int(allow_none=True)
-    subido_por_usuario_id = fields.Int(required=True)
+class ArchivoSchema(Schema):
+    id = fields.Integer(dump_only=True)
+
+    registro_clinico_id = fields.Integer(allow_none=True)
+    informe_id = fields.Integer(allow_none=True)
+    receta_id = fields.Integer(allow_none=True)
+    examen_complementario_id = fields.Integer(allow_none=True)
+
+    tipo_archivo_id = fields.Integer(required=True)
+    nombre_archivo = fields.String(dump_only=True)
+    ruta_almacenamiento = fields.String(dump_only=True)
+    tamano_bytes = fields.Integer(dump_only=True)
+    subido_por_usuario_id = fields.Integer(dump_only=True)
+
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)

@@ -72,7 +72,7 @@ const ReportesTab: React.FC<ReportesTabProps> = ({ active }) => {
       <div className="table-card mt-20 scroll-animated">
         <div className="card-header">
           <h3>Pacientes más frecuentes</h3>
-          <span style={{ color: 'var(--text-secondary)', opacity: 0.7, fontSize: '0.8rem' }}>últimos 30 días</span>
+          <span style={{ color: 'var(--text-muted)', opacity: 0.7, fontSize: '0.8rem' }}>últimos 30 días</span>
         </div>
         <table>
           <thead>

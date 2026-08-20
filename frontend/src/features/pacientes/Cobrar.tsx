@@ -1,7 +1,7 @@
 // Cobrar.tsx
 import React, { useState } from 'react';
 import { crearPago, type PagoPayload } from '../../api/pagos';
-import './Cobrar.css';
+import styles from './Cobrar.module.css';
 
 interface CobrarProps {
   consultaId?: number | null;
@@ -87,36 +87,36 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado }) => {
   };
 
   return (
-    <div className="cobrar-wrapper">
-      <div className="pago-container">
+    <div className={styles['cobrar-wrapper']}>
+      <div className={styles['pago-container']}>
         {/* HEADER */}
-        <div className="cb-header">
+        <div className={styles['cb-header']}>
           <div>
             <h1><i className="fas fa-coins"></i> Registrar pago</h1>
-            <p className="cb-subtitle">Complete los datos para finalizar el cobro</p>
+            <p className={styles['cb-subtitle']}>Complete los datos para finalizar el cobro</p>
           </div>
         </div>
 
         {/* FORMULARIO */}
-        <div className="cb-section">
-          <div className="cb-section-title">
+        <div className={styles['cb-section']}>
+          <div className={styles['cb-section-title']}>
             <i className="fas fa-hand-holding-usd"></i> Datos del pago
           </div>
 
           {error && (
-            <div className="cb-cambio-info cb-text-danger" style={{ marginBottom: '1rem' }}>
+            <div className={`${styles['cb-cambio-info']} ${styles['cb-text-danger']}`} style={{ marginBottom: '1rem' }}>
               <i className="fas fa-exclamation-circle"></i> {error}
             </div>
           )}
 
           <form onSubmit={(e) => e.preventDefault()}>
             {/* Monto Base */}
-            <div className="cb-form-group">
+            <div className={styles['cb-form-group']}>
               <label htmlFor="montoBaseInput">Monto a cobrar (Bs)</label>
               <input
                 type="number"
                 id="montoBaseInput"
-                className="cb-form-control"
+                className={styles['cb-form-control']}
                 step="0.01"
                 min="0.01"
                 value={montoBase}
@@ -126,12 +126,12 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado }) => {
             </div>
 
             {/* Descuento */}
-            <div className="cb-form-group">
+            <div className={styles['cb-form-group']}>
               <label htmlFor="descuentoInput">Descuento (Bs)</label>
               <input
                 type="number"
                 id="descuentoInput"
-                className="cb-form-control"
+                className={styles['cb-form-control']}
                 step="0.01"
                 min="0"
                 value={descuento}
@@ -141,23 +141,23 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado }) => {
             </div>
 
             {/* Total (Readonly) */}
-            <div className="cb-form-group">
+            <div className={styles['cb-form-group']}>
               <label htmlFor="totalPagarInput">Total a pagar (Bs)</label>
               <input
                 type="number"
                 id="totalPagarInput"
-                className="cb-form-control cb-total-field"
+                className={`${styles['cb-form-control']} ${styles['cb-total-field']}`}
                 value={totalPagar.toFixed(2)}
                 readOnly
               />
             </div>
 
             {/* Método de pago */}
-            <div className="cb-form-group">
+            <div className={styles['cb-form-group']}>
               <label htmlFor="metodoPago">Método de pago</label>
               <select
                 id="metodoPago"
-                className="cb-form-control"
+                className={styles['cb-form-control']}
                 value={metodoPago}
                 onChange={(e) => {
                   setMetodoPago(e.target.value);
@@ -172,12 +172,12 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado }) => {
 
             {/* Campo condicional para Efectivo */}
             {metodoPago === 'Efectivo' && (
-              <div className="cb-form-group">
+              <div className={styles['cb-form-group']}>
                 <label htmlFor="montoRecibido">Monto recibido (Bs)</label>
                 <input
                   type="number"
                   id="montoRecibido"
-                  className="cb-form-control"
+                  className={styles['cb-form-control']}
                   step="0.01"
                   min="0"
                   value={montoRecibido}
@@ -185,7 +185,7 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado }) => {
                   placeholder="0.00"
                 />
                 {montoRecibido && !isNaN(recibidoNum) && (
-                  <div className={cambio >= 0 ? 'cb-cambio-info' : 'cb-cambio-info cb-text-danger'}>
+                  <div className={cambio >= 0 ? styles['cb-cambio-info'] : `${styles['cb-cambio-info']} ${styles['cb-text-danger']}`}>
                     {cambio >= 0
                       ? `Cambio: Bs ${cambio.toFixed(2)}`
                       : `Faltan Bs ${Math.abs(cambio).toFixed(2)}`}
@@ -196,12 +196,12 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado }) => {
 
             {/* Campo condicional para QR */}
             {metodoPago === 'QR' && (
-              <div className="cb-form-group">
+              <div className={styles['cb-form-group']}>
                 <label htmlFor="referenciaInput">Referencia / N° de transacción</label>
                 <input
                   type="text"
                   id="referenciaInput"
-                  className="cb-form-control"
+                  className={styles['cb-form-control']}
                   value={referencia}
                   onChange={(e) => setReferencia(e.target.value)}
                   placeholder="Opcional"
@@ -210,10 +210,10 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado }) => {
             )}
 
             {/* Botones */}
-            <div className="cb-form-actions">
+            <div className={styles['cb-form-actions']}>
               <button
                 type="button"
-                className="cb-btn-primary"
+                className={styles['cb-btn-primary']}
                 onClick={handleConfirmar}
                 disabled={enviando}
               >
@@ -222,7 +222,7 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado }) => {
               </button>
               <button
                 type="button"
-                className="cb-btn-secondary"
+                className={styles['cb-btn-secondary']}
                 onClick={handleLimpiar}
                 disabled={enviando}
               >

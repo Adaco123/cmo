@@ -1,13 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRefresh } from '@fortawesome/free-solid-svg-icons';
+import { faRefresh, faCalendarDays } from '@fortawesome/free-solid-svg-icons';
 import { type Paciente } from '../../../api/pacientes';
 import { type Cita } from '../../../api/citas';
+import Calendario from '../../../features/citas/Calendario'
 
 interface InicioTabProps {
   active: boolean;
   pacientes: Paciente[];
   citasHoy: Cita[];
+  /**
+   * Todas las citas (no solo las de hoy), para poder marcarlas en el
+   * calendario. Si tu CMODashboard ya carga la lista completa para otra
+   * pestaña, pásala aquí; si no, cae de respaldo a citasHoy.
+   */
+  citasTodas?: Cita[];
   loadingCitas: boolean;
   citasError: string | null;
   finalizandoId: number | null;
@@ -24,6 +31,7 @@ const InicioTab: React.FC<InicioTabProps> = ({
   active,
   pacientes,
   citasHoy,
+  citasTodas,
   loadingCitas,
   citasError,
   finalizandoId,
@@ -31,6 +39,8 @@ const InicioTab: React.FC<InicioTabProps> = ({
   onAtender,
   onFinalizar,
 }) => {
+  const [calendarioAbierto, setCalendarioAbierto] = useState(false);
+
   return (
     <div className={`tab-content ${active ? 'active' : ''}`}>
       <section className="stats-grid">
@@ -44,13 +54,29 @@ const InicioTab: React.FC<InicioTabProps> = ({
           <div className="stat-value">Bs 16.450</div>
           <div className="stat-change positive">↑ 18% vs ayer</div>
         </div>
+
+        <button
+          type="button"
+          className="mini-calendar-card scroll-animated"
+          onClick={() => setCalendarioAbierto(true)}
+        >
+          <div className="mini-calendar-icon">
+            <FontAwesomeIcon icon={faCalendarDays} />
+          </div>
+          <div className="mini-calendar-info">
+            <span className="mini-calendar-label">Calendario</span>
+            <span className="mini-calendar-date">
+              {new Intl.DateTimeFormat('es-BO', { day: 'numeric', month: 'long' }).format(new Date())}
+            </span>
+          </div>
+        </button>
       </section>
 
       <div className="table-card scroll-animated" style={{ marginTop: '24px' }}>
         <div className="card-header">
           <h3>Citas de hoy</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: 'var(--text-secondary)', opacity: 0.7, fontSize: '0.8rem' }}>
+            <span style={{ color: 'var(--text-muted)', opacity: 0.7, fontSize: '0.8rem' }}>
               {new Intl.DateTimeFormat('es-BO', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}
             </span>
             <button
@@ -114,6 +140,14 @@ const InicioTab: React.FC<InicioTabProps> = ({
           </div>
         )}
       </div>
+
+      {calendarioAbierto && (
+        <Calendario
+          citas={citasTodas ?? citasHoy}
+          pacientes={pacientes}
+          onClose={() => setCalendarioAbierto(false)}
+        />
+      )}
     </div>
   );
 };

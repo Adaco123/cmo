@@ -1,14 +1,21 @@
 """Rutas del módulo historial_clinico."""
-from flask import request
+from datetime import datetime
+
+from flask import request, current_app
 from flask_restful import Api, Resource
 from flask_jwt_extended import jwt_required
 from marshmallow import ValidationError
 from app.db import db
 from app.consultas.schemas import ConsultaSchema
 from app.medicos.models import Medico
-from app.citas.models import Cita   # solo si vas a validar cita_id
+from app.citas.models import Cita
 from app.historial_clinico.models import HistoriaClinica, RegistroClinico
-from app.historial_clinico.schemas import HistoriaClinicaSchema, RegistroClinicoSchema
+from app.seguimiento_control.models import SeguimientoControl
+from app.historial_clinico.schemas import (
+    HistoriaClinicaSchema,
+    RegistroClinicoSchema,
+    SeguimientoControlSchema,
+)
 from app.historial_clinico.api_v1_0 import historial_clinico_bp
 from app.pacientes.models import Paciente
 from app.pacientes.schemas import PacienteSchema
@@ -19,12 +26,119 @@ from app.recetas.schemas import RecetaSchema, RecetaMedicamentoSchema, RecetaFor
 
 from app.examenes_complementarios.models import CategoriaExamen, ExamenComplementario
 from app.examenes_complementarios.schemas import ExamenComplementarioSchema
+
 historia_schema = HistoriaClinicaSchema()
 registro_schema = RegistroClinicoSchema()
 registro_schema_list = RegistroClinicoSchema(many=True)
 paciente_schema = PacienteSchema()
+consulta_schema = ConsultaSchema()
+receta_schema = RecetaSchema()
+receta_medicamento_schema = RecetaMedicamentoSchema()
+receta_formula_schema = RecetaFormulaMagistralSchema()
+receta_examen_schema = RecetaExamenSchema()
+examen_complementario_schema = ExamenComplementarioSchema()
+seguimiento_schema = SeguimientoControlSchema()
+seguimiento_schema_list = SeguimientoControlSchema(many=True)
 
 api = Api(historial_clinico_bp)
+
+CATEGORIAS_EXAMEN_VALIDAS = {"Laboratorio", "Imagenología", "Otro"}
+TIPOS_RECETA_NOMBRES = {
+    "medicamentos": "Medicamentos",
+    "examenes": "Exámenes",
+    "formulas": "Fórmulas magistrales",
+}
+
+
+def _get_or_create_categoria_examen(nombre: str) -> "CategoriaExamen":
+    categoria = CategoriaExamen.query.filter_by(nombre=nombre).first()
+    if not categoria:
+        categoria = CategoriaExamen(nombre=nombre)
+        db.session.add(categoria)
+        db.session.flush()
+    return categoria
+
+
+def _get_or_create_tipo_receta(nombre: str) -> "TipoReceta":
+    tipo = TipoReceta.query.filter_by(nombre=nombre).first()
+    if not tipo:
+        tipo = TipoReceta(nombre=nombre)
+        db.session.add(tipo)
+        db.session.flush()
+    return tipo
+
+
+def _parse_fecha(valor, campo: str = "proxima_fecha_control"):
+    """
+    Convierte 'YYYY-MM-DD' a date, o None si viene vacío/None.
+    Lanza ValueError con mensaje legible si el formato es inválido.
+    Necesario porque este endpoint arma el dict de seguimiento_control
+    a mano (no pasa por SeguimientoControlSchema.load), así que Marshmallow
+    nunca convierte el string a date por sí solo — sin esto, SQLAlchemy
+    recibe un str en una columna Date y revienta al hacer flush/commit.
+    """
+    if not valor:
+        return None
+    try:
+        return datetime.strptime(valor, "%Y-%m-%d").date()
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"{campo}: formato inválido, use YYYY-MM-DD") from e
+
+
+def _validar_bloques_recetas(recetas_data: dict):
+    """Devuelve (recetas_validated, None) o (None, error_response)."""
+    recetas_validated = {}
+    for clave, item_schema in (
+        ("medicamentos", receta_medicamento_schema),
+        ("examenes", receta_examen_schema),
+        ("formulas", receta_formula_schema),
+    ):
+        bloque = recetas_data.get(clave)
+        if not bloque or not bloque.get("items"):
+            continue
+
+        items_validados = []
+        for i, item in enumerate(bloque["items"]):
+            try:
+                items_validados.append(item_schema.load(item))
+            except ValidationError as err:
+                return None, ({"recetas": {clave: {"items": {i: err.messages}}}}, 400)
+
+        recetas_validated[clave] = {
+            "indicaciones_generales": bloque.get("indicaciones_generales") or None,
+            "items": items_validados,
+        }
+    return recetas_validated, None
+
+
+def _crear_recetas_desde_bloques(recetas_validated: dict, registro_clinico_id: int,
+                                  medico_id: int, seguimiento_control_id=None):
+    """Crea las Receta + sus ítems dentro de la transacción activa."""
+    item_model_by_clave = {
+        "medicamentos": RecetaMedicamento,
+        "examenes": RecetaExamen,
+        "formulas": RecetaFormulaMagistral,
+    }
+    recetas_creadas = []
+    for clave, bloque in recetas_validated.items():
+        tipo = _get_or_create_tipo_receta(TIPOS_RECETA_NOMBRES[clave])
+
+        receta = Receta(
+            registro_clinico_id=registro_clinico_id,
+            tipo_receta_id=tipo.id,
+            medico_id=medico_id,
+            seguimiento_control_id=seguimiento_control_id,
+            indicaciones_generales=bloque["indicaciones_generales"],
+        )
+        db.session.add(receta)
+        db.session.flush()
+
+        ItemModel = item_model_by_clave[clave]
+        for item_data in bloque["items"]:
+            db.session.add(ItemModel(receta_id=receta.id, **item_data))
+
+        recetas_creadas.append(receta)
+    return recetas_creadas
 
 
 # ---------------------------------------------------------------------------
@@ -69,7 +183,6 @@ class HistoriaClinica_Resource(Resource):
         except ValidationError as err:
             return err.messages, 400
 
-        # El paciente dueño de una historia clínica no se reasigna por edición.
         data.pop("paciente_id", None)
 
         for key, value in data.items():
@@ -83,8 +196,6 @@ class HistoriaClinica_Resource(Resource):
         if not historia:
             return {"error": "Historia clínica no encontrada"}, 404
 
-        # Regla del sistema: no se elimina una historia clínica con registros
-        # asociados, para no perder el expediente médico del paciente.
         if historia.registros_clinicos:
             return {
                 "error": "No se puede eliminar: la historia clínica tiene registros clínicos asociados"
@@ -104,7 +215,7 @@ class HistoriaClinicaPorPaciente_Resource(Resource):
 
 
 # ---------------------------------------------------------------------------
-# Registro Clínico
+# Registro Clínico (CRUD simple, sin todo el paquete)
 # ---------------------------------------------------------------------------
 
 class RegistroClinicoList_Resource(Resource):
@@ -115,17 +226,11 @@ class RegistroClinicoList_Resource(Resource):
         except ValidationError as err:
             return err.messages, 400
 
-        # consulta_id es ahora obligatorio: RegistroClinico depende 1:1 de
-        # Consulta, y paciente/médico/fecha/hora/diagnóstico se derivan de ahí,
-        # ya no se reciben en el body.
         consulta = Consulta.get_by_id(data["consulta_id"])
         if not consulta:
             return {"error": "La consulta indicada no existe"}, 404
 
         paciente_id = consulta.paciente_id
-
-        # Historia clínica 1:1 por paciente: se reutiliza si ya existe,
-        # o se abre automáticamente si es la primera atención registrada.
         historias = HistoriaClinica.simple_filter(paciente_id=paciente_id)
         historia = historias[0] if historias else HistoriaClinica(paciente_id=paciente_id, estado=True)
         if not historias:
@@ -156,8 +261,6 @@ class RegistroClinico_Resource(Resource):
         except ValidationError as err:
             return err.messages, 400
 
-        # La historia clínica y la consulta de un registro no se reasignan
-        # por edición (identidad fija una vez creado el registro).
         data.pop("historia_clinica_id", None)
         data.pop("consulta_id", None)
 
@@ -192,7 +295,7 @@ class RegistrosPorHistoria_Resource(Resource):
 
 
 # ---------------------------------------------------------------------------
-# Expediente completo del paciente (paciente + historia + registros)
+# Expediente completo del paciente
 # ---------------------------------------------------------------------------
 
 class ExpedientePaciente_Resource(Resource):
@@ -225,67 +328,20 @@ class ExpedientePaciente_Resource(Resource):
             "registros_clinicos": registro_schema_list.dump(registros),
         }, 200
 
-consulta_schema = ConsultaSchema()
 
-"""
-REEMPLAZA la clase RegistroClinicoCompleto_Resource que te pasé antes
-(la versión que solo hacía consulta + registro). Esta versión agrega
-exámenes complementarios y recetas separadas por tipo, todo en la
-misma transacción.
-
-Agregar/ajustar imports al inicio de app/historial_clinico/routes.py:
-
-    
-
-Y junto a las instancias de schema que ya tienes:
-
-    """
-
-consulta_schema = ConsultaSchema()
-receta_schema = RecetaSchema()
-receta_medicamento_schema = RecetaMedicamentoSchema()
-receta_formula_schema = RecetaFormulaMagistralSchema()
-receta_examen_schema = RecetaExamenSchema()
-examen_complementario_schema = ExamenComplementarioSchema()
-
-# Nombres canónicos — deben coincidir exactamente con lo que envía el
-# frontend en `categoria` (exámenes complementarios) y con la clave de
-# cada bloque dentro de `recetas` (medicamentos / examenes / formulas).
-CATEGORIAS_EXAMEN_VALIDAS = {"Laboratorio", "Imagenología", "Otro"}
-TIPOS_RECETA_NOMBRES = {
-    "medicamentos": "Medicamentos",
-    "examenes": "Exámenes",
-    "formulas": "Fórmulas magistrales",
-}
-
-
-def _get_or_create_categoria_examen(nombre: str) -> "CategoriaExamen":
-    categoria = CategoriaExamen.query.filter_by(nombre=nombre).first()
-    if not categoria:
-        categoria = CategoriaExamen(nombre=nombre)
-        db.session.add(categoria)
-        db.session.flush()
-    return categoria
-
-
-def _get_or_create_tipo_receta(nombre: str) -> "TipoReceta":
-    tipo = TipoReceta.query.filter_by(nombre=nombre).first()
-    if not tipo:
-        tipo = TipoReceta(nombre=nombre)
-        db.session.add(tipo)
-        db.session.flush()
-    return tipo
-
+# ---------------------------------------------------------------------------
+# Registro clínico completo (día 1: consulta + registro + exámenes + recetas
+# + opcionalmente el primer seguimiento_control)
+# ---------------------------------------------------------------------------
 
 class RegistroClinicoCompleto_Resource(Resource):
     """
     POST /api/historial_clinico/registro-completo
 
-    Crea, en una sola transacción: la Consulta, el RegistroClinico,
-    los ExamenComplementario que el médico haya pedido, y una Receta
-    independiente por cada tipo (medicamentos / exámenes / fórmulas)
-    que tenga al menos un ítem. Si cualquier paso falla, se revierte
-    todo — no queda nada guardado a medias.
+    Crea, en una sola transacción: la Consulta, el RegistroClinico, los
+    ExamenComplementario, una Receta por tipo con ítems, y opcionalmente
+    el primer SeguimientoControl (con su propia receta). Si algo falla,
+    se revierte todo.
     """
 
     @jwt_required()
@@ -295,6 +351,7 @@ class RegistroClinicoCompleto_Resource(Resource):
         registro_data = body.get("registro", {})
         examenes_data = body.get("examenes_complementarios", []) or []
         recetas_data = body.get("recetas", {}) or {}
+        seguimiento_data = body.get("seguimiento_control")
 
         # --- Validación de forma ---
         try:
@@ -322,33 +379,40 @@ class RegistroClinicoCompleto_Resource(Resource):
             examenes_validated.append({
                 "categoria_nombre": categoria_nombre,
                 "nombre_examen": nombre_examen,
+                "resultado": (ex.get("resultado") or "").strip() or None,
                 "observaciones": (ex.get("observaciones") or "").strip() or None,
             })
 
-        recetas_validated = {}  # clave: 'medicamentos'|'examenes'|'formulas'
-        for clave, item_schema in (
-            ("medicamentos", receta_medicamento_schema),
-            ("examenes", receta_examen_schema),
-            ("formulas", receta_formula_schema),
-        ):
-            bloque = recetas_data.get(clave)
-            if not bloque or not bloque.get("items"):
-                continue
+        recetas_validated, error = _validar_bloques_recetas(recetas_data)
+        if error:
+            return error
 
-            items_validados = []
-            for i, item in enumerate(bloque["items"]):
-                try:
-                    # receta_id es dump_only en estos schemas (se asigna
-                    # desde la URL normalmente); aquí lo asignamos luego
-                    # de crear la Receta, así que no hace falta excluirlo.
-                    items_validados.append(item_schema.load(item))
-                except ValidationError as err:
-                    return {"recetas": {clave: {"items": {i: err.messages}}}}, 400
+        seguimiento_validated = None
+        seguimiento_recetas_validated = {}
+        if seguimiento_data:
+            evolucion = (seguimiento_data.get("evolucion") or "").strip()
+            if not evolucion:
+                return {"seguimiento_control": {"evolucion": ["Requerido"]}}, 400
 
-            recetas_validated[clave] = {
-                "indicaciones_generales": bloque.get("indicaciones_generales") or None,
-                "items": items_validados,
+            # 👇 fix: antes se mandaba el string crudo directo al modelo
+            # (nunca pasaba por SeguimientoControlSchema.load), y SQLAlchemy
+            # rechazaba el str en la columna Date -> 500 al hacer commit.
+            try:
+                proxima_fecha_control = _parse_fecha(
+                    seguimiento_data.get("proxima_fecha_control")
+                )
+            except ValueError as err:
+                return {"seguimiento_control": {"proxima_fecha_control": [str(err)]}}, 400
+
+            seguimiento_validated = {
+                "evolucion": evolucion,
+                "proxima_fecha_control": proxima_fecha_control,
             }
+            seguimiento_recetas_validated, error = _validar_bloques_recetas(
+                seguimiento_data.get("recetas", {}) or {}
+            )
+            if error:
+                return error
 
         # --- Validación de relaciones ---
         if not Paciente.get_by_id(consulta_validated["paciente_id"]):
@@ -386,55 +450,172 @@ class RegistroClinicoCompleto_Resource(Resource):
             db.session.add(registro)
             db.session.flush()
 
+            # 👇 lista propia, en el mismo orden en que se mandaron —
+            # ya no se lee registro.examenes_complementarios al final,
+            # porque el orden de esa relación no está garantizado.
+            examenes_creados = []
             for ex in examenes_validated:
                 categoria = _get_or_create_categoria_examen(ex["categoria_nombre"])
                 examen = ExamenComplementario(
                     registro_clinico_id=registro.id,
                     categoria_id=categoria.id,
                     nombre_examen=ex["nombre_examen"],
+                    resultado=ex["resultado"],
                     observaciones=ex["observaciones"],
                 )
                 db.session.add(examen)
+                examenes_creados.append(examen)
 
-            recetas_creadas = []
-            item_model_by_clave = {
-                "medicamentos": RecetaMedicamento,
-                "examenes": RecetaExamen,
-                "formulas": RecetaFormulaMagistral,
-            }
-            for clave, bloque in recetas_validated.items():
-                tipo = _get_or_create_tipo_receta(TIPOS_RECETA_NOMBRES[clave])
+            recetas_creadas = _crear_recetas_desde_bloques(
+                recetas_validated, registro.id, medico_id
+            )
 
-                receta = Receta(
+            seguimiento = None
+            if seguimiento_validated:
+                seguimiento = SeguimientoControl(
                     registro_clinico_id=registro.id,
-                    tipo_receta_id=tipo.id,
                     medico_id=medico_id,
-                    indicaciones_generales=bloque["indicaciones_generales"],
+                    evolucion=seguimiento_validated["evolucion"],
+                    proxima_fecha_control=seguimiento_validated["proxima_fecha_control"],
                 )
-                db.session.add(receta)
+                db.session.add(seguimiento)
                 db.session.flush()
 
-                ItemModel = item_model_by_clave[clave]
-                for item_data in bloque["items"]:
-                    db.session.add(ItemModel(receta_id=receta.id, **item_data))
-
-                recetas_creadas.append(receta)
+                recetas_creadas += _crear_recetas_desde_bloques(
+                    seguimiento_recetas_validated, registro.id, medico_id,
+                    seguimiento_control_id=seguimiento.id,
+                )
 
             db.session.commit()
         except Exception:
             db.session.rollback()
+            # 👇 log del traceback real — antes se perdía y solo veías
+            # el 500 genérico sin poder saber la causa.
+            current_app.logger.exception("Error guardando registro clínico completo")
             return {"error": "No se pudo guardar el registro clínico completo"}, 500
 
-        return {
+        respuesta = {
             "consulta": consulta_schema.dump(consulta),
+            "registro": registro_schema.dump(registro),
+            "examenes_complementarios": examen_complementario_schema.dump(
+                examenes_creados, many=True   # 👈 usa la lista, no la relación
+            ),
+            "recetas": receta_schema.dump(recetas_creadas, many=True),
+        }
+        if seguimiento:
+            respuesta["seguimiento_control"] = seguimiento_schema.dump(seguimiento)
+
+        return respuesta, 201
+
+# ---------------------------------------------------------------------------
+# Seguimientos de control (día 15, 22, 29... cada visita posterior)
+# ---------------------------------------------------------------------------
+
+class SeguimientoControl_Resource(Resource):
+    """
+    GET  /api/historial_clinico/registros/<int:registro_id>/seguimientos
+    POST /api/historial_clinico/registros/<int:registro_id>/seguimientos
+    """
+
+    @jwt_required()
+    def get(self, registro_id):
+        if not RegistroClinico.get_by_id(registro_id):
+            return {"error": "Registro clínico no encontrado"}, 404
+
+        seguimientos = (
+            SeguimientoControl.query
+            .filter_by(registro_clinico_id=registro_id)
+            .order_by(SeguimientoControl.fecha.asc())
+            .all()
+        )
+        return seguimiento_schema_list.dump(seguimientos), 200
+
+    @jwt_required()
+    def post(self, registro_id):
+        registro = RegistroClinico.get_by_id(registro_id)
+        if not registro:
+            return {"error": "Registro clínico no encontrado"}, 404
+
+        body = request.get_json(force=True) or {}
+        medico_id = body.get("medico_id")
+        evolucion = (body.get("evolucion") or "").strip()
+        recetas_data = body.get("recetas", {}) or {}
+
+        if not Medico.get_by_id(medico_id):
+            return {"error": "El médico indicado no existe"}, 404
+        if not evolucion:
+            return {"evolucion": ["Requerido"]}, 400
+
+        # 👇 mismo fix que en registro-completo: convertir antes de pasarlo
+        # al modelo, no dejar que llegue como str crudo a la columna Date.
+        try:
+            proxima_fecha_control = _parse_fecha(body.get("proxima_fecha_control"))
+        except ValueError as err:
+            return {"proxima_fecha_control": [str(err)]}, 400
+
+        recetas_validated, error = _validar_bloques_recetas(recetas_data)
+        if error:
+            return error
+
+        try:
+            seguimiento = SeguimientoControl(
+                registro_clinico_id=registro.id,
+                medico_id=medico_id,
+                evolucion=evolucion,
+                proxima_fecha_control=proxima_fecha_control,
+            )
+            db.session.add(seguimiento)
+            db.session.flush()
+
+            recetas_creadas = _crear_recetas_desde_bloques(
+                recetas_validated, registro.id, medico_id,
+                seguimiento_control_id=seguimiento.id,
+            )
+
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Error guardando seguimiento de control")
+            return {"error": "No se pudo guardar el seguimiento de control"}, 500
+
+        return {
+            "seguimiento": seguimiento_schema.dump(seguimiento),
+            "recetas": receta_schema.dump(recetas_creadas, many=True),
+        }, 201
+
+class RegistroClinicoDetalleCompleto_Resource(Resource):
+    """
+    GET /api/historial_clinico/registros/<int:registro_id>/completo
+
+    Devuelve el registro clínico junto con TODO lo relacionado:
+    exámenes complementarios (con sus archivos), recetas por tipo,
+    y los seguimientos de control con sus propias recetas.
+    """
+
+    @jwt_required()
+    def get(self, registro_id):
+        registro = RegistroClinico.get_by_id(registro_id)
+        if not registro:
+            return {"error": "Registro clínico no encontrado"}, 404
+
+        seguimientos = (
+            SeguimientoControl.query
+            .filter_by(registro_clinico_id=registro_id)
+            .order_by(SeguimientoControl.fecha.asc())
+            .all()
+        )
+
+        return {
             "registro": registro_schema.dump(registro),
             "examenes_complementarios": examen_complementario_schema.dump(
                 registro.examenes_complementarios, many=True
             ),
-            "recetas": receta_schema.dump(recetas_creadas, many=True),
-        }, 201
+            "recetas": receta_schema.dump(registro.recetas, many=True),
+            "seguimientos_control": seguimiento_schema_list.dump(seguimientos),
+        }, 200
 
 
+api.add_resource(RegistroClinicoDetalleCompleto_Resource, "/registros/<int:registro_id>/completo")
 api.add_resource(RegistroClinicoCompleto_Resource, "/registro-completo")
 
 api.add_resource(HistoriaClinicaList_Resource, "/historias")
@@ -444,5 +625,7 @@ api.add_resource(HistoriaClinicaPorPaciente_Resource, "/historias/paciente/<int:
 api.add_resource(RegistroClinicoList_Resource, "/registros")
 api.add_resource(RegistroClinico_Resource, "/registros/<int:registro_id>")
 api.add_resource(RegistrosPorHistoria_Resource, "/registros/historia/<int:historia_id>")
+
+api.add_resource(SeguimientoControl_Resource, "/registros/<int:registro_id>/seguimientos")
 
 api.add_resource(ExpedientePaciente_Resource, "/paciente/<int:paciente_id>")

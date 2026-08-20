@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPaciente, type PacientePayload } from '../../api/pacientes';
-import './PacienteForm.css';
+import styles from './PacienteForm.module.css';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faUserPlus,
@@ -27,7 +27,7 @@ interface PacienteFormData {
   direccion: string;
   telefono: string;
   correo: string;
-  
+
   origen_id: string;
   medico_referente_externo: string;
   consultorio_id: string;
@@ -117,7 +117,7 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
       direccion: normalizeOptional(formData.direccion),
       telefono: normalizeOptional(formData.telefono),
       correo: normalizeOptional(formData.correo),
-      
+
       origen_id: Number(formData.origen_id || ORIGEN_MIS_PACIENTES),
       medico_referente_externo: normalizeOptional(formData.medico_referente_externo),
       consultorio_id: Number(formData.consultorio_id || CONSULTORIO_ID),
@@ -143,17 +143,17 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
   };
 
   return (
-    <div className="container">
-      <div className="header">
+    <div className={styles.container}>
+      <div className={styles.header}>
         <FontAwesomeIcon icon={faUserPlus} />
         <h1>Nuevo Paciente</h1>
-        <span>
+        <span className={styles.headerDate}>
           <FontAwesomeIcon icon={faCalendarAlt} /> Fecha: <span>{currentDate}</span>
         </span>
         {onClose && (
           <button
             type="button"
-            className="close-icon-btn"
+            className={styles.closeIconBtn}
             onClick={onClose}
             title="Cerrar"
             aria-label="Cerrar"
@@ -164,15 +164,15 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div className="sections-grid">
+        <div className={styles.sectionsGrid}>
           {/* 1. Datos Personales */}
-          <div className="section">
-            <div className="section-title">
+          <div className={styles.section}>
+            <div className={styles.sectionTitle}>
               <FontAwesomeIcon icon={faIdCard} />
               Datos Personales
             </div>
-            <div className="row row-3">
-              <div className="field-group">
+            <div className={`${styles.row} ${styles.rowThree}`}>
+              <div className={styles.fieldGroup}>
                 <label htmlFor="nombres"><FontAwesomeIcon icon={faUser} /> Nombres</label>
                 <input
                   type="text"
@@ -184,7 +184,7 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
                   required
                 />
               </div>
-              <div className="field-group">
+              <div className={styles.fieldGroup}>
                 <label htmlFor="apellidos"><FontAwesomeIcon icon={faUser} /> Apellidos</label>
                 <input
                   type="text"
@@ -196,7 +196,7 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
                   required
                 />
               </div>
-              <div className="field-group">
+              <div className={styles.fieldGroup}>
                 <label htmlFor="documento"><FontAwesomeIcon icon={faIdBadge} /> Documento</label>
                 <input
                   type="text"
@@ -209,8 +209,8 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
                 />
               </div>
             </div>
-            <div className="row row-3">
-              <div className="field-group">
+            <div className={`${styles.row} ${styles.rowThree}`}>
+              <div className={styles.fieldGroup}>
                 <label htmlFor="fecha_nacimiento"><FontAwesomeIcon icon={faCalendarAlt} /> Fecha de Nacimiento</label>
                 <input
                   type="date"
@@ -221,7 +221,7 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
                   required
                 />
               </div>
-              <div className="field-group">
+              <div className={styles.fieldGroup}>
                 <label htmlFor="sexo"><FontAwesomeIcon icon={faVenusMars} /> Sexo</label>
                 <select id="sexo" name="sexo" value={formData.sexo} onChange={handleChange}>
                   <option value="">Seleccione</option>
@@ -230,7 +230,7 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
                   <option value="otro">Otro</option>
                 </select>
               </div>
-              <div className="field-group">
+              <div className={styles.fieldGroup}>
                 <label htmlFor="direccion"><FontAwesomeIcon icon={faMapPin} /> Dirección</label>
                 <input
                   type="text"
@@ -242,8 +242,8 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
                 />
               </div>
             </div>
-            <div className="row row-3">
-              <div className="field-group">
+            <div className={`${styles.row} ${styles.rowThree}`}>
+              <div className={styles.fieldGroup}>
                 <label htmlFor="telefono"><FontAwesomeIcon icon={faPhoneAlt} /> Teléfono</label>
                 <input
                   type="tel"
@@ -254,7 +254,7 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
                   onChange={handleChange}
                 />
               </div>
-              <div className="field-group">
+              <div className={styles.fieldGroup}>
                 <label htmlFor="correo"><FontAwesomeIcon icon={faEnvelope} /> Correo Electrónico</label>
                 <input
                   type="email"
@@ -267,22 +267,22 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
               </div>
             </div>
           </div>
-          
+
           {/* 3. Datos Médicos y Administrativos */}
-          <div className="section">
-            <div className="section-title">
+          <div className={styles.section}>
+            <div className={styles.sectionTitle}>
               <FontAwesomeIcon icon={faUserMd} />
               Datos Médicos y Administrativos
             </div>
-            <div className="row row-3">
-              <div className="field-group">
+            <div className={`${styles.row} ${styles.rowThree}`}>
+              <div className={styles.fieldGroup}>
                 <label htmlFor="origen_id"><FontAwesomeIcon icon={faHospital} /> Origen</label>
                 <select id="origen_id" name="origen_id" value={formData.origen_id} onChange={handleChange}>
                   <option value={String(ORIGEN_MIS_PACIENTES)}>Mis pacientes</option>
                   <option value={String(ORIGEN_EXTERNO)}>Externo</option>
                 </select>
               </div>
-              <div className="field-group">
+              <div className={styles.fieldGroup}>
                 <label htmlFor="medico_referente_externo"><FontAwesomeIcon icon={faUserMd} /> Médico Referente Externo</label>
                 <input
                   type="text"
@@ -293,14 +293,13 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
                   onChange={handleChange}
                 />
               </div>
-              
             </div>
-            <div className="row row-2">
-              <div className="field-group">
+            <div className={`${styles.row} ${styles.rowTwo}`}>
+              <div className={styles.fieldGroup}>
                 <label>Estado</label>
-                <div className="toggle-wrapper">
-                  <span className="toggle-label">Inactivo</span>
-                  <label className="toggle-switch">
+                <div className={styles.toggleWrapper}>
+                  <span className={styles.toggleLabel}>Inactivo</span>
+                  <label className={styles.toggleSwitch}>
                     <input
                       type="checkbox"
                       id="estado"
@@ -308,17 +307,17 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
                       checked={formData.estado}
                       onChange={handleChange}
                     />
-                    <span className="slider"></span>
+                    <span className={styles.slider}></span>
                   </label>
-                  <span className="toggle-label">Activo</span>
+                  <span className={styles.toggleLabel}>Activo</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {submitError && <p className="error-text">{submitError}</p>}
-        <button type="submit" className="btn-save-modern" disabled={isSubmitting}>
+        {submitError && <p className={styles.errorText}>{submitError}</p>}
+        <button type="submit" className={styles.btnSaveModern} disabled={isSubmitting}>
           <FontAwesomeIcon icon={faSave} /> {isSubmitting ? 'Guardando...' : 'Guardar Paciente'}
         </button>
       </form>

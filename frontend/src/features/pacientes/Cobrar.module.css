@@ -1,0 +1,189 @@
+/* Cobrar.module.css */
+.cobrar-wrapper {
+  width: 100%;
+  font-family: var(--sans);
+}
+
+.pago-container {
+  width: 100%;
+  max-width: 700px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 2.2rem 2.4rem;
+  box-shadow: var(--shadow-card);
+  color: var(--text-main);
+}
+
+/* HEADER */
+.cb-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 1rem;
+  margin-bottom: 1.2rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.cb-header h1 {
+  font-size: 1.45rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--text-main);
+  letter-spacing: -0.02em;
+}
+.cb-header h1 i { color: var(--accent); }
+.cb-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+/* SECCIÓN */
+.cb-section {
+  background: var(--bg-input);
+  border-radius: var(--radius-md);
+  padding: 1.5rem 1.8rem;
+  border: 1px solid var(--border-color);
+}
+.cb-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 1.2rem;
+}
+.cb-section-title i {
+  color: var(--accent);
+  font-size: 1.2rem;
+}
+
+/* FORMULARIO */
+.cb-form-group {
+  margin-bottom: 1.1rem;
+}
+.cb-form-group label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 0.3rem;
+}
+.cb-form-control {
+  width: 100%;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 0.88rem;
+  font-family: inherit;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.cb-form-control:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-bg);
+}
+.cb-form-control::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+.cb-form-control[readOnly] {
+  opacity: 0.8;
+  cursor: default;
+  border-color: var(--border-color);
+}
+select.cb-form-control {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2316233A' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  padding-right: 2.5rem;
+}
+select.cb-form-control option {
+  background: var(--bg-card);
+  color: var(--text-main);
+}
+.cb-total-field {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary-dark);
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  padding: 1rem 1.1rem;
+}
+
+/* CAMBIO INFO */
+.cb-cambio-info {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--success);
+}
+.cb-cambio-info.cb-text-danger {
+  color: var(--status-inactive);
+}
+
+/* BOTONES */
+.cb-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 1.2rem;
+}
+.cb-btn-primary,
+.cb-btn-secondary {
+  padding: 0.9rem 1.6rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: inherit;
+  flex: 1;
+  justify-content: center;
+}
+.cb-btn-primary {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: var(--shadow);
+}
+.cb-btn-primary:hover:not(:disabled) {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+}
+.cb-btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+.cb-btn-secondary {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1.5px solid var(--border-color);
+}
+.cb-btn-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* RESPONSIVE */
+@media (max-width: 600px) {
+  .pago-container { padding: 1.8rem 1.5rem; }
+  .cb-header h1 { font-size: 1.3rem; }
+  .cb-form-actions { flex-direction: column; }
+  .cb-btn-primary,
+  .cb-btn-secondary { width: 100%; }
+}

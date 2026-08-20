@@ -1,0 +1,245 @@
+.modalContent {
+  background: var(--bg-card);
+  color: var(--text-main);
+  border-radius: var(--radius-md);
+  width: min(100%, 720px);
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-color);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.header h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.closeBtn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-main);
+}
+
+.body {
+  display: flex;
+  gap: 24px;
+  padding: 24px;
+  flex-wrap: wrap;
+}
+
+.dayPicker {
+  flex: 1 1 320px;
+}
+
+.months {
+  display: flex;
+}
+
+.month {
+  width: 100%;
+}
+
+.caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 12px;
+}
+
+.captionLabel {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-main);
+  text-transform: capitalize;
+}
+
+.nav {
+  display: flex;
+  gap: 6px;
+}
+
+.navButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.navButton:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-main);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.headCell {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 700;
+  padding-bottom: 6px;
+}
+
+.cell {
+  padding: 2px;
+  text-align: center;
+}
+
+.day {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.day:hover {
+  background: var(--bg-card-hover);
+}
+
+.diaHoy {
+  border: 1px solid var(--cmo-primary);
+  font-weight: 700;
+}
+
+.diaFuera {
+  color: var(--text-muted);
+  opacity: 0.4;
+}
+
+.diaConCitas::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cmo-secondary);
+}
+
+.diaSeleccionado {
+  background: var(--cmo-primary) !important;
+  color: #fff !important;
+}
+
+.diaSeleccionado.diaConCitas::after {
+  background: #fff;
+}
+
+.listaDia {
+  flex: 1 1 240px;
+  min-width: 220px;
+  border-left: 1px solid var(--border-color);
+  padding-left: 24px;
+}
+
+.listaDia h4 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+  text-transform: capitalize;
+  margin-bottom: 14px;
+}
+
+.sinCitas {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.citasList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+}
+
+.citaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.citaItem:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--cmo-primary);
+}
+
+.citaHora {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--cmo-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.citaNombre {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.citaMotivo {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 600px) {
+  .body {
+    flex-direction: column;
+  }
+  .listaDia {
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    padding-left: 0;
+    padding-top: 20px;
+  }
+}

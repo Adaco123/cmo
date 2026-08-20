@@ -2,7 +2,20 @@ import api from '../api';
 import type { ConsultaPayload, Consulta } from './consultas';
 import type { ExamenComplementarioItemPayload, ExamenComplementario } from './examenesComplementarios';
 import type { RecetasPayload, Receta } from './recetas';
+import type { SeguimientoControlPayload, SeguimientoControl } from './seguimientoControl';
+export interface RegistroClinicoCompletoDetalle {
+  registro: RegistroClinico;
+  examenes_complementarios: ExamenComplementario[];
+  recetas: Receta[];
+  seguimientos_control: SeguimientoControl[];
+}
 
+export async function getRegistroClinicoCompleto(registroId: number): Promise<RegistroClinicoCompletoDetalle> {
+  const { data } = await api.get<RegistroClinicoCompletoDetalle>(
+    `/api/historial_clinico/registros/${registroId}/completo`,
+  );
+  return data;
+}
 export interface HistoriaClinicaPayload {
   paciente_id: number;
   estado?: boolean;
@@ -42,6 +55,8 @@ export interface RegistroClinicoPayload {
   enfermedad_actual?: string | null;
   examen_fisico?: string | null;
   tratamiento?: string | null;
+  // Nota clínica en texto libre (ya no es una fecha). La fecha real del
+  // próximo control va en seguimiento_control.proxima_fecha_control.
   consulta_control?: string | null;
   alergias?: string | null;
   observaciones?: string | null;
@@ -94,8 +109,9 @@ export interface RegistroClinico {
 /**
  * Payload para POST /registro-completo: crea, en una sola transacción,
  * la Consulta, el RegistroClinico, los exámenes complementarios que el
- * médico haya pedido, y una Receta independiente por cada tipo
- * (medicamentos / exámenes / fórmulas) que tenga al menos un ítem.
+ * médico haya pedido, una Receta independiente por cada tipo
+ * (medicamentos / exámenes / fórmulas) que tenga al menos un ítem, y
+ * opcionalmente el primer SeguimientoControl (con su propia receta).
  * `registro` va sin `consulta_id` porque el backend lo asigna
  * automáticamente con el id de la Consulta recién creada.
  */
@@ -104,6 +120,9 @@ export interface RegistroCompletoPayload {
   registro: Omit<RegistroClinicoPayload, 'consulta_id'>;
   examenes_complementarios?: ExamenComplementarioItemPayload[];
   recetas?: RecetasPayload;
+  // Opcional: si el doctor ya sabe el día 1 cuándo debe volver el paciente.
+  // No lleva medico_id porque el backend usa el mismo consulta.medico_id.
+  seguimiento_control?: SeguimientoControlPayload;
 }
 
 export interface RegistroCompletoResponse {
@@ -111,6 +130,8 @@ export interface RegistroCompletoResponse {
   registro: RegistroClinico;
   examenes_complementarios: ExamenComplementario[];
   recetas: Receta[];
+  // Solo viene si se mandó seguimiento_control en el payload.
+  seguimiento_control?: SeguimientoControl;
 }
 
 export async function createRegistroCompleto(

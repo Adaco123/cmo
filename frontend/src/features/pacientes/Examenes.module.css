@@ -1,29 +1,19 @@
 /* Variables locales (se pueden heredar de :root global si se desea) */
-:root {
-  --bg: #0B1320;
-  --surface: #102A43;
-  --surface-2: #0D2138;
-  --primary: #2F6FB8;
-  --secondary: #D73232;
-  --accent: #5AAEFF;
-  --line: rgba(90, 174, 255, 0.14);
-  --text: #E7EEF6;
-  --text-dim: #7C93AD;
-  --ok: #3ECF8E;
-  --amber: #E8A94B;
-  --white: #FFFFFF;
-  --silver: #C8D0DA;
-}
 
 * {
   box-sizing: border-box;
+}
+
+/* Variable local de advertencia (no existe --amber en index.css) */
+.drawer {
+  --amber-local: color-mix(in srgb, var(--primary) 55%, #f59e0b 45%);
 }
 
 /* Overlay */
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(3, 8, 16, 0.6);
+  background: color-mix(in srgb, var(--text-main) 55%, transparent);
   backdrop-filter: blur(2px);
   z-index: 60;
 }
@@ -36,13 +26,14 @@
   height: 100%;
   width: 1040px;
   max-width: 96vw;
-  background: linear-gradient(180deg, rgba(16, 42, 67, 0.98), rgba(11, 19, 32, 0.99));
-  border-left: 1px solid var(--line);
-  box-shadow: -30px 0 60px -20px rgba(0, 0, 0, 0.7);
+  background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-body) 100%);
+  border-left: 1px solid var(--border-color);
+  box-shadow: var(--shadow-hover);
   z-index: 61;
   display: flex;
   flex-direction: column;
   animation: slideIn 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  color: var(--text);
 }
 
 @keyframes slideIn {
@@ -57,7 +48,7 @@
 /* Header */
 .drawerHead {
   padding: 18px 28px 16px;
-  border-bottom: 1px solid rgba(215, 50, 50, 0.25);
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: flex-start;
   gap: 14px;
@@ -68,8 +59,8 @@
   height: 44px;
   border-radius: 14px;
   flex-shrink: 0;
-  background: rgba(215, 50, 50, 0.12);
-  color: var(--secondary);
+  background: var(--accent-bg);
+  color: var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -86,17 +77,18 @@
   font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.01em;
+  color: var(--text-h);
 }
 
 .titles p {
   margin: 0;
   font-size: 11.5px;
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
 
 .ctx {
   font-size: 11px;
-  color: var(--silver);
+  color: var(--text-muted);
   margin-top: 5px;
   display: flex;
   gap: 12px;
@@ -112,21 +104,21 @@
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--text-dim);
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 15px;
   flex-shrink: 0;
-  transition: 0.2s;
+  transition: var(--transition-fast);
 }
 
 .drawerClose:hover {
   color: var(--text);
-  border-color: var(--secondary);
+  border-color: var(--primary);
 }
 
 /* Body */
@@ -150,14 +142,14 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.65rem 0.6rem;
-  border-radius: 12px;
-  border: 1.5px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 0.8rem;
   font-weight: 600;
-  transition: all 0.15s ease;
+  transition: var(--transition-fast);
 }
 
 .examTab i {
@@ -165,41 +157,41 @@
 }
 
 .examTab .k {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--mono);
   font-size: 9px;
-  background: rgba(0, 0, 0, 0.25);
+  background: color-mix(in srgb, var(--text-main) 10%, transparent);
   padding: 1px 5px;
   border-radius: 4px;
   opacity: 0.6;
 }
 
 .examTab.active .k {
-  background: rgba(255, 255, 255, 0.2);
+  background: color-mix(in srgb, var(--text-main) 20%, transparent);
   opacity: 0.9;
 }
 
 .examTab.active.tabLab {
-  border-color: var(--accent);
-  background: rgba(90, 174, 255, 0.1);
-  color: var(--accent);
+  border-color: var(--primary);
+  background: var(--accent-bg);
+  color: var(--primary-dark);
 }
 
 .examTab.active.tabImg {
-  border-color: var(--ok);
-  background: rgba(62, 207, 142, 0.1);
-  color: var(--ok);
+  border-color: var(--success);
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .examTab.active.tabOtros {
-  border-color: var(--amber);
-  background: rgba(242, 184, 75, 0.1);
-  color: var(--amber);
+  border-color: var(--amber-local);
+  background: color-mix(in srgb, var(--amber-local) 14%, transparent);
+  color: var(--amber-local);
 }
 
 /* Chips */
 .chipsLabel {
   font-size: 11px;
-  color: var(--text-dim);
+  color: var(--text-muted);
   margin: 0 0 6px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -214,28 +206,28 @@
 
 .chipQuick {
   padding: 0.35rem 1rem;
-  border-radius: 40px;
-  border: 1px solid rgba(90, 174, 255, 0.25);
-  background: rgba(90, 174, 255, 0.08);
-  color: var(--accent);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--primary-dark);
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--transition-fast);
 }
 
 .chipQuick:hover {
   background: var(--primary);
-  color: var(--white);
+  color: #fff;
   border-color: var(--primary);
   transform: translateY(-1px);
 }
 
 /* Formulario */
 .examForm {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 18px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
   padding: 1.2rem 1.5rem;
   margin-bottom: 1.2rem;
 }
@@ -265,19 +257,19 @@
 .formGroup label {
   font-size: 13px;
   font-weight: 600;
-  color: var(--silver);
+  color: var(--text-muted);
   margin-bottom: 4px;
 }
 
 .required {
-  color: var(--secondary);
+  color: var(--status-inactive);
   margin-left: 3px;
 }
 
 .counter {
   font-size: 10.5px;
-  color: var(--text-dim);
-  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted);
+  font-family: var(--mono);
 }
 
 .formGroup input,
@@ -285,21 +277,21 @@
 .formGroup textarea {
   width: 100%;
   padding: 9px 12px;
-  border-radius: 10px;
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-color);
+  background: #fff;
   color: var(--text);
   font-size: 13px;
   font-family: inherit;
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .formGroup input:focus,
 .formGroup select:focus,
 .formGroup textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(90, 174, 255, 0.2);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--accent-bg);
 }
 
 .formGroup textarea {
@@ -309,29 +301,29 @@
 }
 
 .formGroup select option {
-  background: var(--surface);
+  background: #fff;
   color: var(--text);
 }
 
 .formHint {
   font-size: 10.5px;
-  color: var(--text-dim);
+  color: var(--text-muted);
   margin-top: 4px;
 }
 
 /* Upload */
 .uploadArea {
-  border: 2px dashed rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  transition: 0.2s;
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  transition: var(--transition-fast);
   padding: 10px 12px;
   cursor: pointer;
 }
 
 .uploadArea.drag {
-  border-color: var(--accent);
-  background: rgba(90, 174, 255, 0.08);
+  border-color: var(--primary);
+  background: var(--accent-bg);
 }
 
 .uploadArea input[type="file"] {
@@ -349,12 +341,12 @@
 
 .uploadLabel i {
   font-size: 18px;
-  color: var(--accent);
+  color: var(--primary);
 }
 
 .uploadLabel span {
   font-size: 12px;
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
 
 .fileGallery {
@@ -368,10 +360,10 @@
   position: relative;
   width: 64px;
   height: 64px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
   flex-shrink: 0;
 }
 
@@ -388,7 +380,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-size: 20px;
 }
 
@@ -399,7 +391,7 @@
   width: 17px;
   height: 17px;
   border-radius: 50%;
-  background: rgba(3, 8, 16, 0.75);
+  background: color-mix(in srgb, var(--text-main) 70%, transparent);
   color: #fff;
   display: flex;
   align-items: center;
@@ -407,11 +399,11 @@
   font-size: 9px;
   cursor: pointer;
   border: none;
-  transition: background 0.2s;
+  transition: background var(--transition-fast);
 }
 
 .rmThumb:hover {
-  background: var(--secondary);
+  background: var(--status-inactive);
 }
 
 .thumbName {
@@ -419,8 +411,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(3, 8, 16, 0.75);
-  color: var(--silver);
+  background: color-mix(in srgb, var(--text-main) 70%, transparent);
+  color: #fff;
   font-size: 8px;
   padding: 1px 3px;
   white-space: nowrap;
@@ -430,7 +422,7 @@
 
 .galleryCount {
   font-size: 11px;
-  color: var(--text-dim);
+  color: var(--text-muted);
   margin-top: 6px;
 }
 
@@ -448,25 +440,25 @@
   gap: 8px;
   padding: 10px 20px;
   border: none;
-  border-radius: 12px;
-  background: var(--primary);
-  color: var(--white);
+  border-radius: var(--radius-sm);
+  background: var(--primary-gradient);
+  color: #fff;
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
-  transition: 0.2s;
-  box-shadow: 0 4px 12px rgba(47, 111, 184, 0.3);
+  transition: var(--transition-fast);
+  box-shadow: var(--shadow);
 }
 
 .btnAddExam:hover {
-  background: #1f5a9e;
+  background: var(--primary-dark);
   transform: translateY(-2px);
 }
 
 .btnAddExam kbd {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--mono);
   font-size: 9px;
-  background: rgba(255, 255, 255, 0.2);
+  background: color-mix(in srgb, #fff 20%, transparent);
   padding: 2px 6px;
   border-radius: 5px;
 }
@@ -476,19 +468,19 @@
   align-items: center;
   gap: 7px;
   padding: 10px 16px;
-  border-radius: 12px;
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-color);
   background: transparent;
-  color: var(--silver);
+  color: var(--text-muted);
   font-weight: 600;
   font-size: 12.5px;
   cursor: pointer;
-  transition: 0.2s;
+  transition: var(--transition-fast);
 }
 
 .btnDup:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .btnDup:disabled {
@@ -506,9 +498,9 @@
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
   margin-bottom: 6px;
   animation: lineIn 0.18s ease-out;
 }
@@ -528,8 +520,8 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--secondary);
-  color: var(--white);
+  background: var(--status-inactive);
+  color: #fff;
   font-size: 0.66rem;
   font-weight: 700;
   display: flex;
@@ -554,12 +546,12 @@
 
 .paperclip {
   font-size: 10px;
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
 
 .t2 {
   font-size: 11px;
-  color: var(--text-dim);
+  color: var(--text-muted);
   margin-top: 1px;
 }
 
@@ -567,16 +559,16 @@
   font-size: 0.6rem;
   font-weight: 700;
   padding: 3px 10px;
-  border-radius: 40px;
+  border-radius: var(--radius-xl);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   flex-shrink: 0;
-  background: rgba(62, 207, 142, 0.15);
-  color: var(--ok);
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .rm {
-  color: var(--text-dim);
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 14px;
   padding: 0 4px;
@@ -585,146 +577,16 @@
 }
 
 .rm:hover {
-  color: var(--secondary);
+  color: var(--status-inactive);
 }
 
 .ticketEmpty {
   text-align: center;
   padding: 1.3rem 0.8rem;
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-size: 0.78rem;
-  border: 1.5px dashed var(--line);
-  border-radius: 12px;
-}
-
-/* Footer */
-.drawerFoot {
-  padding: 16px 28px;
-  border-top: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-
-.timerPill {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.45rem 0.85rem;
-  border-radius: 40px;
-  background: rgba(90, 174, 255, 0.12);
-  color: var(--accent);
-  font-family: 'JetBrains Mono', monospace;
-  transition: background 0.2s, color 0.2s;
-}
-
-.timerPill.amber {
-  background: rgba(232, 169, 75, 0.14);
-  color: var(--amber);
-}
-
-.timerPill.red {
-  background: rgba(215, 50, 50, 0.16);
-  color: #FF7A7A;
-}
-
-.dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.countSummary {
-  display: flex;
-  gap: 0.9rem;
-  font-size: 0.73rem;
-  color: var(--silver);
-}
-
-.countSummary b {
-  color: var(--text);
-}
-
-.footActions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-left: auto;
-}
-
-.btnGhost {
-  padding: 0.65rem 1.1rem;
-  border-radius: 12px;
-  border: 1.5px solid rgba(255, 255, 255, 0.14);
-  background: transparent;
-  color: var(--silver);
-  font-weight: 600;
-  font-size: 0.78rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: 0.2s;
-}
-
-.btnGhost:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.btnSaveModern {
-  border: none;
-  position: relative;
-  overflow: hidden;
-  z-index: 1;
-  color: var(--secondary);
-  background: #fff;
-  font-family: 'Inter', sans-serif;
-  font-weight: 700;
-  font-size: 13px;
-  padding: 12px 22px;
-  border-radius: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 4px 8px 19px -3px rgba(0, 0, 0, 0.35);
-  transition: color 250ms;
-}
-
-.btnSaveModern::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  width: 0;
-  border-radius: 14px;
-  background-color: var(--secondary);
-  z-index: -1;
-  box-shadow: 4px 8px 19px -3px rgba(0, 0, 0, 0.27);
-  transition: all 250ms;
-}
-
-.btnSaveModern:hover {
-  color: #fff;
-}
-
-.btnSaveModern:hover::before {
-  width: 100%;
-}
-
-.btnSaveModern kbd {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  background: rgba(0, 0, 0, 0.12);
-  padding: 2px 6px;
-  border-radius: 5px;
+  border: 1.5px dashed var(--border-color);
+  border-radius: var(--radius-md);
 }
 
 /* Toast */
@@ -733,17 +595,17 @@
   left: 50%;
   bottom: 28px;
   transform: translateX(-50%) translateY(10px);
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   color: var(--text);
   padding: 0.7rem 1.1rem;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   font-size: 0.8rem;
   display: flex;
   align-items: center;
   gap: 0.9rem;
   z-index: 70;
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-hover);
   animation: toastIn 0.18s ease-out forwards;
 }
 
@@ -761,7 +623,7 @@
 .toast button {
   background: none;
   border: none;
-  color: var(--accent);
+  color: var(--primary);
   font-weight: 700;
   cursor: pointer;
   font-size: 0.8rem;
@@ -778,18 +640,5 @@
   }
   .formRow {
     grid-template-columns: 1fr;
-  }
-  .drawerFoot {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .footActions {
-    margin-left: 0;
-    flex-direction: column;
-  }
-  .btnGhost,
-  .btnSaveModern {
-    width: 100%;
-    justify-content: center;
   }
 }

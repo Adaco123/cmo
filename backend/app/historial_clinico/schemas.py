@@ -25,12 +25,8 @@ class RegistroClinicoSchema(Schema):
     # RELACIONES
     # ============================================================
 
-    # Lo asigna automáticamente el Resource a partir de
-    # consulta.paciente_id.
     historia_clinica_id = fields.Integer(dump_only=True)
 
-    # El cliente debe indicar a qué consulta pertenece
-    # el registro clínico.
     consulta_id = fields.Integer(required=True)
 
     # ============================================================
@@ -99,7 +95,10 @@ class RegistroClinicoSchema(Schema):
         allow_none=True
     )
 
-    consulta_control = fields.Date(
+    # 👇 Antes era fields.Date — ahora el doctor lo anota como texto
+    # libre en el mismo formulario ("antibiótico 7 días, control por
+    # persistencia de fiebre"), ya no como una fecha exacta.
+    consulta_control = fields.String(
         allow_none=True
     )
 
@@ -115,9 +114,6 @@ class RegistroClinicoSchema(Schema):
     # PDF
     # ============================================================
 
-    # Actualmente no existen como columnas en el modelo
-    # RegistroClinico. Si tu Resource las genera dinámicamente,
-    # pueden mantenerse como dump_only.
     pdf_generado = fields.Boolean(
         dump_only=True
     )
@@ -130,16 +126,6 @@ class RegistroClinicoSchema(Schema):
     # ============================================================
     # DATOS DERIVADOS DE CONSULTA
     # ============================================================
-    #
-    # Estos valores NO los manda el cliente.
-    # Se obtienen mediante las propiedades del modelo:
-    #
-    # registro.consulta.fecha
-    # registro.consulta.hora
-    # registro.consulta.medico
-    # registro.consulta.diagnostico
-    # registro.consulta.motivo
-    #
 
     fecha = fields.Date(
         dump_only=True
@@ -173,3 +159,12 @@ class RegistroClinicoSchema(Schema):
     updated_at = fields.DateTime(
         dump_only=True
     )
+class SeguimientoControlSchema(Schema):
+    id = fields.Int(dump_only=True)
+    registro_clinico_id = fields.Int(required=True)
+    medico_id = fields.Int(required=True)
+    fecha = fields.Date(dump_only=True)
+    evolucion = fields.Str(required=True, validate=validate.Length(min=1))
+    proxima_fecha_control = fields.Date(allow_none=True, load_default=None)
+    created_at = fields.DateTime(dump_only=True)
+    updated_at = fields.DateTime(dump_only=True)

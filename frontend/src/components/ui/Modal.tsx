@@ -3,6 +3,8 @@ import React from 'react';
 interface ModalProps {
   onClose: () => void;
   children: React.ReactNode;
+  contentClassName?: string;
+  contentStyle?: React.CSSProperties;
 }
 
 /**
@@ -16,10 +18,14 @@ interface ModalProps {
  *     </Modal>
  *   )}
  */
-const Modal: React.FC<ModalProps> = ({ onClose, children }) => {
+const Modal: React.FC<ModalProps> = ({ onClose, children, contentClassName, contentStyle }) => {
   return (
     <div className="historia-backdrop" onClick={onClose}>
-      <div className="historia-backdrop-content" onClick={(e) => e.stopPropagation()}>
+      <div
+        className={['historia-backdrop-content', contentClassName].filter(Boolean).join(' ')}
+        style={contentStyle}
+        onClick={(e) => e.stopPropagation()}
+      >
         {children}
       </div>
     </div>

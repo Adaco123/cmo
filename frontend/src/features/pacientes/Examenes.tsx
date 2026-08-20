@@ -1,17 +1,51 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useImperativeHandle,
+  forwardRef,
+  
+} from 'react';
 import styles from './Examenes.module.css';
-
+import '../../index.css'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faFlaskVial } from '@fortawesome/free-solid-svg-icons';
 // Tipos
 type Categoria = 'laboratorio' | 'imagenologia' | 'otros';
 
 interface ExamenItem {
   id: number;
   nombre: string;
-  resultado: string;
   observaciones: string;
   estado: boolean;
   archivos: { nombre: string; archivoObj: File }[];
   categoria: Categoria;
+}
+
+export interface ExamenPayloadItem {
+  nombre_examen: string;
+  resultado: string | null;
+  observaciones: string | null;
+  categoria_id: number;
+  archivos: File[];
+}
+
+export interface ExamenesBloque {
+  items: ExamenPayloadItem[];
+}
+
+export interface ExamenesPayloadSalida {
+  laboratorio?: ExamenesBloque;
+  imagenologia?: ExamenesBloque;
+  otros?: ExamenesBloque;
+}
+
+export interface ExamenesHandle {
+  /** Devuelve solo las categorías que tienen al menos un ítem. `null` si no hay nada. */
+  getPayload: () => ExamenesPayloadSalida | null;
+  /** Limpia todo — llamar después de un guardado exitoso. */
+  reset: () => void;
 }
 
 interface Props {
@@ -24,7 +58,8 @@ interface Props {
     registro_numero: string;
     medico_nombre: string;
   };
-  onSave?: (items: ExamenItem[]) => void;
+  /** Notifica al padre cuántos ítems hay en total (para el badge del dock). */
+  onItemsCountChange?: (count: number) => void;
 }
 
 // Catálogo de exámenes por categoría
@@ -62,49 +97,67 @@ const CATEGORIA_ID: Record<Categoria, number> = {
   otros: 3
 };
 
-const Examenes: React.FC<Props> = ({ isOpen, onClose, contexto, onSave }) => {
+interface ToastState {
+  msg: string;
+  undo?: () => void;
+}
+
+const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
+  { isOpen, onClose, contexto, onItemsCountChange },
+  ref
+) {
   // Estado general
   const [tab, setTab] = useState<Categoria>('laboratorio');
   const [items, setItems] = useState<ExamenItem[]>([]);
   const [nextId, setNextId] = useState(1);
-  const [startTime, setStartTime] = useState<number | null>(null);
-  const [lastAdded, setLastAdded] = useState<string | null>(null);
-  const [showPayload, setShowPayload] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Formulario
   const [nombre, setNombre] = useState('');
-  const [resultado, setResultado] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   // Referencias
   const nombreInputRef = useRef<HTMLInputElement>(null);
-  const resultadoInputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadAreaRef = useRef<HTMLDivElement>(null);
 
-  // Timer
-  useEffect(() => {
-    if (isOpen && !startTime) {
-      setStartTime(Date.now());
-    }
-    if (!isOpen) {
-      setStartTime(null);
-    }
-  }, [isOpen, startTime]);
+  /* ---------- handle expuesto al padre (getPayload / reset) ---------- */
+  useImperativeHandle(ref, () => ({
+    getPayload: () => {
+      const payload: ExamenesPayloadSalida = {};
 
-  const [timerText, setTimerText] = useState('0:00');
+      (['laboratorio', 'imagenologia', 'otros'] as Categoria[]).forEach((cat) => {
+        const catItems = items.filter((i) => i.categoria === cat);
+        if (catItems.length) {
+          payload[cat] = {
+            items: catItems.map((i) => ({
+              nombre_examen: i.nombre,
+              resultado: null,
+              observaciones: i.observaciones.trim() || null,
+              categoria_id: CATEGORIA_ID[cat],
+              archivos: i.archivos.map((a) => a.archivoObj),
+            })),
+          };
+        }
+      });
+
+      return Object.keys(payload).length ? payload : null;
+    },
+    reset: () => {
+      setItems([]);
+      setNombre('');
+      setObservaciones('');
+      setPendingFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    },
+  }));
+
+  // Notifica al padre el conteo total de ítems (para el badge del dock).
   useEffect(() => {
-    if (!startTime) return;
-    const interval = setInterval(() => {
-      const secs = Math.floor((Date.now() - startTime) / 1000);
-      const m = Math.floor(secs / 60);
-      const s = secs % 60;
-      setTimerText(`${m}:${String(s).padStart(2, '0')}`);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [startTime]);
+    onItemsCountChange?.(items.length);
+  }, [items, onItemsCountChange]);
 
   // Enfoque al abrir
   useEffect(() => {
@@ -116,7 +169,6 @@ const Examenes: React.FC<Props> = ({ isOpen, onClose, contexto, onSave }) => {
   // Resetear formulario al cambiar pestaña
   useEffect(() => {
     setNombre('');
-    setResultado('');
     setObservaciones('');
     setPendingFiles([]);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -129,24 +181,33 @@ const Examenes: React.FC<Props> = ({ isOpen, onClose, contexto, onSave }) => {
     otros: items.filter(i => i.categoria === 'otros').length,
   };
 
+  /* ---------- toast (con soporte de deshacer, igual que Receta.tsx) ---------- */
+  const showToast = (msg: string, undoFn?: () => void) => {
+    setToast({ msg, undo: undoFn });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3200);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
+
   // Agregar examen
   const agregarExamen = useCallback(() => {
     const trimmedNombre = nombre.trim();
     if (!trimmedNombre) {
-      setToastMessage('Ingrese el nombre del examen');
+      showToast('Ingrese el nombre del examen');
       nombreInputRef.current?.focus();
       return;
     }
-    if (!resultado.trim() && pendingFiles.length === 0) {
-      setToastMessage('Se necesita un resultado o al menos un archivo adjunto');
-      resultadoInputRef.current?.focus();
-      return;
-    }
+    // El campo resultado ya no existe en el formulario: siempre se
+    // envía null al componente padre (ver getPayload más arriba).
 
     const nuevo: ExamenItem = {
       id: nextId,
       nombre: trimmedNombre,
-      resultado: resultado.trim(),
       observaciones: observaciones.trim(),
       estado: true,
       archivos: pendingFiles.map(f => ({ nombre: f.name, archivoObj: f })),
@@ -154,30 +215,36 @@ const Examenes: React.FC<Props> = ({ isOpen, onClose, contexto, onSave }) => {
     };
     setItems(prev => [...prev, nuevo]);
     setNextId(prev => prev + 1);
-    setLastAdded(trimmedNombre);
 
-    // Limpiar campos (excepto nombre para rapidez)
-    setResultado('');
+    // Limpiar campos
+    setNombre('');
     setObservaciones('');
     setPendingFiles([]);
     if (fileInputRef.current) fileInputRef.current.value = '';
 
     // Enfocar de nuevo al nombre para agregar otro
     setTimeout(() => nombreInputRef.current?.focus(), 50);
-  }, [nombre, resultado, observaciones, pendingFiles, tab, nextId]);
+  }, [nombre, observaciones, pendingFiles, tab, nextId]);
 
-  // Duplicar último
-  const duplicarUltimo = useCallback(() => {
-    if (lastAdded) {
-      setNombre(lastAdded);
-      nombreInputRef.current?.focus();
-      setToastMessage('Nombre del último examen copiado');
-    }
-  }, [lastAdded]);
-
-  // Eliminar item
+  // Eliminar item — igual que Receta.tsx: quita la línea y muestra un
+  // toast con opción de "Deshacer" que la reinserta en su posición original.
   const eliminarItem = useCallback((id: number) => {
-    setItems(prev => prev.filter(item => item.id !== id));
+    setItems(prev => {
+      const idx = prev.findIndex(item => item.id === id);
+      if (idx < 0) return prev;
+      const removed = prev[idx];
+      const next = prev.filter(item => item.id !== id);
+
+      showToast('Examen eliminado', () => {
+        setItems(list => {
+          const copy = [...list];
+          copy.splice(idx, 0, removed);
+          return copy;
+        });
+      });
+
+      return next;
+    });
   }, []);
 
   // Manejo de archivos
@@ -210,26 +277,6 @@ const Examenes: React.FC<Props> = ({ isOpen, onClose, contexto, onSave }) => {
     }
   }, [agregarArchivos]);
 
-  // Guardar (llama a onSave con los items)
-  const guardarExamenes = useCallback(() => {
-    if (items.length === 0) {
-      setToastMessage('Agrega al menos un examen antes de guardar');
-      return;
-    }
-    if (onSave) {
-      onSave(items);
-    }
-    onClose();
-  }, [items, onSave, onClose]);
-
-  // Toast (auto‑cierre)
-  useEffect(() => {
-    if (toastMessage) {
-      const timer = setTimeout(() => setToastMessage(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toastMessage]);
-
   // Atajos de teclado
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -245,15 +292,10 @@ const Examenes: React.FC<Props> = ({ isOpen, onClose, contexto, onSave }) => {
         setTab(map[e.key]);
         return;
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        guardarExamenes();
-        return;
-      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose, guardarExamenes]);
+  }, [isOpen, onClose]);
 
   // Renderizar chips
   const chipsDisponibles = CHIPS[tab] || [];
@@ -276,11 +318,10 @@ const Examenes: React.FC<Props> = ({ isOpen, onClose, contexto, onSave }) => {
             )}
           </div>
           <div className={styles.t2}>
-            {item.resultado ? item.resultado.substring(0, 50) : 'Solo archivo adjunto'}
+            {item.archivos.length > 0 ? `${item.archivos.length} archivo(s) adjunto(s)` : 'Sin archivos adjuntos'}
           </div>
         </div>
-        <div className={styles.resultBadge}>Con resultado</div>
-        <button className={styles.rm} onClick={() => eliminarItem(item.id)}>
+        <button type="button" className={styles.rm} title="Eliminar" onClick={() => eliminarItem(item.id)}>
           <i className="fas fa-trash"></i>
         </button>
       </div>
@@ -304,14 +345,10 @@ const Examenes: React.FC<Props> = ({ isOpen, onClose, contexto, onSave }) => {
     ));
   };
 
-  // Determinar clase del timer
-  let timerClass = styles.timerPill;
-  if (startTime) {
-    const secs = Math.floor((Date.now() - startTime) / 1000);
-    if (secs >= 90) timerClass = `${styles.timerPill} ${styles.red}`;
-    else if (secs >= 45) timerClass = `${styles.timerPill} ${styles.amber}`;
-  }
-
+  // IMPORTANTE: este return-null solo oculta el contenido renderizado.
+  // El componente sigue MONTADO (sus hooks/estado siguen vivos) mientras
+  // el padre lo mantenga en el árbol sin envolverlo en `isOpen && (...)`.
+  // Así es como los ítems sobreviven a abrir/cerrar el drawer.
   if (!isOpen) return null;
 
   return (
@@ -323,13 +360,12 @@ const Examenes: React.FC<Props> = ({ isOpen, onClose, contexto, onSave }) => {
       <div className={styles.drawer}>
         {/* Header */}
         <div className={styles.drawerHead}>
-          <div className={styles.ico}><i className="fas fa-flask"></i></div>
-          <div className={styles.titles}>
+<div className={styles.ico}><FontAwesomeIcon icon={faFlaskVial} /></div>
+          <div className={styles.titles}>          
             <h3>Exámenes complementarios</h3>
-            <p>Registre estudios realizados previamente o solicitados como apoyo al diagnóstico.</p>
             <div className={styles.ctx}>
               <span>Paciente: <b>{contexto.paciente_nombre}</b></span>
-              <span>Registro clínico: <b>{contexto.registro_numero}</b></span>
+              
               <span>Médico: <b>{contexto.medico_nombre}</b></span>
             </div>
           </div>
@@ -395,7 +431,7 @@ const Examenes: React.FC<Props> = ({ isOpen, onClose, contexto, onSave }) => {
                   onKeyDown={e => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
-                      resultadoInputRef.current?.focus();
+                      agregarExamen();
                     }
                   }}
                 />
@@ -404,29 +440,6 @@ const Examenes: React.FC<Props> = ({ isOpen, onClose, contexto, onSave }) => {
                 </datalist>
                 <div className={styles.formHint}>
                   Puede escribir un examen que no esté en la lista si es necesario.
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.formRow}>
-              <div className={`${styles.formGroup} ${styles.full}`}>
-                <label htmlFor="resultado_examen">Resultado <span className={styles.required}>*</span></label>
-                <textarea
-                  ref={resultadoInputRef}
-                  id="resultado_examen"
-                  rows={3}
-                  placeholder="Ingrese el resultado (puede dictarlo con el micrófono del teclado)… o deje vacío si va a adjuntar un archivo con el resultado"
-                  value={resultado}
-                  onChange={e => setResultado(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && e.ctrlKey) {
-                      e.preventDefault();
-                      agregarExamen();
-                    }
-                  }}
-                />
-                <div className={styles.formHint}>
-                  Se necesita resultado o al menos un archivo adjunto — este registro es para exámenes ya realizados.
                 </div>
               </div>
             </div>
@@ -486,9 +499,6 @@ const Examenes: React.FC<Props> = ({ isOpen, onClose, contexto, onSave }) => {
               <button className={styles.btnAddExam} onClick={agregarExamen}>
                 <i className="fas fa-plus"></i> Agregar examen <kbd>Enter</kbd>
               </button>
-              <button className={styles.btnDup} onClick={duplicarUltimo} disabled={!lastAdded}>
-                <i className="fas fa-clone"></i> Repetir último
-              </button>
             </div>
           </div>
 
@@ -497,38 +507,26 @@ const Examenes: React.FC<Props> = ({ isOpen, onClose, contexto, onSave }) => {
             {renderItemList()}
           </div>
         </div>
-
-        {/* Footer */}
-        <div className={styles.drawerFoot}>
-          <div className={timerClass}>
-            <span className={styles.dot}></span>
-            <span>{timerText}</span>
-          </div>
-          <div className={styles.countSummary}>
-            <span><b>{counts.laboratorio}</b> laboratorio</span>
-            <span><b>{counts.imagenologia}</b> imagenología</span>
-            <span><b>{counts.otros}</b> otros</span>
-          </div>
-          <div className={styles.footActions}>
-            <button className={styles.btnGhost} onClick={() => window.print()}>
-              <i className="fas fa-print"></i> Imprimir
-            </button>
-            <button className={styles.btnSaveModern} onClick={guardarExamenes}>
-              <i className="fas fa-signature"></i> Guardar exámenes <kbd>Ctrl+Enter</kbd>
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Toast */}
-      {toastMessage && (
+      {toast && (
         <div className={styles.toast}>
-          <span>{toastMessage}</span>
-          <button onClick={() => setToastMessage(null)}>Cerrar</button>
+          <span>{toast.msg}</span>
+          {toast.undo && (
+            <button
+              onClick={() => {
+                toast.undo?.();
+                setToast(null);
+              }}
+            >
+              Deshacer
+            </button>
+          )}
         </div>
       )}
     </>
   );
-};
+});
 
 export default Examenes;

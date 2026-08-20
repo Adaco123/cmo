@@ -12,6 +12,7 @@ export type CategoriaExamenNombre = 'Laboratorio' | 'Imagenología' | 'Otro';
 export interface ExamenComplementarioItemPayload {
   categoria: CategoriaExamenNombre;
   nombre_examen: string;
+  resultado?: string | null;
   observaciones?: string | null;
 }
 

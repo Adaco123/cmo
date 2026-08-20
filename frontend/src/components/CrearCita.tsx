@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createCita, type CitaPayload } from '../api/citas';
-import './CrearCita.css';
+import styles from './CrearCita.module.css';
 
 interface CrearCitaProps {
   paciente?: { id?: number | null; nombres?: string; apellidos?: string } | null;
@@ -85,24 +85,28 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
   };
 
   return (
-    <div className="container historia-modal">
-      
+    <div className={`${styles.container} ${styles['historia-modal']}`}>
+      {onClose && (
+        <button type="button" className={styles['close-btn']} onClick={onClose} aria-label="Cerrar">
+          &times;
+        </button>
+      )}
 
-      <div className="header">
+      <div className={styles.header}>
         <i className="fas fa-calendar-plus"></i>
         <h1>Agendar Cita</h1>
         <span>{folio}</span>
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div className="section">
-          <div className="section-title">
+        <div className={styles.section}>
+          <div className={styles['section-title']}>
             <i className="fas fa-user"></i>
             Datos de la Cita
           </div>
 
-          <div className="row row-2">
-            <div className="field-group">
+          <div className={`${styles.row} ${styles['row-2']}`}>
+            <div className={styles['field-group']}>
               <label htmlFor="estado_id">Estado *</label>
               <select
                 id="estado_id"
@@ -119,8 +123,8 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
             </div>
           </div>
 
-          <div className="row row-2">
-            <div className="field-group">
+          <div className={`${styles.row} ${styles['row-2']}`}>
+            <div className={styles['field-group']}>
               <label htmlFor="fecha">Fecha *</label>
               <input
                 type="date"
@@ -131,7 +135,7 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
                 required
               />
             </div>
-            <div className="field-group">
+            <div className={styles['field-group']}>
               <label htmlFor="hora_inicio">Hora inicio *</label>
               <input
                 type="time"
@@ -144,7 +148,7 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
             </div>
           </div>
 
-          <div className="field-group" style={{ marginTop: '1.2rem' }}>
+          <div className={styles['field-group']} style={{ marginTop: '1.2rem' }}>
             <label htmlFor="motivo">Motivo de la Cita *</label>
             <textarea
               id="motivo"
@@ -158,7 +162,7 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
           </div>
         </div>
 
-        <button type="submit" className="btn-save-modern" disabled={loading}>
+        <button type="submit" className={styles['btn-save-modern']} disabled={loading}>
           {loading ? (
             <>
               <i className="fas fa-spinner fa-spin"></i> Guardando...

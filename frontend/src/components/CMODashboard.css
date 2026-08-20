@@ -5,35 +5,12 @@
   box-sizing: border-box;
 }
 
-:root {
-  --cmo-primary: #2E6FB8;
-  --cmo-secondary: #D62F2F;
-  --cmo-accent: #4EA3FF;
-  --bg-deep: #080D1A;
-  --bg-surface: #0E1B2E;
-  --bg-card: rgba(22, 38, 62, 0.55);
-  --text-primary: #FFFFFF;
-  --text-secondary: #94A3B8;
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-glow: rgba(78, 163, 255, 0.25);
-  --shadow-card: 0 12px 40px rgba(0, 0, 0, 0.45);
-  --shadow-btn: 0 4px 20px rgba(214, 47, 47, 0.4);
-  --shadow-hover: 0 20px 50px rgba(0, 0, 0, 0.6);
-  --radius-sm: 12px;
-  --radius-md: 20px;
-  --radius-lg: 28px;
-  --radius-xl: 48px;
-  --transition-fast: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-smooth: 0.45s cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-spring: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-  --status-active: #10B981;
-  --status-inactive: #EF4444;
-}
+
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  background: var(--bg-deep);
-  color: var(--text-secondary);
+  background: var(--bg-body);
+  color: var(--text-main);
   line-height: 1.6;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
@@ -353,9 +330,11 @@ body {
 }
 
 .sidebar-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 20px; margin-top: 20px;
+  background: #B0C8DA;
+  border-top: 1px solid var(--border-color);
+  padding: 20px 16px 12px; margin-top: 20px;
   display: flex; align-items: center; gap: 14px;
+  border-radius: 16px 16px 0 0;
 }
 
 .sidebar-footer .avatar {
@@ -496,18 +475,18 @@ body {
 }
 
 .action-btn.primary {
-  background: linear-gradient(135deg, var(--cmo-secondary), #9b1b1b);
-  color: #fff; box-shadow: 0 6px 28px rgba(214, 47, 47, 0.4);
+  background: linear-gradient(135deg, #14b8a6, #2dd4bf);
+  color: #fff; box-shadow: 0 6px 28px rgba(20, 184, 166, 0.35);
 }
 
 .action-btn.secondary {
-  background: linear-gradient(135deg, var(--cmo-primary), #164275);
-  color: #fff; box-shadow: 0 6px 28px rgba(46, 111, 184, 0.4);
+  background: linear-gradient(135deg, #14b8a6, #2dd4bf);
+  color: #fff; box-shadow: 0 6px 28px rgba(20, 184, 166, 0.25);
 }
 
 .action-btn:hover {
   transform: translateY(-4px) scale(1.03);
-  box-shadow: 0 12px 36px rgba(78, 163, 255, 0.35);
+  box-shadow: 0 12px 36px rgba(20, 184, 166, 0.26);
 }
 
 /* ── Table Card ── */
@@ -756,19 +735,19 @@ body {
 
 .setting-item select:focus { border-color: var(--cmo-accent); outline: none; }
 .setting-item select option { background: var(--bg-surface); color: #fff; }
-/* ── Botón Glow → ahora integrado con el resto de la UI ── */
+/* ── Botón Glow → ahora integrado con la paleta del login ── */
 .glow-btn {
-  border: 1px solid rgba(78, 163, 255, 0.35);
+  border: 1px solid rgba(20, 184, 166, 0.45);
   padding: 0.75em 1.8em;
   color: #ffffff;
   font-size: 13.5px;
   font-weight: 600;
-  background: rgba(78, 163, 255, 0.1);
+  background: linear-gradient(135deg, #14b8a6, #2dd4bf);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: var(--radius-xl);
   outline: none;
-  box-shadow: none;
+  box-shadow: 0 8px 20px rgba(20, 184, 166, 0.2);
   text-shadow: none;
   position: relative;
   transition: all var(--transition-fast);
@@ -781,15 +760,15 @@ body {
 }
 
 .glow-btn:hover {
-  background: rgba(78, 163, 255, 0.2);
-  border-color: var(--cmo-accent);
-  box-shadow: 0 0 0 4px rgba(78, 163, 255, 0.12), 0 8px 24px rgba(46, 111, 184, 0.25);
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+  border-color: rgba(20, 184, 166, 0.7);
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12), 0 10px 28px rgba(20, 184, 166, 0.28);
   transform: translateY(-2px);
 }
 
 .glow-btn:active {
   transform: translateY(0);
-  box-shadow: 0 0 0 4px rgba(78, 163, 255, 0.12);
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12);
 }
 /* ── Scrollbars ── */
 .mt-20 { margin-top: 20px; }

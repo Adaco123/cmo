@@ -1,0 +1,802 @@
+/* ============================================================
+   RegistroClinicoDetalle.module.css
+   ------------------------------------------------------------
+   Lenguaje visual: "HUD médico". Todo el registro vive dentro de
+   un panel con esquinas tipo visor y una franja de "gauges" (SVG)
+   para los signos vitales — presión, frecuencia cardíaca y
+   respiratoria, saturación, temperatura y glicemia — más una
+   franja compacta para peso/talla/IMC.
+
+   Las notas clínicas (alergias, examen físico, enfermedad actual,
+   tratamiento, consulta control, observaciones) van en tarjetas
+   sueltas; alergias usa la variante de alerta.
+
+   Exámenes complementarios usa un "visor" tipo carrete: imagen
+   principal + tira de miniaturas + zoom a pantalla completa.
+
+   Solo se usan tokens ya definidos en index.css (los mismos del
+   módulo anterior): --bg-card, --bg-input, --border-color,
+   --text-main, --text-muted, --primary, --primary-light,
+   --status-inactive, --radius-sm/md/xl, --shadow-card,
+   --transition-fast, --accent, --sans, --mono.
+   ============================================================ */
+
+.container * {
+  box-sizing: border-box;
+}
+
+.container {
+  color: var(--text-main);
+  font-family: var(--sans);
+}
+
+/* ============================================================
+   Panel HUD
+   ============================================================ */
+.hud {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 26px;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+.corners span {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: var(--primary);
+  border-style: solid;
+  border-width: 0;
+  opacity: 0.75;
+}
+
+.cTl { top: 10px; left: 10px; border-top-width: 2px; border-left-width: 2px; border-top-left-radius: 5px; }
+.cTr { top: 10px; right: 10px; border-top-width: 2px; border-right-width: 2px; border-top-right-radius: 5px; }
+.cBl { bottom: 10px; left: 10px; border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 5px; }
+.cBr { bottom: 10px; right: 10px; border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 5px; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.regId {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.regId .sep {
+  opacity: 0.4;
+}
+
+.liveBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  padding: 5px 12px;
+  border-radius: var(--radius-xl);
+}
+
+.pulseDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  animation: pulse 1.8s infinite;
+}
+
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* ============================================================
+   Encabezado
+   ============================================================ */
+.headline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.headlineTitle {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--text-main);
+}
+
+.headlineFecha {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.motivo {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  margin: 0 0 24px;
+}
+
+/* ============================================================
+   Encabezados de sub-sección (eyebrow con línea)
+   ============================================================ */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.eyebrow::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, color-mix(in srgb, var(--primary) 40%, transparent), transparent);
+}
+
+.vacio {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  opacity: 0.75;
+  padding: 2px 0 4px;
+}
+
+/* ============================================================
+   Signos vitales — gauges SVG
+   ============================================================ */
+.vitalsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.gaugeTile {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 13px 10px 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.gaugeTile:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+}
+
+.gaugeTile.warn {
+  border-color: color-mix(in srgb, var(--status-inactive) 45%, var(--border-color));
+}
+
+.gaugeWrap {
+  position: relative;
+  width: 70px;
+  height: 70px;
+}
+
+.gaugeWrap svg {
+  transform: rotate(-90deg);
+}
+
+.gaugeTrack {
+  fill: none;
+  stroke: var(--border-color);
+  stroke-width: 7;
+}
+
+.gaugeValue {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 7;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.gaugeTile.warn .gaugeValue {
+  stroke: var(--status-inactive);
+}
+
+.gaugeCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.gaugeNum {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.gaugeUnit {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.gaugeLabel {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ---- Tensión arterial ---- */
+.paTile {
+  grid-column: span 2;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+@media (min-width: 480px) {
+  .paTile { grid-column: span 1; }
+}
+
+.paHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.paHead .gaugeNum {
+  font-size: 17px;
+}
+
+.paBars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.paBar {
+  height: 4px;
+  border-radius: 3px;
+  background: var(--border-color);
+  overflow: hidden;
+}
+
+.paBar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--primary);
+}
+
+/* ---- Peso / talla / IMC ---- */
+.bioStrip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.bioCell {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.bioCell .val {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 14.5px;
+  color: var(--text-main);
+}
+
+.bioCell .lab {
+  font-size: 9.5px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ============================================================
+   Notas clínicas
+   ============================================================ */
+.notesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.noteCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 13px 15px;
+}
+
+.noteCard.alerta {
+  border-color: color-mix(in srgb, var(--status-inactive) 45%, transparent);
+  background: color-mix(in srgb, var(--status-inactive) 8%, var(--bg-card));
+}
+
+.noteHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.noteCard.alerta .noteHead {
+  color: var(--status-inactive);
+}
+
+.noteBody {
+  font-size: 13px;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+/* ============================================================
+   Exámenes complementarios — visor tipo carrete
+   ============================================================ */
+.examCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 18px 20px 20px;
+  margin-bottom: 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.examCard::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--primary-gradient);
+}
+
+.examHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.examNombre {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.examCategoria {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  padding: 3px 10px;
+  border-radius: var(--radius-xl);
+  white-space: nowrap;
+}
+
+.examResultado {
+  font-size: 13px;
+  color: var(--text-main);
+  margin: 6px 0 2px;
+  line-height: 1.5;
+}
+
+.examObs {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.visor {
+  margin-top: 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px;
+}
+
+.visorMain {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-card);
+  cursor: zoom-in;
+  border: none;
+  padding: 0;
+  width: 100%;
+  display: block;
+}
+
+.visorMain img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s ease;
+}
+
+.visorMain:hover img {
+  transform: scale(1.035);
+}
+
+.visorBadge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--text-main);
+  background: color-mix(in srgb, var(--bg-input) 88%, transparent);
+  border: 1px solid var(--border-color);
+  padding: 3px 9px;
+  border-radius: var(--radius-xl);
+}
+
+.visorExpand {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--bg-input) 90%, transparent);
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.visorExpand:hover {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.visorThumbs {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.visorThumb {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  background: var(--bg-card);
+  transition: border-color var(--transition-fast), opacity var(--transition-fast);
+  opacity: 0.65;
+}
+
+.visorThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.visorThumb:hover {
+  opacity: 1;
+}
+
+.visorThumb.active {
+  border-color: var(--primary);
+  opacity: 1;
+}
+
+/* ---- lightbox a pantalla completa ---- */
+.lightboxOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: color-mix(in srgb, var(--text-main) 75%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  animation: lightboxIn 0.18s ease;
+}
+
+@keyframes lightboxIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.lightboxImg {
+  max-width: min(88vw, 1000px);
+  max-height: 76vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-card);
+}
+
+.lightboxCaption {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: #eaf4f7;
+  font-size: 13px;
+}
+
+.lightboxCaption span:first-child {
+  font-family: var(--mono);
+  font-weight: 600;
+}
+
+.lightboxDownload {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary-light);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+.lightboxDownload:hover {
+  text-decoration: underline;
+}
+
+.lightboxClose {
+  position: absolute;
+  top: 22px;
+  right: 26px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transition: background var(--transition-fast);
+}
+
+.lightboxClose:hover {
+  background: var(--bg-card-hover);
+}
+
+/* ============================================================
+   Recetas
+   ============================================================ */
+.recetaCard {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+
+.recetaCard:last-child {
+  margin-bottom: 0;
+}
+
+.indicaciones {
+  font-size: 13px;
+  color: var(--text-main);
+  font-style: italic;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.bloqueReceta + .bloqueReceta {
+  margin-top: 12px;
+}
+
+.bloqueLabel {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.itemReceta {
+  font-size: 13px;
+  color: var(--text-main);
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+}
+
+.itemReceta:last-child {
+  margin-bottom: 0;
+}
+
+.itemIndicaciones {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+
+.tagUrgente {
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--status-inactive);
+  background: color-mix(in srgb, var(--status-inactive) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-inactive) 40%, transparent);
+  padding: 2px 8px;
+  border-radius: var(--radius-xl);
+}
+
+/* ============================================================
+   Seguimientos de control — timeline vertical
+   ============================================================ */
+.seguimientoCard {
+  position: relative;
+  padding-left: 26px;
+  padding-bottom: 24px;
+  border-left: 2px solid color-mix(in srgb, var(--primary) 35%, var(--border-color));
+  margin-left: 6px;
+}
+
+.seguimientoCard:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+
+.seguimientoCard::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 2.5px solid var(--primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.seguimientoHead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.seguimientoHead b {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+.seguimientoHead span {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  padding: 2px 9px;
+  border-radius: var(--radius-xl);
+}
+
+.seguimientoCard > p {
+  font-size: 13px;
+  color: var(--text-main);
+  line-height: 1.55;
+  margin-bottom: 12px;
+}
+
+section.section,
+.section {
+  margin-bottom: 28px;
+}
+
+.section:last-of-type {
+  margin-bottom: 0;
+}
+
+/* ============================================================
+   Estado de carga / error
+   ============================================================ */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
+
+.emptyState svg {
+  font-size: 1.8rem;
+  opacity: 0.5;
+}
+
+@media (max-width: 640px) {
+  .hud { padding: 20px 16px; }
+  .vitalsGrid { grid-template-columns: repeat(2, 1fr); }
+  .paTile { grid-column: span 2; }
+}

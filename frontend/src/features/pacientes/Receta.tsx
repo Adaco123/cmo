@@ -7,11 +7,10 @@ import React, {
   useState,
   forwardRef,
 } from "react";
-import "./Receta.css";
+import styles from "./Receta.module.css";
+import RecetaImprimir from "../../assets/mosol.png"
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faCakeCandles,
-  faCalendarDay,
   faFileMedical,
   faFlaskVial,
   faMortarPestle,
@@ -19,13 +18,17 @@ import {
   faPills,
   faPlus,
   faPrescriptionBottle,
-  faPrint,
-  faSignature,
   faTrash,
   faTriangleExclamation,
-  faUser,
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
+
+/* ============================================================
+   Helper para combinar clases del CSS Module
+   ============================================================ */
+const cx = (...classes: Array<string | false | null | undefined>) =>
+  classes.filter(Boolean).join(" ");
+
 /* ============================================================
    Tipos
    ============================================================ */
@@ -121,7 +124,7 @@ const MED_DB: DBItem[] = [
   { n: "Cetirizina", s: "Cetirizina 10mg VO c/24h x10d" },
   { n: "Metoclopramida", s: "Metoclopramida 10mg VO c/8h x3d" },
 ];
-const MED_CHIPS = [ "Diclofenaco", "Azitromicina", "Complejo B"];
+const MED_CHIPS = ["Diclofenaco", "Azitromicina", "Complejo B"];
 
 const EXAM_DB: DBItem[] = [
   { n: "Hemograma completo", s: "Hemograma completo" },
@@ -157,7 +160,7 @@ const PLACEHOLDER: Record<Tab, string> = {
   examenes: "Hemograma completo, urgente",
   formulas: "Crema betametasona 0.1% + ác. salicílico 3% c.s.p 30g, tópico c/12h x10d",
 };
-const TITLES: Record<Tab, string> = { medicamentos: "Medicamentos", examenes: "Exámenes complementarios", formulas: "Fórmulas magistrales" };
+const TITLES: Record<Tab, string> = { medicamentos: "Medicamentos", examenes: "Exámenes", formulas: "Fórmulas magistrales" };
 const TIPO_ID: Record<Tab, number> = { medicamentos: 1, examenes: 2, formulas: 3 };
 
 const CLINICA = { nombre: "Centro Médico Oruro", direccion: "Av. 6 de Agosto · Oruro, Bolivia" };
@@ -215,7 +218,7 @@ function parseMed(raw: string): Omit<MedItem, "id"> {
   if (dm) { duracion = `${dm[1]} días`; work = work.replace(dm[0], " "); }
   else if (/dosis\s?[úu]nica/i.test(work)) { duracion = "Dosis única"; work = work.replace(/dosis\s?[úu]nica/i, " "); }
 
-  let nombre = work.replace(/[+|,/-]+/g, " ").replace(/\s{2,}/g, " ").trim();
+  let nombre = work.replace(/[+|,\/-]+/g, " ").replace(/\s{2,}/g, " ").trim();
   if (!nombre) nombre = text;
 
   const horario = scheduleFromFrequency(frecuencia);
@@ -254,6 +257,14 @@ interface RecetaProps {
   pacienteCi?: string;
   alergias?: string;
   medicoNombre?: string;
+  diagnostico?: string;
+  /**
+   * Se dispara cada vez que cambia la lista de medicamentos recetados
+   * (agregar, eliminar, deshacer, reset). El padre (RegistroClinico.tsx)
+   * usa esto para llenar automáticamente el campo "Tratamiento", que en
+   * ese formulario es de solo lectura.
+   */
+  onTratamientoChange?: (texto: string) => void;
 }
 
 const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
@@ -265,6 +276,8 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
     pacienteCi = "—",
     alergias = "",
     medicoNombre = "Dr. Miguel",
+    diagnostico = "",
+    onTratamientoChange,
   }: RecetaProps,
   ref
 ): React.ReactElement {
@@ -285,6 +298,11 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ---- impresión con membrete CMO (solo categoría medicamentos) ----
+  const [imprimirCMO, setImprimirCMO] = useState(false);
+  // ---- vista previa del membrete CMO antes de imprimir ----
+  const [showPreviewCMO, setShowPreviewCMO] = useState(false);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   const fecha = useMemo(
@@ -292,10 +310,38 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
     []
   );
 
+  const fechaPartes = useMemo(() => {
+    const d = new Date();
+    return {
+      dia: String(d.getDate()).padStart(2, "0"),
+      mes: String(d.getMonth() + 1).padStart(2, "0"),
+      anio: String(d.getFullYear()),
+    };
+  }, []);
+
   const itemsOfTab = useCallback(
     (t: Tab): AnyItem[] => (t === "medicamentos" ? medicamentos : t === "examenes" ? examenes : formulas),
     [medicamentos, examenes, formulas]
   );
+
+  /* ---------- texto de tratamiento derivado de medicamentos ----------
+     Se usa para alimentar a RegistroClinico.tsx (campo "Tratamiento",
+     de solo lectura ahí). Formato: "1. Nombre dosis — vía · frecuencia · duración" */
+  const buildTratamientoTexto = useCallback((meds: MedItem[]): string => {
+    if (!meds.length) return "";
+    return meds
+      .map((m, i) => {
+        const dosis = m.dosis ? ` ${m.dosis}` : "";
+        const partes = [m.via, m.frecuencia, m.duracion].filter(Boolean).join(" · ");
+        return `${i + 1}. ${m.nombre}${dosis}${partes ? " — " + partes : ""}`;
+      })
+      .join("\n");
+  }, []);
+
+  useEffect(() => {
+    onTratamientoChange?.(buildTratamientoTexto(medicamentos));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [medicamentos]);
 
   /* ---------- handle expuesto al padre (getPayload / reset) ---------- */
   useImperativeHandle(ref, () => ({
@@ -482,8 +528,6 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
 
   /* ---------- cerrar drawer (abrirlo ahora lo controla el padre) ---------- */
   const closeDrawer = () => {
-    const total = medicamentos.length + examenes.length + formulas.length;
-    if (total && !window.confirm("¿Cerrar sin guardar la receta?")) return;
     onClose();
   };
 
@@ -506,21 +550,38 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
         switchTab(t);
       }
       if (e.ctrlKey && e.key.toLowerCase() === "z") { e.preventDefault(); undoLast(); }
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); handleFinish(); }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, tab, medicamentos, examenes, formulas, inputValue]);
 
-  /* ---------- acciones finales ---------- */
-  const handlePrint = () => window.print();
+  /* ---------- impresión con membrete CMO ----------
+     Inyectamos un <style> con @page en orientación horizontal
+     porque la plantilla (1435x1096) es apaisada, y lo quitamos
+     apenas termina la impresión para no afectar otras impresiones
+     de la app. */
+    const handleImprimirCMO = () => {
+    const pageStyle = document.createElement("style");
+    pageStyle.id = "cmo-print-page-style";
+    pageStyle.innerHTML = "@page { size: 14.94in 11.41in; margin: 0; }";
+    document.head.appendChild(pageStyle);
 
-  const handleFinish = () => {
-    const total = medicamentos.length + examenes.length + formulas.length;
-    if (!total) { showToast("Agrega al menos una línea antes de guardar"); return; }
-    window.print();
+    setImprimirCMO(true);
+    setTimeout(() => {
+      window.print();
+    }, 50);
   };
+
+  useEffect(() => {
+    const onAfterPrint = () => {
+      setImprimirCMO(false);
+      const pageStyle = document.getElementById("cmo-print-page-style");
+      if (pageStyle) pageStyle.remove();
+    };
+    window.addEventListener("afterprint", onAfterPrint);
+    return () => window.removeEventListener("afterprint", onAfterPrint);
+  }, []);
 
   const handleChipClick = (label: string) => {
     const dbItem = DB[tab].find((d) => d.n === label);
@@ -545,21 +606,21 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
       t2 = [f.ingredientes, f.via, f.freqDur].filter(Boolean).join(" · ");
     }
     return (
-      <div className="ticket-line" key={it.id}>
-        <div className="num">{i + 1}</div>
-        <div className="body">
-          <div className="t1">{t1}</div>
-          {t2 && <div className="t2">{t2}</div>}
+      <div className={styles["ticket-line"]} key={it.id}>
+        <div className={styles.num}>{i + 1}</div>
+        <div className={styles.body}>
+          <div className={styles.t1}>{t1}</div>
+          {t2 && <div className={styles.t2}>{t2}</div>}
         </div>
         {tab === "examenes" && (
           <div
-            className={`urgency-badge ${(it as ExamItem).urgencia}`}
+            className={cx(styles["urgency-badge"], styles[(it as ExamItem).urgencia])}
             onClick={() => toggleUrgency(it.id)}
           >
             {(it as ExamItem).urgencia}
           </div>
         )}
-        <button type="button" className="rm" title="Eliminar" onClick={() => removeItem(tab, it.id)}>
+        <button type="button" className={styles.rm} title="Eliminar" onClick={() => removeItem(tab, it.id)}>
           <FontAwesomeIcon icon={faTrash} />
         </button>
       </div>
@@ -573,31 +634,31 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
         const t1 = it.nombre + (it.dosis ? " " + it.dosis : "");
         const meta = [it.via, it.frecuencia, it.duracion].filter(Boolean).join(" · ");
         return (
-          <div className="rx-item" key={it.id}>
-            <span className="idx">{i + 1}.</span>
+          <div className={styles["rx-item"]} key={it.id}>
+            <span className={styles.idx}>{i + 1}.</span>
             {t1}
-            {meta && <div className="meta">{meta}</div>}
-            {it.horario && <div className="meta">Horario sugerido: {it.horario.join(" · ")}</div>}
+            {meta && <div className={styles.meta}>{meta}</div>}
+            {it.horario && <div className={styles.meta}>Horario sugerido: {it.horario.join(" · ")}</div>}
           </div>
         );
       })
     ) : (
-      <div className="paper-empty">Sin ítems aún</div>
+      <div className={styles["paper-empty"]}>Sin ítems aún</div>
     );
 
   const renderPaperExam = () =>
     examenes.length ? (
       examenes.map((it, i) => (
-        <div className="rx-item" key={it.id}>
-          <span className="idx">{i + 1}.</span>
+        <div className={styles["rx-item"]} key={it.id}>
+          <span className={styles.idx}>{i + 1}.</span>
           {it.nombre}
           {it.urgencia === "urgente" && (
-            <span style={{ color: "var(--secondary)", fontWeight: 700 }}> (URGENTE)</span>
+            <span style={{ color: "var(--status-inactive)", fontWeight: 700 }}> (URGENTE)</span>
           )}
         </div>
       ))
     ) : (
-      <div className="paper-empty">Sin ítems aún</div>
+      <div className={styles["paper-empty"]}>Sin ítems aún</div>
     );
 
   const renderPaperForm = () =>
@@ -605,82 +666,193 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
       formulas.map((it, i) => {
         const meta = [it.ingredientes, it.via, it.freqDur].filter(Boolean).join(" · ");
         return (
-          <div className="rx-item" key={it.id}>
-            <span className="idx">{i + 1}.</span>
+          <div className={styles["rx-item"]} key={it.id}>
+            <span className={styles.idx}>{i + 1}.</span>
             {it.nombre}
-            {meta && <div className="meta">{meta}</div>}
+            {meta && <div className={styles.meta}>{meta}</div>}
           </div>
         );
       })
     ) : (
-      <div className="paper-empty">Sin ítems aún</div>
+      <div className={styles["paper-empty"]}>Sin ítems aún</div>
     );
+
+  /* ---------- contenido superpuesto al membrete CMO ----------
+     Compartido entre la vista previa en pantalla (modal) y la
+     impresión final, para que ambos se vean idénticos. Usa la
+     categoría (pestaña) activa — así cada categoría se imprime
+     por separado: el doctor llena medicamentos, imprime con
+     membrete, cambia a exámenes, imprime de nuevo, etc.
+
+     En la pestaña de EXÁMENES, además de la lista de ítems, se
+     agrega al final (parte de abajo, después de todos los
+     exámenes) el diagnóstico del paciente, tomado de
+     RegistroClinico.tsx a través del prop `diagnostico`. */
+  const renderCmoItems = () => {
+  const list = itemsOfTab(tab);
+
+  const header = (
+    <div className={styles["cmo-rp-header"]}>
+      <div className={styles["cmo-rp-header-name"]}>
+        <strong>Paciente:</strong> {pacienteNombre}
+      </div>
+      <div className={styles["cmo-rp-header-age"]}>
+        <strong>Edad:</strong> {pacienteEdad}
+      </div>
+    </div>
+  );
+
+  if (tab === "examenes") {
+    const items = list as ExamItem[];
+    return (
+      <>
+        {header}
+        {items.length ? (
+          items.map((it, i) => (
+            <div key={it.id} className={styles["cmo-rp-line"]}>
+              {i + 1}. {it.nombre}
+              {it.urgencia === "urgente" && <span className={styles["cmo-rp-meta"]}> — URGENTE</span>}
+            </div>
+          ))
+        ) : (
+          <div className={styles["cmo-rp-line"]}>Sin exámenes</div>
+        )}
+      </>
+    );
+  }
+
+  if (!list.length) {
+    return (
+      <>
+        {header}
+        <div className={styles["cmo-rp-line"]}>Sin {TITLES[tab].toLowerCase()}</div>
+      </>
+    );
+  }
+
+  if (tab === "medicamentos") {
+    return (
+      <>
+        {header}
+        {(list as MedItem[]).map((m, i) => {
+          const instrucciones = [m.via, m.frecuencia, m.duracion].filter(Boolean).join(" · ");
+          return (
+            <div key={m.id} className={styles["cmo-rp-med-row"]}>
+              <div className={styles["cmo-rp-med-col-left"]}>
+                <span className={styles["cmo-rp-num"]}>{i + 1}.</span>
+                <span className={styles["cmo-rp-med-name"]}>
+                  {m.nombre}
+                  {m.dosis ? ` ${m.dosis}` : ""}
+                </span>
+              </div>
+              <div className={styles["cmo-rp-med-col-right"]}>
+                {instrucciones && <div className={styles["cmo-rp-instrucciones"]}>{instrucciones}</div>}
+                {m.horario && m.horario.length > 0 && (
+                  <div className={styles["cmo-rp-horario"]}>🕐 {m.horario.join(" · ")}</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {header}
+      {(list as FormItem[]).map((it, i) => {
+        const meta = [it.ingredientes, it.via, it.freqDur].filter(Boolean).join(" · ");
+        return (
+          <div key={it.id} className={styles["cmo-rp-line"]}>
+            {i + 1}. {it.nombre}
+            {meta && <span className={styles["cmo-rp-meta"]}> — {meta}</span>}
+          </div>
+        );
+      })}
+    </>
+  );
+};
+
+  const renderCmoRp = () => (
+  <>
+    <div className={styles["cmo-rp"]}>{renderCmoItems()}</div>
+    {tab === "examenes" && (
+      <div className={styles["cmo-rp-diagnostico"]}>
+        <strong>Diagnóstico:</strong> {diagnostico?.trim() ? diagnostico : "No especificado"}
+      </div>
+    )}
+    <div className={styles["cmo-fecha"]}>
+      <span>{fechaPartes.dia}</span>
+      <span>{fechaPartes.mes}</span>
+      <span>{fechaPartes.anio}</span>
+    </div>
+  </>
+);
 
   const tieneAlergias = Boolean(alergias && alergias.trim());
 
   return (
-    <div className="receta-widget">
-      <div className={`overlay ${isOpen ? "show" : ""}`} onClick={closeDrawer} />
+    <div className={cx(styles["receta-widget"], imprimirCMO && styles["printing-cmo"])}>
+      <div className={cx(styles.overlay, isOpen && styles.show)} onClick={closeDrawer} />
 
       {/* ================= DRAWER: RECETA ================= */}
-      <div className={`drawer ${isOpen ? "show" : ""}`}>
-        <div className="drawer-head">
-          <div className="ico"><FontAwesomeIcon icon={faPrescriptionBottle} /></div>
-          <div className="titles">
+      <div className={cx(styles.drawer, isOpen && styles.show)}>
+        <div className={styles["drawer-head"]}>
+          <div className={styles.ico}><FontAwesomeIcon icon={faPrescriptionBottle} /></div>
+          <div className={styles.titles}>
             <h3>Receta médica</h3>
-            <p className={`drawer-alergias ${tieneAlergias ? "tiene" : ""}`}>
+            <p className={cx(styles["drawer-alergias"], tieneAlergias && styles.tiene)}>
               <FontAwesomeIcon icon={faTriangleExclamation} /> Alergias: {tieneAlergias ? alergias : "No"}
             </p>
           </div>
-          <div className="badge">tipo_receta_id: {TIPO_ID[tab]}</div>
-          <div className="drawer-close" onClick={closeDrawer}>
+          <div className={styles.badge}>tipo_receta_id: {TIPO_ID[tab]}</div>
+          <div className={styles["drawer-close"]} onClick={closeDrawer}>
             <FontAwesomeIcon icon={faXmark} />
           </div>
         </div>
 
-        <div className="drawer-body">
-          
-
-          <div className="rx-grid">
+        <div className={styles["drawer-body"]}>
+          <div className={styles["rx-grid"]}>
             {/* ================= EDITOR ================= */}
             <div>
-              <div className="field">
-                <div className="flabel"><FontAwesomeIcon icon={faFileMedical} className="ficon" />Tipo de receta</div>
+              <div className={styles.field}>
+                <div className={styles.flabel}><FontAwesomeIcon icon={faFileMedical} className={styles.ficon} />Tipo de receta</div>
 
-                <div className="type-chips">
+                <div className={styles["type-chips"]}>
                   <button
                     type="button"
-                    className={`type-chip tab-med ${tab === "medicamentos" ? "active" : ""}`}
+                    className={cx(styles["type-chip"], styles["tab-med"], tab === "medicamentos" && styles.active)}
                     onClick={() => switchTab("medicamentos")}
                   >
-                    <FontAwesomeIcon icon={faPills} /> Medicamentos <span className="k">Alt+1</span>
+                    <FontAwesomeIcon icon={faPills} /> Medicamentos <span className={styles.k}>Alt+1</span>
                   </button>
                   <button
                     type="button"
-                    className={`type-chip tab-exam ${tab === "examenes" ? "active" : ""}`}
+                    className={cx(styles["type-chip"], styles["tab-exam"], tab === "examenes" && styles.active)}
                     onClick={() => switchTab("examenes")}
                   >
-                    <FontAwesomeIcon icon={faFlaskVial} /> Exámenes <span className="k">Alt+2</span>
+                    <FontAwesomeIcon icon={faFlaskVial} /> Exámenes <span className={styles.k}>Alt+2</span>
                   </button>
                   <button
                     type="button"
-                    className={`type-chip tab-form ${tab === "formulas" ? "active" : ""}`}
+                    className={cx(styles["type-chip"], styles["tab-form"], tab === "formulas" && styles.active)}
                     onClick={() => switchTab("formulas")}
                   >
-                    <FontAwesomeIcon icon={faMortarPestle} /> Fórmulas <span className="k">Alt+3</span>
+                    <FontAwesomeIcon icon={faMortarPestle} /> Fórmulas <span className={styles.k}>Alt+3</span>
                   </button>
                 </div>
 
-                <div className="chips">
+                <div className={styles.chips}>
                   {CHIPS[tab].map((label) => (
-                    <button type="button" className="chip-quick" key={label} onClick={() => handleChipClick(label)}>
+                    <button type="button" className={styles["chip-quick"]} key={label} onClick={() => handleChipClick(label)}>
                       {label}
                     </button>
                   ))}
                 </div>
 
-                <div className="row-entry">
-                  <div className="smart-row">
+                <div className={styles["row-entry"]}>
+                  <div className={styles["smart-row"]}>
                     <input
                       ref={inputRef}
                       type="text"
@@ -690,27 +862,27 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
                       onChange={onInputChange}
                       onKeyDown={onInputKeyDown}
                     />
-                    <button type="button" className="icon-btn primary" title="Agregar (Enter)" onClick={() => commitItem()}>
+                    <button type="button" className={cx(styles["icon-btn"], styles.primary)} title="Agregar (Enter)" onClick={() => commitItem()}>
                       <FontAwesomeIcon icon={faPlus} />
                     </button>
                   </div>
 
                   {showSuggestions && (
-                    <div className="suggestions">
+                    <div className={styles.suggestions}>
                       {filtered.map((item, i) => (
                         <div
                           key={item.n}
-                          className={`sugg-item ${i === highlighted ? "hi" : ""}`}
+                          className={cx(styles["sugg-item"], i === highlighted && styles.hi)}
                           onMouseDown={(e) => { e.preventDefault(); acceptSuggestion(i); }}
                         >
-                          <span className="name">{item.n}</span>
-                          <span className="preview">{item.s}<span className="sugg-tabhint">Tab</span></span>
+                          <span className={styles.name}>{item.n}</span>
+                          <span className={styles.preview}>{item.s}<span className={styles["sugg-tabhint"]}>Tab</span></span>
                         </div>
                       ))}
                     </div>
                   )}
 
-                  <div className="kbd-hints">
+                  <div className={styles["kbd-hints"]}>
                     <span><kbd>Enter</kbd> agregar</span>
                     <span><kbd>Tab</kbd> autocompletar</span>
                     <span><kbd>↑↓</kbd> navegar</span>
@@ -719,18 +891,18 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
                   </div>
                 </div>
 
-                <div className="ticket">
+                <div className={styles.ticket}>
                   {itemsOfTab(tab).length === 0 ? (
-                    <div className="ticket-empty">Aún no agregaste ninguna línea. Escribe arriba o toca un frecuente.</div>
+                    <div className={styles["ticket-empty"]}>Aún no agregaste ninguna línea. Escribe arriba o toca un frecuente.</div>
                   ) : (
                     itemsOfTab(tab).map((it, i) => renderTicketLine(it, i))
                   )}
                 </div>
               </div>
 
-              <div className="field">
-                <div className="flabel">
-                  <FontAwesomeIcon icon={faNotesMedical} className="ficon" />Indicaciones generales
+              <div className={styles.field}>
+                <div className={styles.flabel}>
+                  <FontAwesomeIcon icon={faNotesMedical} className={styles.ficon} />Indicaciones generales
                   <small>Enter la refleja en la hojita</small>
                 </div>
                 <textarea
@@ -743,45 +915,54 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
             </div>
 
             {/* ================= PAPEL ================= */}
-            <div className="paper-wrap">
-              <div className="paper">
-                <div className="paper-margin" />
-                <div className="paper-inner">
-                  <div className="paper-head">
+            <div className={styles["paper-wrap"]}>
+              <div className={styles["paper-toolbar"]}>
+                <button type="button" className={styles["icon-btn"]} onClick={() => setShowPreviewCMO(true)}>
+                  Vista previa CMO · {TITLES[tab]}
+                </button>
+                <button type="button" className={cx(styles["icon-btn"], styles.primary)} onClick={handleImprimirCMO}>
+                  Imprimir {TITLES[tab]} (CMO)
+                </button>
+              </div>
+
+              <div className={styles.paper}>
+                <div className={styles["paper-margin"]} />
+                <div className={styles["paper-inner"]}>
+                  <div className={styles["paper-head"]}>
                     <div>
-                      <div className="clinic">{CLINICA.nombre}</div>
-                      <div className="clinic-sub">{CLINICA.direccion}</div>
+                      <div className={styles.clinic}>{CLINICA.nombre}</div>
+                      <div className={styles["clinic-sub"]}>{CLINICA.direccion}</div>
                     </div>
-                    <div className="rx-mark">℞</div>
+                    <div className={styles["rx-mark"]}>℞</div>
                   </div>
-                  <div className="paper-meta">
+                  <div className={styles["paper-meta"]}>
                     <div><span>Paciente: </span><b>{pacienteNombre}</b></div>
                     <div><span>Fecha: </span><b>{fecha}</b></div>
                     <div><span>Edad: </span><b>{pacienteEdad}</b></div>
                     <div><span>Doc: </span><b>{pacienteCi}</b></div>
                   </div>
 
-                  <div className="paper-section-title">Medicamentos</div>
+                  <div className={styles["paper-section-title"]}>Medicamentos</div>
                   <div>{renderPaperMed()}</div>
 
-                  <div className="paper-section-title">Exámenes complementarios</div>
+                  <div className={styles["paper-section-title"]}>Exámenes complementarios</div>
                   <div>{renderPaperExam()}</div>
 
-                  <div className="paper-section-title">Fórmulas magistrales</div>
+                  <div className={styles["paper-section-title"]}>Fórmulas magistrales</div>
                   <div>{renderPaperForm()}</div>
 
-                  <div className="paper-section-title">Indicaciones generales</div>
+                  <div className={styles["paper-section-title"]}>Indicaciones generales</div>
                   <div>
                     {indicaciones.trim() ? (
-                      <div className="paper-indicaciones-text">{indicaciones.trim()}</div>
+                      <div className={styles["paper-indicaciones-text"]}>{indicaciones.trim()}</div>
                     ) : (
-                      <div className="paper-empty">Sin indicaciones</div>
+                      <div className={styles["paper-empty"]}>Sin indicaciones</div>
                     )}
                   </div>
 
-                  <div className="paper-sign">
-                    <div className="line">{medicoNombre}</div>
-                    <div className="date">{fecha}</div>
+                  <div className={styles["paper-sign"]}>
+                    <div className={styles.line}>{medicoNombre}</div>
+                    <div className={styles.date}>{fecha}</div>
                   </div>
                 </div>
               </div>
@@ -790,7 +971,46 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
         </div>
       </div>
 
-      <div className={`toast ${toast ? "show" : ""}`}>
+      {/* ================= IMPRESIÓN CON MEMBRETE CMO ================= */}
+      {imprimirCMO && (
+        <div className={styles["cmo-print"]}>
+          <div className={styles["cmo-canvas"]}>
+            <img src={RecetaImprimir} alt="Receta CMO" />
+            {renderCmoRp()}
+          </div>
+        </div>
+      )}
+
+      {/* ================= VISTA PREVIA DEL MEMBRETE CMO ================= */}
+      {showPreviewCMO && (
+        <div className={styles["cmo-preview-overlay"]} onClick={() => setShowPreviewCMO(false)}>
+          <div className={styles["cmo-preview-box"]} onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className={styles["cmo-preview-close"]}
+              onClick={() => setShowPreviewCMO(false)}
+            >
+              <FontAwesomeIcon icon={faXmark} />
+            </button>
+            <div className={styles["cmo-preview-title"]}>{TITLES[tab]}</div>
+            <div className={styles["cmo-canvas"]}>
+              <img src={RecetaImprimir} alt="Vista previa receta CMO" />
+              {renderCmoRp()}
+            </div>
+            <div className={styles["cmo-preview-actions"]}>
+              <button
+                type="button"
+                className={cx(styles["icon-btn"], styles.primary)}
+                onClick={() => { setShowPreviewCMO(false); handleImprimirCMO(); }}
+              >
+                Imprimir {TITLES[tab]}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className={cx(styles.toast, toast && styles.show)}>
         <span>{toast?.msg}</span>
         {toast?.undo && (
           <button

@@ -50,11 +50,11 @@ class RecetaSchema(ma.Schema):
     registro_clinico_id = fields.Integer(required=True)
     tipo_receta_id = fields.Integer(required=True)
     medico_id = fields.Integer(required=True)
-
+    seguimiento_control_id = fields.Integer(dump_only=True, allow_none=True)
     fecha = fields.Date(dump_only=True)
     indicaciones_generales = fields.String(allow_none=True)
     estado = fields.Boolean(load_default=True)
-
+    
     # Detalles anidados, solo lectura (se gestionan con sus propios endpoints,
     # no se cargan directo al crear/editar la receta)
     medicamentos = fields.Nested(RecetaMedicamentoSchema, many=True, dump_only=True)

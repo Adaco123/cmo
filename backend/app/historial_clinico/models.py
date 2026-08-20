@@ -64,7 +64,7 @@ class RegistroClinico(db.Model, BaseModelMixin):
     enfermedad_actual = db.Column(db.Text)
     examen_fisico = db.Column(db.Text)
     tratamiento = db.Column(db.Text)
-    consulta_control = db.Column(db.Date)
+    consulta_control = db.Column(db.Text)
     alergias = db.Column(db.Text)
     observaciones = db.Column(db.Text)
 

@@ -60,9 +60,10 @@ export interface RecetaFormulaMagistral extends RecetaFormulaMagistralItemPayloa
   id: number;
   receta_id: number;
 }
-export interface RecetaExamen extends RecetaExamenItemPayload {
+export interface RecetaExamen extends Omit<RecetaExamenItemPayload, 'urgencia'> {
   id: number;
   receta_id: number;
+  urgencia: string; // el backend siempre la devuelve rellena (default "Rutina")
 }
 
 export interface Receta {
@@ -70,6 +71,7 @@ export interface Receta {
   registro_clinico_id: number;
   tipo_receta_id: number;
   medico_id: number;
+  seguimiento_control_id?: number | null;
   fecha: string;
   indicaciones_generales?: string | null;
   estado: boolean;

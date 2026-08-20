@@ -51,7 +51,7 @@ const PacienteTable: React.FC<PacienteTableProps> = ({
               onChange={(e) => onSearchChange(e.target.value)}
             />
           </div>
-          <button className="glow-btn" type="button" onClick={onAgregar}>
+          <button className="glow-btn danger" type="button" onClick={onAgregar}>
             Agregar
           </button>
         </div>

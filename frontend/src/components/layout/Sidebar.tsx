@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-
+import cmoImage from '../../assets/cmo.png';
 export type DashboardTab =
   | 'inicio'
   | 'nueva_atencion'
@@ -49,17 +49,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, onLogout }) =
       <div className="sidebar-top">
         <a href="#" className="sidebar-brand">
           <span className="sidebar-brand-mark">
-            <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="7" width="7" height="13" rx="2" />
-              <line x1="6.5" y1="3" x2="6.5" y2="7" />
-              <circle cx="6.5" cy="11" r="2.5" fill="white" stroke="none" opacity="0.9" />
-              <path d="M14 8c2.5 1.5 4 4 4 7s-1.5 5.5-4 7" />
-              <path d="M16 6c3 2 5 5.5 5 9s-2 7-5 9" />
-            </svg>
+            <img src={cmoImage} alt="CMO" />
           </span>
           <span className="sidebar-brand-text">
             CMO
-            <span className="sidebar-brand-sub">Centro Médico Oruro</span>
+            <span className="sidebar-brand-sub">Consultores Médicos Oruro</span>
           </span>
         </a>
 
