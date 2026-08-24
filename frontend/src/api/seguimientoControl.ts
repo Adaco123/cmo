@@ -24,6 +24,7 @@ export interface SeguimientoControlCreatePayload extends SeguimientoControlPaylo
 
 export interface SeguimientoControl {
   id: number;
+  paciente_id: number;
   registro_clinico_id: number;
   medico_id: number;
   fecha: string;
@@ -52,6 +53,12 @@ export async function createSeguimientoControl(
 export async function getSeguimientosPorRegistro(registroId: number): Promise<SeguimientoControl[]> {
   const { data } = await api.get<SeguimientoControl[]>(
     `/api/historial_clinico/registros/${registroId}/seguimientos`,
+  );
+  return data;
+}
+export async function getSeguimientos():Promise<SeguimientoControl[]>{
+  const {data}=await api.get<SeguimientoControl[]>(
+    `/api/historial_clinico/seguimientos`,
   );
   return data;
 }

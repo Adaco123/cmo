@@ -49,14 +49,14 @@ export interface RecetaPayloadSalida {
   medicamentos?: RecetaBloque<{
     medicamento: string; dosis: string; via_administracion: string | null;
     frecuencia: string; duracion: string | null; cantidad: string | null; indicaciones: string | null;
-  }>;
+  }>[];
   examenes?: RecetaBloque<{
     nombre_examen: string; tipo_examen: string; urgencia: string; indicaciones_previas: string | null;
-  }>;
+  }>[];
   formulas?: RecetaBloque<{
     nombre_formula: string; ingredientes: string; forma_farmaceutica: string | null;
     cantidad_preparar: string | null; via_administracion: string | null; indicaciones: string | null;
-  }>;
+  }>[];
 }
 
 export interface RecetaHandle {
@@ -68,6 +68,7 @@ export interface RecetaHandle {
 
 interface MedItem {
   id: number;
+  grupo: number;
   nombre: string;
   dosis: string;
   via: string;
@@ -79,6 +80,7 @@ interface MedItem {
 
 interface ExamItem {
   id: number;
+  grupo: number;
   nombre: string;
   urgencia: "urgente" | "normal";
   raw: string;
@@ -86,6 +88,7 @@ interface ExamItem {
 
 interface FormItem {
   id: number;
+  grupo: number;
   nombre: string;
   ingredientes: string;
   via: string;
@@ -195,7 +198,7 @@ function normalizeVia(v: string): string {
   return v.toUpperCase();
 }
 
-function parseMed(raw: string): Omit<MedItem, "id"> {
+function parseMed(raw: string): Omit<MedItem, "id" | "grupo"> {
   const text = raw.trim();
   let work = text;
 
@@ -225,14 +228,14 @@ function parseMed(raw: string): Omit<MedItem, "id"> {
   return { nombre, dosis, via, frecuencia, duracion, horario, raw: text };
 }
 
-function parseExam(raw: string): Omit<ExamItem, "id"> {
+function parseExam(raw: string): Omit<ExamItem, "id" | "grupo"> {
   const text = raw.trim();
   const urgente = /\burgente\b|\bstat\b/i.test(text);
   const nombre = text.replace(/,?\s*\burgente\b/i, "").replace(/,?\s*\bstat\b/i, "").trim() || text;
   return { nombre, urgencia: urgente ? "urgente" : "normal", raw: text };
 }
 
-function parseFormula(raw: string): Omit<FormItem, "id"> {
+function parseFormula(raw: string): Omit<FormItem, "id" | "grupo"> {
   const text = raw.trim();
   const parts = text.split("|").map((p) => p.trim());
   const nombreIng = parts[0] || text;
@@ -288,6 +291,15 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   const [examenes, setExamenes] = useState<ExamItem[]>([]);
   const [formulas, setFormulas] = useState<FormItem[]>([]);
 
+  // Grupo activo por tab: cada tab arranca en la receta 1. Al tocar
+  // "+ Nueva receta" se incrementa el grupo del tab actual, y los
+  // próximos ítems que se agreguen quedan en esa receta nueva.
+  const [grupoActivo, setGrupoActivo] = useState<Record<Tab, number>>({
+    medicamentos: 1,
+    examenes: 1,
+    formulas: 1,
+  });
+
   const [inputValue, setInputValue] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filtered, setFiltered] = useState<DBItem[]>([]);
@@ -302,6 +314,9 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   const [imprimirCMO, setImprimirCMO] = useState(false);
   // ---- vista previa del membrete CMO antes de imprimir ----
   const [showPreviewCMO, setShowPreviewCMO] = useState(false);
+  // ---- qué receta (grupo) del tab activo se va a imprimir/previsualizar ----
+  // Por defecto apunta siempre a la última receta agregada del tab.
+  const [grupoImprimir, setGrupoImprimir] = useState(1);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -324,6 +339,20 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
     [medicamentos, examenes, formulas]
   );
 
+  // Grupos (recetas) que existen en el tab activo, en el orden en que
+  // se fueron creando — para el selector de "cuál receta imprimir".
+  const gruposDelTab = useMemo(() => {
+    const vistos = new Set<number>();
+    const orden: number[] = [];
+    for (const it of itemsOfTab(tab)) {
+      if (!vistos.has(it.grupo)) {
+        vistos.add(it.grupo);
+        orden.push(it.grupo);
+      }
+    }
+    return orden;
+  }, [itemsOfTab, tab]);
+
   /* ---------- texto de tratamiento derivado de medicamentos ----------
      Se usa para alimentar a RegistroClinico.tsx (campo "Tratamiento",
      de solo lectura ahí). Formato: "1. Nombre dosis — vía · frecuencia · duración" */
@@ -344,49 +373,63 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   }, [medicamentos]);
 
   /* ---------- handle expuesto al padre (getPayload / reset) ---------- */
+
+  // Separa una lista de ítems en varios bloques según su `grupo`
+  // (respetando el orden en que se crearon los grupos), y arma cada
+  // bloque con el mapeo al shape que espera el backend.
+  function agruparPorGrupo<I extends { grupo: number }, O>(
+    items: I[],
+    mapItem: (it: I) => O
+  ): RecetaBloque<O>[] {
+    const gruposOrden: number[] = [];
+    const porGrupo = new Map<number, I[]>();
+    for (const it of items) {
+      if (!porGrupo.has(it.grupo)) {
+        porGrupo.set(it.grupo, []);
+        gruposOrden.push(it.grupo);
+      }
+      porGrupo.get(it.grupo)!.push(it);
+    }
+    return gruposOrden.map((g) => ({
+      indicaciones_generales: indicaciones.trim() || null,
+      items: porGrupo.get(g)!.map(mapItem),
+    }));
+  }
+
   useImperativeHandle(ref, () => ({
     getPayload: () => {
       const payload: RecetaPayloadSalida = {};
 
       if (medicamentos.length) {
-        payload.medicamentos = {
-          indicaciones_generales: indicaciones.trim() || null,
-          items: medicamentos.map((m) => ({
-            medicamento: m.nombre,
-            dosis: m.dosis || "—",
-            via_administracion: m.via || null,
-            frecuencia: m.frecuencia || "—",
-            duracion: m.duracion || null,
-            cantidad: null,
-            indicaciones: null,
-          })),
-        };
+        payload.medicamentos = agruparPorGrupo(medicamentos, (m) => ({
+          medicamento: m.nombre,
+          dosis: m.dosis || "—",
+          via_administracion: m.via || null,
+          frecuencia: m.frecuencia || "—",
+          duracion: m.duracion || null,
+          cantidad: null,
+          indicaciones: null,
+        }));
       }
 
       if (examenes.length) {
-        payload.examenes = {
-          indicaciones_generales: indicaciones.trim() || null,
-          items: examenes.map((e) => ({
-            nombre_examen: e.nombre,
-            tipo_examen: "General",
-            urgencia: e.urgencia === "urgente" ? "Urgente" : "Rutina",
-            indicaciones_previas: null,
-          })),
-        };
+        payload.examenes = agruparPorGrupo(examenes, (e) => ({
+          nombre_examen: e.nombre,
+          tipo_examen: "General",
+          urgencia: e.urgencia === "urgente" ? "Urgente" : "Rutina",
+          indicaciones_previas: null,
+        }));
       }
 
       if (formulas.length) {
-        payload.formulas = {
-          indicaciones_generales: indicaciones.trim() || null,
-          items: formulas.map((f) => ({
-            nombre_formula: f.nombre,
-            ingredientes: f.ingredientes || f.raw,
-            forma_farmaceutica: null,
-            cantidad_preparar: null,
-            via_administracion: f.via || null,
-            indicaciones: null,
-          })),
-        };
+        payload.formulas = agruparPorGrupo(formulas, (f) => ({
+          nombre_formula: f.nombre,
+          ingredientes: f.ingredientes || f.raw,
+          forma_farmaceutica: null,
+          cantidad_preparar: null,
+          via_administracion: f.via || null,
+          indicaciones: null,
+        }));
       }
 
       return Object.keys(payload).length ? payload : null;
@@ -396,6 +439,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
       setExamenes([]);
       setFormulas([]);
       setIndicaciones("Tomar agua y descansar");
+      setGrupoActivo({ medicamentos: 1, examenes: 1, formulas: 1 });
     },
   }));
 
@@ -418,15 +462,16 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
     if (!raw) return;
     const id = seq;
     setSeq((s) => s + 1);
+    const grupo = grupoActivo[tab];
 
     if (tab === "medicamentos") {
-      const obj: MedItem = { id, ...parseMed(raw) };
+      const obj: MedItem = { id, grupo, ...parseMed(raw) };
       setMedicamentos((list) => [...list, obj]);
     } else if (tab === "examenes") {
-      const obj: ExamItem = { id, ...parseExam(raw) };
+      const obj: ExamItem = { id, grupo, ...parseExam(raw) };
       setExamenes((list) => [...list, obj]);
     } else {
-      const obj: FormItem = { id, ...parseFormula(raw) };
+      const obj: FormItem = { id, grupo, ...parseFormula(raw) };
       setFormulas((list) => [...list, obj]);
     }
 
@@ -437,6 +482,14 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
       else if (tab === "examenes") setExamenes((list) => list.filter((x) => x.id !== id));
       else setFormulas((list) => list.filter((x) => x.id !== id));
     });
+  };
+
+  // Inicia una receta nueva y separada dentro del tab activo. No hace
+  // nada si el tab todavía no tiene ítems (no tiene sentido abrir una
+  // receta 2 vacía antes de haber llenado la 1).
+  const nuevaReceta = () => {
+    if (!itemsOfTab(tab).length) return;
+    setGrupoActivo((g) => ({ ...g, [tab]: g[tab] + 1 }));
   };
 
   const removeItem = (t: Tab, id: number) => {
@@ -525,6 +578,13 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
     setShowSuggestions(false);
     setTimeout(() => inputRef.current?.focus(), 0);
   };
+
+  // La receta a imprimir/previsualizar sigue por defecto a la más
+  // reciente del tab activo (así el doctor no tiene que reseleccionar
+  // cada vez que agrega una receta nueva); igual puede cambiarla a mano.
+  useEffect(() => {
+    setGrupoImprimir(grupoActivo[tab]);
+  }, [tab, grupoActivo]);
 
   /* ---------- cerrar drawer (abrirlo ahora lo controla el padre) ---------- */
   const closeDrawer = () => {
@@ -687,9 +747,13 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
      En la pestaña de EXÁMENES, además de la lista de ítems, se
      agrega al final (parte de abajo, después de todos los
      exámenes) el diagnóstico del paciente, tomado de
-     RegistroClinico.tsx a través del prop `diagnostico`. */
+     RegistroClinico.tsx a través del prop `diagnostico`.
+
+     Cuando el tab tiene varias recetas (grupos), solo se pinta la
+     receta elegida en `grupoImprimir` — cada receta se imprime aparte,
+     con el mismo membrete, en vez de mezclarlas todas en una hoja. */
   const renderCmoItems = () => {
-  const list = itemsOfTab(tab);
+  const list = itemsOfTab(tab).filter((it) => it.grupo === grupoImprimir);
 
   const header = (
     <div className={styles["cmo-rp-header"]}>
@@ -891,11 +955,37 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
                   </div>
                 </div>
 
+                {itemsOfTab(tab).length > 0 && (
+                  <div className={styles["ticket-toolbar"]}>
+                    <button type="button" className={styles["new-receta-btn"]} onClick={nuevaReceta}>
+                      <FontAwesomeIcon icon={faPlus} /> Nueva receta
+                    </button>
+                  </div>
+                )}
+
                 <div className={styles.ticket}>
                   {itemsOfTab(tab).length === 0 ? (
                     <div className={styles["ticket-empty"]}>Aún no agregaste ninguna línea. Escribe arriba o toca un frecuente.</div>
                   ) : (
-                    itemsOfTab(tab).map((it, i) => renderTicketLine(it, i))
+                    (() => {
+                      const items = itemsOfTab(tab);
+                      const nodes: React.ReactNode[] = [];
+                      let prevGrupo: number | null = null;
+                      items.forEach((it, i) => {
+                        if (it.grupo !== prevGrupo) {
+                          if (prevGrupo !== null) {
+                            nodes.push(
+                              <div key={`sep-${it.grupo}`} className={styles["ticket-sep"]}>
+                                <span>Receta {it.grupo}</span>
+                              </div>
+                            );
+                          }
+                          prevGrupo = it.grupo;
+                        }
+                        nodes.push(renderTicketLine(it, i));
+                      });
+                      return nodes;
+                    })()
                   )}
                 </div>
               </div>
@@ -916,12 +1006,28 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
 
             {/* ================= PAPEL ================= */}
             <div className={styles["paper-wrap"]}>
+              {gruposDelTab.length > 1 && (
+                <div className={styles["receta-picker"]}>
+                  <span className={styles["receta-picker-label"]}>Receta a imprimir:</span>
+                  {gruposDelTab.map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      className={cx(styles["receta-picker-btn"], g === grupoImprimir && styles.active)}
+                      onClick={() => setGrupoImprimir(g)}
+                    >
+                      Receta {g}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className={styles["paper-toolbar"]}>
                 <button type="button" className={styles["icon-btn"]} onClick={() => setShowPreviewCMO(true)}>
-                  Vista previa CMO · {TITLES[tab]}
+                  Vista previa CMO · {TITLES[tab]}{gruposDelTab.length > 1 ? ` · Receta ${grupoImprimir}` : ""}
                 </button>
                 <button type="button" className={cx(styles["icon-btn"], styles.primary)} onClick={handleImprimirCMO}>
-                  Imprimir {TITLES[tab]} (CMO)
+                  Imprimir {TITLES[tab]} (CMO){gruposDelTab.length > 1 ? ` · Receta ${grupoImprimir}` : ""}
                 </button>
               </div>
 
@@ -992,7 +1098,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
             >
               <FontAwesomeIcon icon={faXmark} />
             </button>
-            <div className={styles["cmo-preview-title"]}>{TITLES[tab]}</div>
+            <div className={styles["cmo-preview-title"]}>{TITLES[tab]}{gruposDelTab.length > 1 ? ` · Receta ${grupoImprimir}` : ""}</div>
             <div className={styles["cmo-canvas"]}>
               <img src={RecetaImprimir} alt="Vista previa receta CMO" />
               {renderCmoRp()}

@@ -86,58 +86,86 @@ def _parse_fecha(valor, campo: str = "proxima_fecha_control"):
 
 
 def _validar_bloques_recetas(recetas_data: dict):
-    """Devuelve (recetas_validated, None) o (None, error_response)."""
+    """Devuelve (recetas_validated, None) o (None, error_response).
+
+    Cada clave ("medicamentos" / "examenes" / "formulas") ahora acepta una
+    LISTA de bloques -> cada bloque de la lista se convierte en una Receta
+    separada (esto es lo que permite que el doctor agregue "otra receta"
+    de medicamentos aparte, en vez de que todo caiga en la misma).
+
+    Por compatibilidad hacia atrás también se acepta un único bloque como
+    dict suelto (formato viejo); se envuelve en una lista de un elemento.
+    """
     recetas_validated = {}
     for clave, item_schema in (
         ("medicamentos", receta_medicamento_schema),
         ("examenes", receta_examen_schema),
         ("formulas", receta_formula_schema),
     ):
-        bloque = recetas_data.get(clave)
-        if not bloque or not bloque.get("items"):
+        bloques = recetas_data.get(clave)
+        if not bloques:
             continue
+        if isinstance(bloques, dict):
+            bloques = [bloques]
 
-        items_validados = []
-        for i, item in enumerate(bloque["items"]):
-            try:
-                items_validados.append(item_schema.load(item))
-            except ValidationError as err:
-                return None, ({"recetas": {clave: {"items": {i: err.messages}}}}, 400)
+        bloques_validados = []
+        for b, bloque in enumerate(bloques):
+            items = bloque.get("items")
+            if not items:
+                continue
 
-        recetas_validated[clave] = {
-            "indicaciones_generales": bloque.get("indicaciones_generales") or None,
-            "items": items_validados,
-        }
+            items_validados = []
+            for i, item in enumerate(items):
+                try:
+                    items_validados.append(item_schema.load(item))
+                except ValidationError as err:
+                    return None, (
+                        {"recetas": {clave: {b: {"items": {i: err.messages}}}}}, 400
+                    )
+
+            bloques_validados.append({
+                "indicaciones_generales": bloque.get("indicaciones_generales") or None,
+                "items": items_validados,
+            })
+
+        if bloques_validados:
+            recetas_validated[clave] = bloques_validados
     return recetas_validated, None
 
 
 def _crear_recetas_desde_bloques(recetas_validated: dict, registro_clinico_id: int,
                                   medico_id: int, seguimiento_control_id=None):
-    """Crea las Receta + sus ítems dentro de la transacción activa."""
+    """Crea las Receta + sus ítems dentro de la transacción activa.
+
+    recetas_validated: clave -> lista de bloques; cada bloque de la lista
+    se guarda como su propia fila Receta (una por cada "receta" que el
+    doctor haya agregado por separado en el frontend).
+    """
     item_model_by_clave = {
         "medicamentos": RecetaMedicamento,
         "examenes": RecetaExamen,
         "formulas": RecetaFormulaMagistral,
     }
     recetas_creadas = []
-    for clave, bloque in recetas_validated.items():
+    for clave, bloques in recetas_validated.items():
         tipo = _get_or_create_tipo_receta(TIPOS_RECETA_NOMBRES[clave])
-
-        receta = Receta(
-            registro_clinico_id=registro_clinico_id,
-            tipo_receta_id=tipo.id,
-            medico_id=medico_id,
-            seguimiento_control_id=seguimiento_control_id,
-            indicaciones_generales=bloque["indicaciones_generales"],
-        )
-        db.session.add(receta)
-        db.session.flush()
-
         ItemModel = item_model_by_clave[clave]
-        for item_data in bloque["items"]:
-            db.session.add(ItemModel(receta_id=receta.id, **item_data))
 
-        recetas_creadas.append(receta)
+        for bloque in bloques:
+            receta = Receta(
+                registro_clinico_id=registro_clinico_id,
+                tipo_receta_id=tipo.id,
+                medico_id=medico_id,
+                seguimiento_control_id=seguimiento_control_id,
+                indicaciones_generales=bloque["indicaciones_generales"],
+            )
+            db.session.add(receta)
+            db.session.flush()
+
+            for item_data in bloque["items"]:
+                db.session.add(ItemModel(receta_id=receta.id, **item_data))
+
+            recetas_creadas.append(receta)
     return recetas_creadas
 
 

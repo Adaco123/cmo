@@ -11,6 +11,15 @@
    dejaron con un valor de respaldo vía var(--warn, #C08A2E) para
    que funcionen ya mismo y se puedan sobreescribir si agregas
    ese token a :root más adelante.
+
+   FIX de contraste: .page y .topbar viven directo sobre el fondo
+   azul (--bg-body), no dentro de una card clara. Antes usaban
+   --text-main/--text-muted (pensados para texto DENTRO de
+   --bg-card) y quedaban casi invisibles sobre el azul. Ahora usan
+   el par --text-on-dark/--text-on-dark-muted, igual que en
+   VerPaciente.module.css. Todo lo que sí vive dentro de una card
+   clara (.card, .field, .pacienteCard, .dockBtn, etc.) se dejó
+   con --text-main/--text-muted, que es lo correcto ahí.
    ============================================================ */
 
 .page * {
@@ -19,7 +28,7 @@
 
 .page {
   background: var(--bg-body);
-  color: var(--text-main);
+  color: var(--text-on-dark);
   font-family: var(--sans);
   width: 100%;
   min-height: 100vh;
@@ -68,13 +77,14 @@
   font-size: 15px;
   margin: 0;
   font-weight: 700;
-  color: var(--text-main);
+  /* sobre --bg-body directo, no --text-main (ver nota de arriba) */
+  color: var(--text-on-dark);
 }
 
 .brand span {
   display: block;
   font-size: 11.5px;
-  color: var(--text-muted);
+  color: var(--text-on-dark-muted);
   margin-top: 1px;
 }
 
@@ -104,12 +114,12 @@
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-on-dark-muted);
   margin-top: 6px;
 }
 
 .railLabel b {
-  color: var(--text-main);
+  color: var(--text-on-dark);
 }
 
 /* ============================================================

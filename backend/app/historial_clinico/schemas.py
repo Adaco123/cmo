@@ -161,6 +161,7 @@ class RegistroClinicoSchema(Schema):
     )
 class SeguimientoControlSchema(Schema):
     id = fields.Int(dump_only=True)
+    paciente_id = fields.Int(dump_only=True)
     registro_clinico_id = fields.Int(required=True)
     medico_id = fields.Int(required=True)
     fecha = fields.Date(dump_only=True)

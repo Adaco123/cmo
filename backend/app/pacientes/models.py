@@ -39,6 +39,7 @@ class Paciente(db.Model, BaseModelMixin):
     historia_clinica = db.relationship("HistoriaClinica", back_populates="paciente", uselist=False)
     citas = db.relationship("Cita", back_populates="paciente")
     consultas = db.relationship("Consulta", back_populates="paciente")
+    archivos = db.relationship("Archivo", back_populates="paciente")
 
     def obtener_alergias(self):
         """Retorna una lista con las alergias registradas para este paciente."""

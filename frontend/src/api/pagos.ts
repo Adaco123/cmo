@@ -24,11 +24,6 @@ export interface Pago {
   created_at?: string;
   updated_at?: string;
 }
-export interface PagosResumenHoy{
-  total_pagado_hoy:string;
-  cantidad_pagos: number;
-}
-
 export async function crearPago(payload: PagoPayload): Promise<Pago> {
   const { data } = await api.post<Pago>('/api/pagos/', payload);
   return data;
@@ -41,9 +36,4 @@ export async function getPagosPorCobro(cobroId: number): Promise<Pago[]> {
 
 export async function eliminarPago(pagoId: number): Promise<void> {
   await api.delete(`/api/pagos/${pagoId}`);
-}
-
-export async function pagosHoy(): Promise <PagosResumenHoy>{
-  const {data} =await api.get<PagosResumenHoy>(`/api/pagos/resumenHoy/`);
-  return data;
 }

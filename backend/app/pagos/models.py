@@ -1,5 +1,6 @@
 """Modelo(s) del módulo pagos."""
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal
 
 from sqlalchemy import func
 
@@ -51,3 +52,49 @@ class Pago(db.Model, BaseModelMixin):
             .first()
         )
         return total, cantidad
+
+    @classmethod
+    def resumen_pagos_mes_bolivia(cls):
+        """Retorna (total, cantidad) de pagos registrados en el mes actual."""
+        ahora_bo = datetime.now(BOLIVIA_TZ)
+        inicio_mes_bo = ahora_bo.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        fin_mes_bo = (inicio_mes_bo.replace(day=28) + timedelta(days=4)).replace(day=1)
+
+        total, cantidad = (
+            db.session.query(
+                func.coalesce(func.sum(cls.monto), 0),
+                func.count(cls.id),
+            )
+            .filter(cls.created_at >= inicio_mes_bo, cls.created_at < fin_mes_bo)
+            .first()
+        )
+        return total, cantidad
+
+    @classmethod
+    def resumen_pagos_diario_mes_bolivia(cls):
+        """Retorna el total y la cantidad de pagos agrupados por día del mes actual."""
+        ahora_bo = datetime.now(BOLIVIA_TZ)
+        inicio_mes_bo = ahora_bo.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        fin_mes_bo = (inicio_mes_bo.replace(day=28) + timedelta(days=4)).replace(day=1)
+
+        pagos = (
+            cls.query
+            .filter(cls.created_at >= inicio_mes_bo, cls.created_at < fin_mes_bo)
+            .order_by(cls.created_at.asc())
+            .all()
+        )
+
+        resumen = {}
+        for pago in pagos:
+            fecha_bo = pago.created_at.astimezone(BOLIVIA_TZ).date().isoformat()
+            dia = resumen.setdefault(
+                fecha_bo,
+                {"fecha": fecha_bo, "total_pagado": Decimal("0"), "cantidad_pagos": 0},
+            )
+            dia["total_pagado"] += pago.monto
+            dia["cantidad_pagos"] += 1
+
+        return [
+            {**dia, "total_pagado": str(dia["total_pagado"])}
+            for dia in resumen.values()
+        ]

@@ -29,7 +29,7 @@ def _validar_referencias(data):
 
 
 class CitasList_Resource(Resource):
-    #@jwt_required()
+    @jwt_required()
     def get(self):
         items = Cita.get_all()
         return schema_list.dump(items), 200

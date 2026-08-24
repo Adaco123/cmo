@@ -9,6 +9,7 @@ class ArchivoSchema(Schema):
     informe_id = fields.Integer(allow_none=True)
     receta_id = fields.Integer(allow_none=True)
     examen_complementario_id = fields.Integer(allow_none=True)
+    paciente_id = fields.Integer(allow_none=True)
 
     tipo_archivo_id = fields.Integer(required=True)
     nombre_archivo = fields.String(dump_only=True)

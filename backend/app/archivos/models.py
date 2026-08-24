@@ -16,6 +16,8 @@ class Archivo(db.Model, BaseModelMixin):
     subido_por_usuario_id = db.Column(db.BigInteger, db.ForeignKey('usuarios.id'), nullable=False)
     receta_id = db.Column(db.BigInteger, db.ForeignKey('recetas.id'), nullable=True)
     receta = db.relationship("Receta",back_populates="archivos")
+    paciente_id = db.Column(db.BigInteger, db.ForeignKey('pacientes.id'), nullable=True)
+    paciente = db.relationship("Paciente", back_populates="archivos")
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now(), nullable=False)
     updated_at = db.Column(
         db.DateTime(timezone=True),

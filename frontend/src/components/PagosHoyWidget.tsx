@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { pagosHoy } from '../api/pagos'; // sin "es" extra
+import { pagosHoy } from '../api/reportes';
 import './PagosHoyWidget.css';
 const REFRESH_MS = 60000; // definido acá arriba, fuera del componente está OK porque es una constante fija, no un hook
 

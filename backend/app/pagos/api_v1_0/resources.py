@@ -202,7 +202,25 @@ class PagosResumenHoy_Resource(Resource):
         }, 200
 
 
+class PagosReporteMensualDiario_Resource(Resource):
+    @jwt_required()
+    def get(self):
+        return Pago.resumen_pagos_diario_mes_bolivia(), 200
+
+
+class PagosReporteMensual_Resource(Resource):
+    @jwt_required()
+    def get(self):
+        total, cantidad = Pago.resumen_pagos_mes_bolivia()
+        return {
+            "total_pagado_mes": str(total),
+            "cantidad_pagos": cantidad,
+        }, 200
+
+
 api.add_resource(PagosResumenHoy_Resource, "/resumenHoy")
 api.add_resource(PagosList_Resource, "/")
 api.add_resource(Pago_Resource, "/<int:item_id>")
 api.add_resource(PagosPorCobro_Resource, "/cobro/<int:cobro_id>")
+api.add_resource(PagosReporteMensualDiario_Resource, "/reporteMensualDiario")
+api.add_resource(PagosReporteMensual_Resource, "/reporteMensual")

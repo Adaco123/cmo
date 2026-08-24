@@ -540,11 +540,11 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
               placeholder="Ej: Antibiótico por 7 días, control por persistencia de fiebre..."
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-              <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Volver en</span>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Volver en</span>
               <input ref={controlRef} type="text" inputMode="numeric" maxLength={3} placeholder="7"
                 value={controlDias} onChange={e => setControlDias(e.target.value.replace(/[^0-9]/g, ''))}
-                style={{ width: 60, background: 'var(--bg-input)', border: '1.5px solid var(--border-color)', borderRadius: 10, textAlign: 'center', fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, padding: '8px 4px', color: 'var(--text)' }} />
-              <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>días</span>
+                style={{ width: 60, background: 'var(--bg-input)', border: '1.5px solid var(--border-color)', borderRadius: 10, textAlign: 'center', fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, padding: '8px 4px', color: 'var(--text-main)' }} />
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>días</span>
             </div>
             <div className={styles.chips}>
               {CONTROL_CHIPS.map(c => (
@@ -555,7 +555,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
             </div>
             {controlFechaLegible && <div className={styles.subhint}>Próximo control: {controlFechaLegible}</div>}
             {!controlNota.trim() && controlDias.trim() && (
-              <div className={styles.subhint} style={{ color: 'var(--warn)' }}>
+              <div className={styles.subhint} style={{ color: 'var(--warn, #C08A2E)' }}>
                 Elegiste una fecha pero falta la nota — sin nota no se registra el seguimiento
               </div>
             )}
@@ -564,7 +564,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
       </div>
 
       {saveError && (
-        <div style={{ color: 'var(--danger)', marginBottom: 8, fontSize: 13 }}>
+        <div style={{ color: 'var(--status-inactive)', marginBottom: 8, fontSize: 13 }}>
           {saveError}
         </div>
       )}

@@ -32,6 +32,7 @@ DESTINOS_VALIDOS = {
     "examen_complementario_id": ExamenComplementario,
     "receta_id": Receta,
     "registro_clinico_id": RegistroClinico,
+    "paciente_id": Paciente,
 }
 
 
@@ -164,15 +165,23 @@ class ArchivosPorPaciente_Resource(Resource):
         if not Paciente.get_by_id(paciente_id):
             return {"error": "Paciente no encontrado"}, 404
 
-        archivos = (
+        archivos_examenes = (
             Archivo.query
             .join(ExamenComplementario, ExamenComplementario.id == Archivo.examen_complementario_id)
             .join(RegistroClinico, RegistroClinico.id == ExamenComplementario.registro_clinico_id)
             .join(HistoriaClinica, HistoriaClinica.id == RegistroClinico.historia_clinica_id)
             .filter(HistoriaClinica.paciente_id == paciente_id)
-            .order_by(Archivo.created_at.desc())
             .all()
         )
+        # Archivos subidos directo al paciente (ej. pacientes externos, sin
+        # historia clínica todavía).
+        archivos_directos = Archivo.simple_filter(paciente_id=paciente_id)
+
+        vistos = {}
+        for archivo in [*archivos_examenes, *archivos_directos]:
+            vistos[archivo.id] = archivo
+
+        archivos = sorted(vistos.values(), key=lambda a: a.created_at, reverse=True)
         return archivo_schema_list.dump(archivos), 200
 api.add_resource(ArchivoDescarga_Resource, "/<int:archivo_id>/descarga")
 api.add_resource(ArchivoUpload_Resource, "/")

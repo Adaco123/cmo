@@ -104,7 +104,7 @@
 }
 
 .headCell {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
@@ -115,6 +115,7 @@
 .cell {
   padding: 2px;
   text-align: center;
+  position: relative;
 }
 
 .day {
@@ -129,6 +130,10 @@
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
+  margin: 0 auto;
+  border: none;
+  background: transparent;
+  font-family: inherit;
 }
 
 .day:hover {
@@ -142,10 +147,22 @@
 
 .diaFuera {
   color: var(--text-muted);
-  opacity: 0.4;
+  opacity: 0.55;
 }
 
 .diaConCitas::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #C1443F; /* <- color fijo solo para este punto (citas) */
+}
+
+.diaConSeguimientos::after {
   content: '';
   position: absolute;
   bottom: 4px;
@@ -154,7 +171,7 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--cmo-secondary);
+  background: #2E9CCA; /* <- color fijo solo para este punto (seguimientos) */
 }
 
 .diaSeleccionado {
@@ -162,7 +179,8 @@
   color: #fff !important;
 }
 
-.diaSeleccionado.diaConCitas::after {
+.diaSeleccionado.diaConCitas::after,
+.diaSeleccionado.diaConSeguimientos::after {
   background: #fff;
 }
 
@@ -171,6 +189,7 @@
   min-width: 220px;
   border-left: 1px solid var(--border-color);
   padding-left: 24px;
+  min-width: 0; /* permite que los hijos con ellipsis se encojan de verdad */
 }
 
 .listaDia h4 {
@@ -179,6 +198,10 @@
   color: var(--text-main);
   text-transform: capitalize;
   margin-bottom: 14px;
+}
+
+.subtitulo {
+  margin-top: 18px;
 }
 
 .sinCitas {
@@ -196,20 +219,51 @@
 }
 
 .citaItem {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   padding: 10px 12px;
   border-radius: 10px;
   background: var(--bg-input);
   border: 1px solid var(--border-color);
   cursor: pointer;
   transition: all 0.15s ease;
+  min-width: 0;
 }
 
 .citaItem:hover {
   background: var(--bg-card-hover);
   border-color: var(--cmo-primary);
+}
+
+.citaItemTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.citaItemInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.whatsappBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #25D366;
+  color: #fff;
+  font-size: 16px;
+  transition: all 0.15s ease;
+}
+
+.whatsappBtn:hover {
+  filter: brightness(1.08);
+  transform: scale(1.05);
 }
 
 .citaHora {
@@ -225,11 +279,17 @@
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .citaMotivo {
   font-size: 0.78rem;
   color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 600px) {

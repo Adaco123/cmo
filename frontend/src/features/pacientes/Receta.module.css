@@ -150,6 +150,22 @@
 .receta-widget .row-entry .hint { font-size: 10.5px; color: var(--text-muted); margin-top: 10px; text-align: right; }
 .receta-widget .row-entry .hint kbd { font-family: var(--mono); background: var(--bg-input); padding: 1px 5px; border-radius: 4px; color: var(--text-muted); margin: 0 2px; }
 
+/* ---------- toolbar de "nueva receta" + separador entre grupos ---------- */
+.receta-widget .ticket-toolbar { display: flex; justify-content: flex-end; margin-top: 10px; }
+.receta-widget .new-receta-btn {
+  display: flex; align-items: center; gap: 6px; font-size: 0.72rem; font-weight: 600;
+  color: var(--primary); background: var(--accent-bg); border: 1px solid var(--accent-border);
+  border-radius: var(--radius-xl); padding: 5px 12px; cursor: pointer;
+}
+.receta-widget .new-receta-btn:hover { background: color-mix(in srgb, var(--primary) 24%, transparent); }
+.receta-widget .ticket-sep {
+  display: flex; align-items: center; gap: 10px; margin: 12px 0 8px;
+  font-size: 0.68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.receta-widget .ticket-sep::before, .receta-widget .ticket-sep::after {
+  content: ""; flex: 1; height: 1px; background: var(--border-color);
+}
+
 /* ---------- ticket / lista de ítems ---------- */
 .receta-widget .ticket { margin-top: 14px; }
 .receta-widget .ticket-line {
@@ -187,6 +203,15 @@
 
 /* ---------- papel (vista previa) ---------- */
 .receta-widget .paper-wrap { position: sticky; top: 0; }
+.receta-widget .receta-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
+.receta-widget .receta-picker-label { font-size: 0.72rem; color: var(--text-muted); font-weight: 600; margin-right: 2px; }
+.receta-widget .receta-picker-btn {
+  padding: 0.3rem 0.85rem; border-radius: var(--radius-xl); border: 1px solid var(--border-color);
+  background: var(--bg-input); color: var(--text-muted); font-size: 0.74rem; font-weight: 600;
+  cursor: pointer; transition: var(--transition-fast);
+}
+.receta-widget .receta-picker-btn:hover { border-color: var(--primary); color: var(--primary); }
+.receta-widget .receta-picker-btn.active { background: var(--accent-bg); border-color: var(--primary); color: var(--primary-dark); }
 .receta-widget .paper-toolbar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 0.6rem; }
 .receta-widget .paper-toolbar .icon-btn { width: auto; padding: 0 14px; font-size: 0.78rem; font-weight: 600; gap: 6px; }
 .receta-widget .paper {

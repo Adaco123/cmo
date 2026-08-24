@@ -78,6 +78,30 @@ export async function descargarArchivoComoAdjunto(archivoId: number, nombreArchi
   window.URL.revokeObjectURL(url);
 }
 export async function getArchivosPorPaciente(pacienteId: number): Promise<ArchivoResponse[]> {
-  const { data } = await api.get<ArchivoResponse[]>(`/api/pacientes/${pacienteId}/archivos`);
+  // Nota: este resource vive bajo el blueprint de "archivos" (no "pacientes"),
+  // por eso el prefijo es /api/archivos y no /api/pacientes.
+  const { data } = await api.get<ArchivoResponse[]>(`/api/archivos/${pacienteId}/archivos`);
+  return data;
+}
+
+/**
+ * Sube UN archivo ligado directamente a un paciente (sin pasar por examen,
+ * receta o registro clínico). Pensado para pacientes externos (origen_id=2)
+ * que aún no tienen historia clínica abierta.
+ * tipoArchivoId depende de tu catálogo tipos_archivo (ej. 1 = imagen, 2 = pdf).
+ */
+export async function subirArchivoPaciente(
+  pacienteId: number,
+  archivo: File,
+  tipoArchivoId: number,
+): Promise<ArchivoResponse> {
+  const formData = new FormData();
+  formData.append('archivo', archivo);
+  formData.append('tipo_archivo_id', String(tipoArchivoId));
+  formData.append('paciente_id', String(pacienteId));
+
+  const { data } = await api.post<ArchivoResponse>('/api/archivos', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return data;
 }

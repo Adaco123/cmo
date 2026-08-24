@@ -1,0 +1,662 @@
+/* ============================================================
+   PacienteExterno.module.css — mismo layout y tokens que
+   VerPaciente.module.css (index.css): sidebar de ficha+acciones,
+   main de contenido, y modales tipo backdrop.
+   ============================================================ */
+
+.container * {
+  box-sizing: border-box;
+}
+
+.container {
+  width: 100%;
+  max-width: 760px;
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 2rem 2.2rem 2.2rem;
+  color: var(--text-main);
+  font-family: var(--sans);
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.closeBtn {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-hover);
+  transition: var(--transition-fast);
+  z-index: 2;
+}
+
+.closeBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ----- Encabezado (pantalla de búsqueda/crear) ----- */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.6rem;
+}
+
+.header svg {
+  font-size: 1.15rem;
+  color: #fff;
+  background: var(--primary-gradient);
+  padding: 0.65rem;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.header h1 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.4rem 1.5rem;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  margin-bottom: 1.1rem;
+}
+
+.sectionTitle svg {
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+/* ----- Buscador de paciente ----- */
+.searchInput {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 0.65rem 0.9rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-main);
+  margin-bottom: 0.9rem;
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--accent-bg);
+}
+
+.listaResultados {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+}
+
+.resultadoItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.75rem 0.95rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: var(--transition-fast);
+}
+
+.resultadoItem:hover {
+  border-color: var(--primary);
+  background: var(--bg-card-hover);
+  transform: translateX(2px);
+}
+
+.resultadoNombre {
+  font-weight: 700;
+  color: var(--text-main);
+  font-size: 0.9rem;
+}
+
+.resultadoDoc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.emptyText {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding: 0.8rem 0.2rem;
+  text-align: center;
+}
+
+/* ----- Formulario crear paciente ----- */
+.row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem 1.4rem;
+  margin-bottom: 1rem;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.fieldGroup label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.fieldGroup input,
+.fieldGroup select {
+  font-family: inherit;
+  font-size: 0.88rem;
+  padding: 0.5rem 0.8rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-main);
+}
+
+.fieldGroup input:focus,
+.fieldGroup select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--accent-bg);
+}
+
+.accionesForm {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.3rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.btnSecundario {
+  font-family: inherit;
+  font-size: 0.83rem;
+  font-weight: 700;
+  color: var(--text-main);
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 0.6rem 1.1rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+
+.btnSecundario:hover {
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+
+.btnPrimario {
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--primary-gradient);
+  border: none;
+  border-radius: var(--radius-xl);
+  padding: 0.6rem 1.4rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btnPrimario:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-hover);
+}
+
+.btnPrimario:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.errorText {
+  color: var(--status-inactive);
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-top: 0.7rem;
+}
+
+/* ============================================================
+   LAYOUT DE PACIENTE SELECCIONADO — idéntico al de VerPaciente:
+   sidebar (ficha + acciones) + main (contenido).
+   ============================================================ */
+.layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 640px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pacienteCard {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.6rem 1.4rem;
+  text-align: center;
+}
+
+.avatar {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: var(--primary-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.pacienteNombre {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-main);
+}
+
+.pacienteMeta {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.btnCambiar {
+  margin-top: 14px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--primary-dark);
+  background: var(--bg-card);
+  border: 1.5px solid var(--primary);
+  border-radius: var(--radius-xl);
+  padding: 0.45rem 0.95rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btnCambiar:hover {
+  background: var(--primary);
+  color: #fff;
+}
+
+.acciones {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.accionBtn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-main);
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 13px 16px;
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.accionBtn svg {
+  font-size: 15px;
+  color: var(--accent);
+  flex-shrink: 0;
+  width: 18px;
+}
+
+.accionBtn:hover {
+  border-color: var(--accent);
+  background: var(--bg-card-hover);
+  transform: translateX(2px);
+}
+
+.main {
+  min-width: 0;
+}
+
+.mainHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.mainHead h1 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-main);
+}
+
+.contador {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  padding: 4px 12px;
+  border-radius: var(--radius-xl);
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 20px;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  background: var(--bg-input);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.emptyState svg {
+  font-size: 1.7rem;
+  opacity: 0.5;
+}
+
+/* ----- Lista de archivos ----- */
+.listaArchivos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.listaArchivos li {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.95rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.listaArchivos li svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.listaArchivos li span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listaArchivos li button {
+  border: none;
+  background: transparent;
+  color: var(--status-inactive);
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-fast);
+}
+
+.listaArchivos li button:hover {
+  background: color-mix(in srgb, var(--status-inactive) 14%, transparent);
+}
+
+/* ============================================================
+   MODALES — idéntico patrón que VerPaciente.module.css
+   ============================================================ */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--text-main) 50%, transparent);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px;
+}
+
+.backdropContent {
+  position: relative;
+  max-width: 560px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 2rem;
+}
+
+.modalCloseBtn {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  box-shadow: var(--shadow-hover);
+  transition: var(--transition-fast);
+}
+
+.modalCloseBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ----- Subida de archivos (dentro del modal) ----- */
+.uploadArea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.8rem 1.4rem;
+  cursor: pointer;
+  text-align: center;
+  transition: var(--transition-fast);
+  background: var(--bg-input);
+}
+
+.uploadArea:hover,
+.uploadArea.drag {
+  border-color: var(--primary);
+  background: var(--accent-bg);
+}
+
+.uploadArea svg {
+  font-size: 1.7rem;
+  color: var(--accent);
+}
+
+.uploadArea p {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.uploadArea span {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.uploadingText {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.7rem;
+  text-align: center;
+}
+
+/* ----- Responsive ----- */
+@media (max-width: 700px) {
+  .container {
+    padding: 1.5rem 1.3rem;
+  }
+  .row {
+    grid-template-columns: 1fr;
+  }
+  .header h1 {
+    font-size: 1.1rem;
+  }
+}
+/* ----- Lista de archivos pendientes (aún no guardados) ----- */
+.listaPendientes {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.listaPendientes li {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--accent-bg);
+  border: 1px dashed var(--accent-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.listaPendientes li svg:first-child {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.listaPendientes li span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listaPendientes li button {
+  border: none;
+  background: transparent;
+  color: var(--status-inactive);
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-fast);
+}
+
+.listaPendientes li button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--status-inactive) 14%, transparent);
+}
+
+.listaPendientes li button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ----- Acciones del modal de adjuntar (Cancelar / Guardar) ----- */
+.modalAcciones {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 1.4rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.modalAcciones .btnPrimario {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}

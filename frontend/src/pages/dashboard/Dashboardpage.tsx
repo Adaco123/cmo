@@ -5,8 +5,8 @@ import Modal from '../../components/ui/Modal';
 import { type Paciente } from '../../api/pacientes';
 import { usePacientes } from '../../features/pacientes/hooks/UsePacientes';
 import { useCitasHoy } from '../../features/citas/hooks/Usecitashoy';
-import HistoriaClinica from '../../features/pacientes/RegistroClinico';
 import PacienteForm from '../../features/pacientes/PacienteForm';
+import PacienteExterno from '../../features/pacientes/PacienteExterno';
 import VerPaciente from '../../features/pacientes/VerPaciente';
 import PagosHoyWidget from '../../components/PagosHoyWidget';
 
@@ -27,7 +27,8 @@ import '../../components/CrearCita.module.css';
 const DashboardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<DashboardTab>('inicio');
   const [showPacienteForm, setShowPacienteForm] = useState(false);
-  const [showHistoria, setShowHistoria] = useState(false);
+  const [showPacienteExterno, setShowPacienteExterno] = useState(false);
+  const [pacienteExternoInicial, setPacienteExternoInicial] = useState<Paciente | null>(null);
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
 
   const {
@@ -49,6 +50,11 @@ const DashboardPage: React.FC = () => {
     reload: loadCitas,
     finalizar: finalizarCita,
   } = useCitasHoy();
+
+  const cerrarPacienteExterno = () => {
+    setShowPacienteExterno(false);
+    setPacienteExternoInicial(null);
+  };
 
   return (
     <>
@@ -95,8 +101,14 @@ const DashboardPage: React.FC = () => {
           error={pacientesError}
           searchValue={filters.externos}
           onSearchChange={(v) => handleFilterChange('externos', v)}
-          onAgregar={() => setShowHistoria(true)}
-          onVer={(p) => setSelectedPaciente(p)}
+          onAgregar={() => {
+            setPacienteExternoInicial(null);
+            setShowPacienteExterno(true);
+          }}
+          onVer={(p) => {
+            setPacienteExternoInicial(p);
+            setShowPacienteExterno(true);
+          }}
         />
 
         <ModelosTab active={activeTab === 'modelos'} searchValue="" />
@@ -104,9 +116,14 @@ const DashboardPage: React.FC = () => {
         <ReportesTab active={activeTab === 'reportes'} />
       </DashboardLayout>
 
-      {showHistoria && (
-        <Modal onClose={() => setShowHistoria(false)}>
-          <HistoriaClinica onClose={() => setShowHistoria(false)} />
+      {showPacienteExterno && (
+        <Modal onClose={cerrarPacienteExterno}>
+          <PacienteExterno
+            pacientesExternos={filteredExternos}
+            pacienteInicial={pacienteExternoInicial}
+            onClose={cerrarPacienteExterno}
+            onPacienteCreado={() => void loadPacientes()}
+          />
         </Modal>
       )}
 
@@ -128,14 +145,7 @@ const DashboardPage: React.FC = () => {
           contentClassName="paciente-modal-content"
         >
           <div style={{ position: 'relative' }}>
-            <button
-              className="close-btn"
-              onClick={() => setSelectedPaciente(null)}
-              aria-label="Cerrar"
-              title="Cerrar"
-            >
-              ×
-            </button>
+            
             <VerPaciente paciente={selectedPaciente} onClose={() => setSelectedPaciente(null)} />
           </div>
         </Modal>

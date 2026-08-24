@@ -41,13 +41,19 @@ export interface RecetaBloquePayload<T> {
 }
 
 /**
- * Las tres recetas son independientes entre sí — cada clave presente
- * (con al menos un ítem) genera una fila `Receta` separada en el backend.
+ * Cada clave es un ARRAY de bloques: cada bloque del array genera su
+ * propia fila `Receta` en el backend. Esto permite que, por ejemplo,
+ * el doctor agregue una receta de medicamentos (diclofenaco + paracetamol)
+ * y después otra receta de medicamentos aparte (ibuprofeno), en vez de
+ * que todo caiga en la misma receta.
+ *
+ * (El backend también acepta un único bloque suelto por compatibilidad
+ * hacia atrás, pero el frontend siempre manda el array.)
  */
 export interface RecetasPayload {
-  medicamentos?: RecetaBloquePayload<RecetaMedicamentoItemPayload>;
-  examenes?: RecetaBloquePayload<RecetaExamenItemPayload>;
-  formulas?: RecetaBloquePayload<RecetaFormulaMagistralItemPayload>;
+  medicamentos?: RecetaBloquePayload<RecetaMedicamentoItemPayload>[];
+  examenes?: RecetaBloquePayload<RecetaExamenItemPayload>[];
+  formulas?: RecetaBloquePayload<RecetaFormulaMagistralItemPayload>[];
 }
 
 // --- Lo que devuelve el backend al leer una receta ya guardada ---

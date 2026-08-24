@@ -400,7 +400,8 @@ body {
 
 .stat-card {
   background: var(--bg-card);
-  border-radius: var(--radius-md); padding: 26px 28px;
+  border-radius: var(--radius-md);
+  padding: 16px 18px;               /* antes: 26px 28px — más chica */
   transition: all var(--transition-smooth);
   border: 1px solid var(--border-color);
   color: var(--text-main); box-shadow: var(--shadow-card);
@@ -419,21 +420,81 @@ body {
 }
 
 .stat-card .stat-label {
-  font-size: 0.8rem; font-weight: 600; color: var(--text-muted);
+  font-size: 0.72rem;                /* antes: 0.8rem */
+  font-weight: 600; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.9;
 }
 
 .stat-card .stat-value {
-  font-size: 2.6rem; font-weight: 800; color: var(--text-main); margin: 8px 0 4px;
+  font-size: 1.8rem;                 /* antes: 2.6rem */
+  font-weight: 800; color: var(--text-main); margin: 6px 0 3px;
   letter-spacing: -0.02em;
 }
 
 .stat-card .stat-change {
-  font-size: 0.85rem; display: flex; align-items: center; gap: 6px; font-weight: 600;
+  font-size: 0.76rem;                /* antes: 0.85rem — achica la flechita ↑ */
+  display: flex; align-items: center; gap: 5px; font-weight: 600;
 }
 
 .stat-card .stat-change.positive { color: var(--status-active); }
 .stat-card .stat-change.negative { color: var(--status-inactive); }
+
+/* ── Mini widget de calendario (tercera tarjeta en stats-grid) ── */
+.mini-calendar-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  transition: all var(--transition-smooth);
+  font-family: inherit;
+  text-align: left;
+}
+
+.mini-calendar-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--cmo-primary);
+}
+
+.mini-calendar-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  background: rgba(20, 184, 166, 0.14);
+  color: var(--cmo-primary);
+}
+
+.mini-calendar-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mini-calendar-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.mini-calendar-date {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  text-transform: capitalize;
+}
 
 /* ── Quick Actions ── */
 .quick-actions { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 28px; }
@@ -594,7 +655,7 @@ body {
 .report-card .sub { font-size: 0.82rem; color: var(--text-muted); opacity: 0.9; margin-top: 6px; }
 
 .report-section-title {
-  font-weight: 700; color: var(--text-main); font-size: 1.15rem; margin: 32px 0 18px 0;
+  font-weight: 700; color: var(--bg-card); font-size: 1.15rem; margin: 32px 0 18px 0;
   border-bottom: 1px solid var(--border-color); padding-bottom: 10px;
 }
 
@@ -987,97 +1048,3 @@ body {
   background: color-mix(in srgb, var(--status-inactive) 85%, black);
   box-shadow: 0 6px 18px rgba(193, 68, 63, 0.35);
 }
-.stat-card {
-  background: var(--bg-card);
-  border-radius: var(--radius-md);
-  padding: 16px 18px;               /* antes: 26px 28px */
-  transition: all var(--transition-smooth);
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
-  box-shadow: var(--shadow-card);
-  position: relative;
-  overflow: hidden;
-}
- 
-.stat-card .stat-label {
-  font-size: 0.72rem;                /* antes: 0.8rem */
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  opacity: 0.9;
-}
- 
-.stat-card .stat-value {
-  font-size: 1.8rem;                 /* antes: 2.6rem */
-  font-weight: 800;
-  color: var(--text-main);
-  margin: 6px 0 3px;                 /* antes: 8px 0 4px */
-  letter-spacing: -0.02em;
-}
- 
-.stat-card .stat-change {
-  font-size: 0.76rem;                /* antes: 0.85rem, esto también achica la "flechita" */
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-weight: 600;
-}
- 
-/* 2) Mini widget de calendario (tercera tarjeta en stats-grid) */
-.mini-calendar-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  background: var(--bg-card);
-  border-radius: var(--radius-md);
-  padding: 16px 18px;
-  border: 1px solid var(--border-color);
-  box-shadow: var(--shadow-card);
-  cursor: pointer;
-  transition: all var(--transition-smooth);
-  font-family: inherit;
-  text-align: left;
-}
- 
-.mini-calendar-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-hover);
-  border-color: var(--cmo-primary);
-}
- 
-.mini-calendar-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.05rem;
-  background: rgba(20, 184, 166, 0.14);
-  color: var(--cmo-primary);
-}
- 
-.mini-calendar-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
- 
-.mini-calendar-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
- 
-.mini-calendar-date {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text-main);
-  text-transform: capitalize;
-}
- 
