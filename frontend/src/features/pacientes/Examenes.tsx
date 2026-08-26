@@ -5,12 +5,27 @@ import React, {
   useCallback,
   useImperativeHandle,
   forwardRef,
-  
 } from 'react';
 import styles from './Examenes.module.css';
-import '../../index.css'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFlaskVial } from '@fortawesome/free-solid-svg-icons';
+import {
+  faFlaskVial,
+  faXRay,
+  faMicroscope,
+  faCloudArrowUp,
+  faFilePdf,
+  faPaperclip,
+  faTrash,
+  faPlus,
+  faXmark,
+} from '@fortawesome/free-solid-svg-icons';
+
+/* ============================================================
+   Helper para combinar clases del CSS Module
+   ============================================================ */
+const cx = (...classes: Array<string | false | null | undefined>) =>
+  classes.filter(Boolean).join(' ');
+
 // Tipos
 type Categoria = 'laboratorio' | 'imagenologia' | 'otros';
 
@@ -18,9 +33,20 @@ interface ExamenItem {
   id: number;
   nombre: string;
   observaciones: string;
-  estado: boolean;
   archivos: { nombre: string; archivoObj: File }[];
   categoria: Categoria;
+}
+
+/* Un archivo pendiente guarda su object URL (solo para imágenes) UNA
+   vez, al agregarlo — antes se llamaba URL.createObjectURL(file) en
+   cada render de la galería, lo que creaba una URL nueva cada vez que
+   el doctor tecleaba algo en "Observaciones" y nunca las liberaba
+   (fuga de memoria). Ahora se crea una sola vez y se libera con
+   URL.revokeObjectURL al quitar el archivo, cambiar de pestaña,
+   guardar o desmontar el componente. */
+interface PendingFile {
+  file: File;
+  url: string | null;
 }
 
 export interface ExamenPayloadItem {
@@ -91,6 +117,12 @@ const CHIPS = {
   otros: ['Electrocardiograma', 'Biopsia', 'Endoscopia', 'Holter de 24h', 'Citología', 'Espirometría']
 };
 
+const TAB_META: Record<Categoria, { label: string; icon: typeof faFlaskVial; className: string }> = {
+  laboratorio: { label: 'Laboratorio', icon: faFlaskVial, className: 'tabLab' },
+  imagenologia: { label: 'Imagenología', icon: faXRay, className: 'tabImg' },
+  otros: { label: 'Otros', icon: faMicroscope, className: 'tabOtros' },
+};
+
 const CATEGORIA_ID: Record<Categoria, number> = {
   laboratorio: 1,
   imagenologia: 2,
@@ -116,12 +148,29 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
   // Formulario
   const [nombre, setNombre] = useState('');
   const [observaciones, setObservaciones] = useState('');
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [shakeNombre, setShakeNombre] = useState(false);
 
   // Referencias
   const nombreInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadAreaRef = useRef<HTMLDivElement>(null);
+
+  // Espejo de pendingFiles para poder liberar sus object URLs al
+  // desmontar el componente (el cleanup de un efecto con deps [] solo
+  // ve el valor que tenía la primera vez, por eso el ref).
+  const pendingFilesRef = useRef<PendingFile[]>([]);
+  useEffect(() => { pendingFilesRef.current = pendingFiles; }, [pendingFiles]);
+  useEffect(() => () => {
+    pendingFilesRef.current.forEach((p) => { if (p.url) URL.revokeObjectURL(p.url); });
+  }, []);
+
+  const limpiarPendingFiles = useCallback(() => {
+    setPendingFiles((prev) => {
+      prev.forEach((p) => { if (p.url) URL.revokeObjectURL(p.url); });
+      return [];
+    });
+  }, []);
 
   /* ---------- handle expuesto al padre (getPayload / reset) ---------- */
   useImperativeHandle(ref, () => ({
@@ -149,9 +198,10 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
       setItems([]);
       setNombre('');
       setObservaciones('');
-      setPendingFiles([]);
+      limpiarPendingFiles();
       if (fileInputRef.current) fileInputRef.current.value = '';
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }));
 
   // Notifica al padre el conteo total de ítems (para el badge del dock).
@@ -170,8 +220,9 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
   useEffect(() => {
     setNombre('');
     setObservaciones('');
-    setPendingFiles([]);
+    limpiarPendingFiles();
     if (fileInputRef.current) fileInputRef.current.value = '';
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
   // Contar items por categoría
@@ -181,11 +232,11 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
     otros: items.filter(i => i.categoria === 'otros').length,
   };
 
-  /* ---------- toast (con soporte de deshacer, igual que Receta.tsx) ---------- */
+  /* ---------- toast (con soporte de deshacer) ---------- */
   const showToast = (msg: string, undoFn?: () => void) => {
     setToast({ msg, undo: undoFn });
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 3200);
+    toastTimer.current = setTimeout(() => setToast(null), 5000);
   };
 
   useEffect(() => {
@@ -194,23 +245,22 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
     };
   }, []);
 
-  // Agregar examen
+  // Agregar examen — si falta el nombre, se agita el campo y se le da
+  // foco en vez de interrumpir con un toast (igual que Receta.tsx).
   const agregarExamen = useCallback(() => {
     const trimmedNombre = nombre.trim();
     if (!trimmedNombre) {
-      showToast('Ingrese el nombre del examen');
+      setShakeNombre(true);
+      setTimeout(() => setShakeNombre(false), 400);
       nombreInputRef.current?.focus();
       return;
     }
-    // El campo resultado ya no existe en el formulario: siempre se
-    // envía null al componente padre (ver getPayload más arriba).
 
     const nuevo: ExamenItem = {
       id: nextId,
       nombre: trimmedNombre,
       observaciones: observaciones.trim(),
-      estado: true,
-      archivos: pendingFiles.map(f => ({ nombre: f.name, archivoObj: f })),
+      archivos: pendingFiles.map(p => ({ nombre: p.file.name, archivoObj: p.file })),
       categoria: tab
     };
     setItems(prev => [...prev, nuevo]);
@@ -219,15 +269,15 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
     // Limpiar campos
     setNombre('');
     setObservaciones('');
-    setPendingFiles([]);
+    limpiarPendingFiles();
     if (fileInputRef.current) fileInputRef.current.value = '';
 
     // Enfocar de nuevo al nombre para agregar otro
     setTimeout(() => nombreInputRef.current?.focus(), 50);
-  }, [nombre, observaciones, pendingFiles, tab, nextId]);
+  }, [nombre, observaciones, pendingFiles, tab, nextId, limpiarPendingFiles]);
 
-  // Eliminar item — igual que Receta.tsx: quita la línea y muestra un
-  // toast con opción de "Deshacer" que la reinserta en su posición original.
+  // Eliminar item — quita la línea y muestra un toast con "Deshacer"
+  // que la reinserta en su posición original.
   const eliminarItem = useCallback((id: number) => {
     setItems(prev => {
       const idx = prev.findIndex(item => item.id === id);
@@ -247,15 +297,51 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
     });
   }, []);
 
+  // Deshace el último examen agregado (el de mayor id), sin importar
+  // en qué categoría haya quedado — atajo Ctrl+Z.
+  const undoLast = useCallback(() => {
+    setItems(prev => {
+      if (!prev.length) return prev;
+      let maxIdx = 0;
+      for (let i = 1; i < prev.length; i++) if (prev[i].id > prev[maxIdx].id) maxIdx = i;
+      const removed = prev[maxIdx];
+      const next = prev.filter((_, i) => i !== maxIdx);
+
+      showToast('Examen eliminado', () => {
+        setItems(list => {
+          const copy = [...list];
+          copy.splice(maxIdx, 0, removed);
+          return copy;
+        });
+      });
+
+      return next;
+    });
+  }, []);
+
   // Manejo de archivos
   const agregarArchivos = useCallback((files: FileList | null) => {
     if (!files) return;
-    const nuevos = Array.from(files);
+    const nuevos: PendingFile[] = Array.from(files).map((f) => ({
+      file: f,
+      url: f.type.startsWith('image/') ? URL.createObjectURL(f) : null,
+    }));
     setPendingFiles(prev => [...prev, ...nuevos]);
   }, []);
 
   const eliminarArchivo = useCallback((index: number) => {
-    setPendingFiles(prev => prev.filter((_, i) => i !== index));
+    setPendingFiles(prev => {
+      const target = prev[index];
+      if (target?.url) URL.revokeObjectURL(target.url);
+      return prev.filter((_, i) => i !== index);
+    });
+  }, []);
+
+  // Abrir el explorador de archivos al hacer click en cualquier parte del área de subida
+  const handleUploadAreaClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.closest(`.${styles.rmThumb}`)) return;
+    fileInputRef.current?.click();
   }, []);
 
   // Drag & drop
@@ -292,10 +378,15 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
         setTab(map[e.key]);
         return;
       }
+      if (e.ctrlKey && e.key.toLowerCase() === 'z') {
+        const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+        const enUnCampo = activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select';
+        if (!enUnCampo) { e.preventDefault(); undoLast(); }
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, undoLast]);
 
   // Renderizar chips
   const chipsDisponibles = CHIPS[tab] || [];
@@ -313,7 +404,7 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
             {item.nombre}
             {item.archivos.length > 0 && (
               <span className={styles.paperclip} title={`${item.archivos.length} archivo(s)`}>
-                <i className="fas fa-paperclip"></i> ×{item.archivos.length}
+                <FontAwesomeIcon icon={faPaperclip} /> ×{item.archivos.length}
               </span>
             )}
           </div>
@@ -322,24 +413,31 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
           </div>
         </div>
         <button type="button" className={styles.rm} title="Eliminar" onClick={() => eliminarItem(item.id)}>
-          <i className="fas fa-trash"></i>
+          <FontAwesomeIcon icon={faTrash} />
         </button>
       </div>
     ));
   };
 
-  // Renderizar miniaturas de archivos
+  // Renderizar miniaturas de archivos pendientes
   const renderGallery = () => {
-    return pendingFiles.map((file, idx) => (
+    return pendingFiles.map((p, idx) => (
       <div key={idx} className={styles.fileThumb}>
-        {file.type.startsWith('image/') ? (
-          <img src={URL.createObjectURL(file)} alt="preview" />
+        {p.url ? (
+          <img src={p.url} alt="preview" />
         ) : (
-          <div className={styles.docIco}><i className="fas fa-file-pdf"></i></div>
+          <div className={styles.docIco}><FontAwesomeIcon icon={faFilePdf} /></div>
         )}
-        <div className={styles.thumbName}>{file.name}</div>
-        <button className={styles.rmThumb} onClick={() => eliminarArchivo(idx)}>
-          <i className="fas fa-times"></i>
+        <div className={styles.thumbName}>{p.file.name}</div>
+        <button
+          type="button"
+          className={styles.rmThumb}
+          onClick={(e) => {
+            e.stopPropagation();
+            eliminarArchivo(idx);
+          }}
+        >
+          <FontAwesomeIcon icon={faXmark} />
         </button>
       </div>
     ));
@@ -348,11 +446,10 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
   // IMPORTANTE: este return-null solo oculta el contenido renderizado.
   // El componente sigue MONTADO (sus hooks/estado siguen vivos) mientras
   // el padre lo mantenga en el árbol sin envolverlo en `isOpen && (...)`.
-  // Así es como los ítems sobreviven a abrir/cerrar el drawer.
   if (!isOpen) return null;
 
   return (
-    <>
+    <div className={styles.examenesWidget}>
       {/* Overlay */}
       <div className={styles.overlay} onClick={onClose} />
 
@@ -360,63 +457,67 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
       <div className={styles.drawer}>
         {/* Header */}
         <div className={styles.drawerHead}>
-<div className={styles.ico}><FontAwesomeIcon icon={faFlaskVial} /></div>
-          <div className={styles.titles}>          
+          <div className={styles.ico}><FontAwesomeIcon icon={faFlaskVial} /></div>
+          <div className={styles.titles}>
             <h3>Exámenes complementarios</h3>
             <div className={styles.ctx}>
               <span>Paciente: <b>{contexto.paciente_nombre}</b></span>
-              
               <span>Médico: <b>{contexto.medico_nombre}</b></span>
             </div>
           </div>
-          <button className={styles.drawerClose} onClick={onClose}>✕</button>
+          <button type="button" className={styles.drawerClose} onClick={onClose}>
+            <FontAwesomeIcon icon={faXmark} />
+          </button>
         </div>
 
         {/* Body */}
         <div className={styles.drawerBody}>
-          {/* Tabs */}
-          <div className={styles.examTabs}>
-            <button
-              className={`${styles.examTab} ${tab === 'laboratorio' ? styles.active : ''} ${styles.tabLab}`}
-              onClick={() => setTab('laboratorio')}
-            >
-              <i className="fas fa-flask"></i> Laboratorio <span className={styles.k}>Alt+1</span>
-            </button>
-            <button
-              className={`${styles.examTab} ${tab === 'imagenologia' ? styles.active : ''} ${styles.tabImg}`}
-              onClick={() => setTab('imagenologia')}
-            >
-              <i className="fas fa-x-ray"></i> Imagenología <span className={styles.k}>Alt+2</span>
-            </button>
-            <button
-              className={`${styles.examTab} ${tab === 'otros' ? styles.active : ''} ${styles.tabOtros}`}
-              onClick={() => setTab('otros')}
-            >
-              <i className="fas fa-microscope"></i> Otros <span className={styles.k}>Alt+3</span>
-            </button>
+          {/* ================= Categoría: tabs + chips + lista ================= */}
+          <div className={styles.panel}>
+            <div className={styles.examTabs}>
+              {(Object.keys(TAB_META) as Categoria[]).map((cat, i) => {
+                const meta = TAB_META[cat];
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    className={cx(styles.examTab, styles[meta.className], tab === cat && styles.active)}
+                    onClick={() => setTab(cat)}
+                  >
+                    <FontAwesomeIcon icon={meta.icon} /> {meta.label}
+                    {counts[cat] > 0 && <span className={styles.count}>{counts[cat]}</span>}
+                    <span className={styles.k}>Alt+{i + 1}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className={styles.chipsLabel}>Más usados en esta categoría</div>
+            <div className={styles.chips}>
+              {chipsDisponibles.map(chip => (
+                <button
+                  key={chip}
+                  type="button"
+                  className={styles.chipQuick}
+                  onClick={() => {
+                    setNombre(chip);
+                    nombreInputRef.current?.focus();
+                  }}
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+
+            <div className={styles.ticket}>
+              {renderItemList()}
+            </div>
           </div>
 
-          {/* Chips */}
-          <div className={styles.chipsLabel}>Más usados en esta categoría</div>
-          <div className={styles.chips}>
-            {chipsDisponibles.map(chip => (
-              <button
-                key={chip}
-                className={styles.chipQuick}
-                onClick={() => {
-                  setNombre(chip);
-                  nombreInputRef.current?.focus();
-                }}
-              >
-                {chip}
-              </button>
-            ))}
-          </div>
-
-          {/* Formulario */}
-          <div className={styles.examForm}>
+          {/* ================= Formulario para agregar un examen ================= */}
+          <div className={styles.panel}>
             <div className={styles.formRow}>
-              <div className={`${styles.formGroup} ${styles.full}`}>
+              <div className={cx(styles.formGroup, styles.full)}>
                 <label htmlFor="nombre_examen">Nombre del examen <span className={styles.required}>*</span></label>
                 <input
                   ref={nombreInputRef}
@@ -427,6 +528,7 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
                   maxLength={200}
                   placeholder="Escriba para buscar o elija un chip de arriba…"
                   value={nombre}
+                  className={cx(shakeNombre && styles.shakeField)}
                   onChange={e => setNombre(e.target.value)}
                   onKeyDown={e => {
                     if (e.key === 'Enter') {
@@ -445,7 +547,7 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
             </div>
 
             <div className={styles.formRow}>
-              <div className={`${styles.formGroup} ${styles.full}`}>
+              <div className={cx(styles.formGroup, styles.full)}>
                 <div className={styles.labelRow}>
                   <label htmlFor="observaciones_examen">Observaciones</label>
                   <span className={styles.counter}>{observaciones.length}/300</span>
@@ -462,7 +564,7 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
             </div>
 
             <div className={styles.formRow}>
-              <div className={`${styles.formGroup} ${styles.full}`}>
+              <div className={cx(styles.formGroup, styles.full)}>
                 <label>Archivos adjuntos</label>
                 <div className={styles.formHint} style={{ margin: '0 0 6px' }}>
                   Puede adjuntar varias imágenes a la vez — por ejemplo, todas las tomas de una misma ecografía.
@@ -470,24 +572,28 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
                 <div
                   ref={uploadAreaRef}
                   className={styles.uploadArea}
+                  onClick={handleUploadAreaClick}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                 >
                   <input
                     ref={fileInputRef}
+                    id="archivo_examen"
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
                     multiple
                     onChange={e => agregarArchivos(e.target.files)}
                   />
-                  <label htmlFor="archivo_examen" className={styles.uploadLabel}>
-                    <i className="fas fa-cloud-upload-alt"></i>
+                  <div className={styles.uploadLabel}>
+                    <FontAwesomeIcon icon={faCloudArrowUp} />
                     <span>Seleccionar o arrastrar una o varias imágenes/PDF</span>
-                  </label>
-                  <div className={styles.fileGallery}>
-                    {renderGallery()}
                   </div>
+                  {pendingFiles.length > 0 && (
+                    <div className={styles.fileGallery}>
+                      {renderGallery()}
+                    </div>
+                  )}
                   <div className={styles.galleryCount}>
                     {pendingFiles.length > 0 && `${pendingFiles.length} archivo(s) listos para este examen`}
                   </div>
@@ -496,15 +602,11 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
             </div>
 
             <div className={styles.formActions}>
-              <button className={styles.btnAddExam} onClick={agregarExamen}>
-                <i className="fas fa-plus"></i> Agregar examen <kbd>Enter</kbd>
+              <button type="button" className={styles.btnAddExam} onClick={agregarExamen}>
+                <FontAwesomeIcon icon={faPlus} /> Agregar examen <kbd>Enter</kbd>
               </button>
+              <span className={styles.hintUndo}><kbd>Ctrl</kbd>+<kbd>Z</kbd> deshacer último</span>
             </div>
-          </div>
-
-          {/* Lista de items (ticket) */}
-          <div className={styles.ticket}>
-            {renderItemList()}
           </div>
         </div>
       </div>
@@ -515,6 +617,7 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
           <span>{toast.msg}</span>
           {toast.undo && (
             <button
+              type="button"
               onClick={() => {
                 toast.undo?.();
                 setToast(null);
@@ -525,7 +628,7 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
           )}
         </div>
       )}
-    </>
+    </div>
   );
 });
 

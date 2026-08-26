@@ -4,6 +4,8 @@ import { downloadRegistroClinicoPdf, getExpedientePaciente } from '../../api/his
 import type { RegistroClinico, RegistroCompletoResponse } from '../../api/historialClinico';
 import type { SeguimientoControlResponse } from '../../api/seguimientoControl';
 import HistoriaClinica from './RegistroClinico';
+import EditarRegistroClinico from './EditarRegistroClinico';
+import type { RegistroCompletoUpdateResponse } from '../../api/historialClinico';
 import RegistroClinicoDetalle from './RegistroClinicoDetalle';
 import Control from './Control';
 import CrearCita from '../../components/CrearCita.tsx';
@@ -225,6 +227,8 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
   const [consultaIdParaCobro, setConsultaIdParaCobro] = useState<number | null>(null);
 
   const [registroIdDetalle, setRegistroIdDetalle] = useState<number | null>(null);
+  // Registro que se está editando (abre EditarRegistroClinico en modal).
+  const [registroIdEditando, setRegistroIdEditando] = useState<number | null>(null);
   // Controla la animación de salida del drawer: cuando se pide cerrar, primero
   // se dispara la animación (cerrando = true) y solo al terminar se desmonta
   // (registroIdDetalle = null), para que el drawer salga deslizando hacia la
@@ -290,8 +294,23 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
   }, []);
 
   const handleEditarRegistro = useCallback((registroId: number) => {
-    console.log('Editando registro ID:', registroId);
+    setRegistroIdEditando(registroId);
     setMenuAbiertoId(null);
+  }, []);
+
+  // Al guardar la edición: reemplaza ese registro en el timeline en
+  // memoria (sin recargar todo el expediente) y cierra el modal.
+  const handleRegistroEditado = useCallback((resultado: RegistroCompletoUpdateResponse) => {
+    setExpediente((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        registros_clinicos: (prev.registros_clinicos || []).map((r) =>
+          r.id === resultado.registro.id ? resultado.registro : r
+        ),
+      };
+    });
+    setRegistroIdEditando(null);
   }, []);
 
   const handleEliminarRegistro = useCallback((registroId: number) => {
@@ -395,56 +414,63 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
       </main>
 
       {/* ================= MODALES DE CREACIÓN ================= */}
+      {/* HistoriaClinica (RegistroClinico.tsx) es un modal autocontenido:
+          trae su propio backdrop, wrapper ancho y botón de cerrar, así que
+          acá solo se monta condicionalmente. */}
       {showHistoriaClinica && (
-        <div className={styles.backdrop} onClick={() => setShowHistoriaClinica(false)}>
+        <HistoriaClinica paciente={paciente} onClose={() => setShowHistoriaClinica(false)} onSave={handleRegistroGuardado} />
+      )}
+
+      {registroIdEditando !== null && (
+        <div className={styles.backdrop} onClick={() => setRegistroIdEditando(null)}>
           <div className={styles.backdropContentWide} onClick={(e) => e.stopPropagation()}>
-            <button type="button" className={styles.closeBtn} onClick={() => setShowHistoriaClinica(false)}>
+            <button type="button" className={styles.closeBtn} onClick={() => setRegistroIdEditando(null)}>
               <FontAwesomeIcon icon={faXmark} />
             </button>
-            <HistoriaClinica paciente={paciente} onClose={() => setShowHistoriaClinica(false)} onSave={handleRegistroGuardado} />
-          </div>
-        </div>
-      )}
-
-      {showCrearCita && (
-        <div className={styles.backdrop} onClick={() => setShowCrearCita(false)}>
-          <div className={styles.backdropContent} onClick={(e) => e.stopPropagation()}>
-            <button type="button" className={styles.closeBtn} onClick={() => setShowCrearCita(false)}>
-              <FontAwesomeIcon icon={faXmark} />
-            </button>
-            <CrearCita paciente={paciente} onClose={() => setShowCrearCita(false)} onSuccess={() => setShowCrearCita(false)} />
-          </div>
-        </div>
-      )}
-
-      {showControl && registroMasReciente && (
-        <div className={styles.backdrop} onClick={() => setShowControl(false)}>
-          <div className={styles.backdropContent} onClick={(e) => e.stopPropagation()}>
-            <button type="button" className={styles.closeBtn} onClick={() => setShowControl(false)}>
-              <FontAwesomeIcon icon={faXmark} />
-            </button>
-            <Control
-              registroClinico={registroMasReciente}
-              pacienteNombre={nombrePaciente}
-              pacienteEdad={paciente?.edad != null ? String(paciente.edad) : '—'}
-              pacienteCi={paciente?.documento ?? '—'}
-              alergias={alergias.join(', ')}
-              onClose={() => setShowControl(false)}
-              onSaved={handleSeguimientoGuardado}
+            <EditarRegistroClinico
+              registroId={registroIdEditando}
+              paciente={paciente}
+              onClose={() => setRegistroIdEditando(null)}
+              onSaved={handleRegistroEditado}
             />
           </div>
         </div>
       )}
 
+      {/* CrearCita es un modal autocontenido: trae su propio backdrop y
+          botón de cerrar, así que acá solo se monta condicionalmente,
+          sin el wrapper de backdrop/backdropContent/closeBtn que usan
+          los demás modales de este archivo. */}
+      {showCrearCita && (
+        <CrearCita
+          paciente={paciente}
+          onClose={() => setShowCrearCita(false)}
+          onSuccess={() => setShowCrearCita(false)}
+        />
+      )}
+
+      {/* Control es un modal autocontenido: trae su propio backdrop y
+          botón de cerrar, así que acá solo se monta condicionalmente. */}
+      {showControl && registroMasReciente && (
+        <Control
+          registroClinico={registroMasReciente}
+          pacienteNombre={nombrePaciente}
+          pacienteEdad={paciente?.edad != null ? String(paciente.edad) : '—'}
+          pacienteCi={paciente?.documento ?? '—'}
+          alergias={alergias.join(', ')}
+          onClose={() => setShowControl(false)}
+          onSaved={handleSeguimientoGuardado}
+        />
+      )}
+
+      {/* Cobrar es un modal autocontenido: trae su propio backdrop y
+          botón de cerrar, así que acá solo se monta condicionalmente. */}
       {showCobrar && consultaIdParaCobro !== null && (
-        <div className={styles.backdrop} onClick={() => setShowCobrar(false)}>
-          <div className={styles.backdropContent} onClick={(e) => e.stopPropagation()}>
-            <button type="button" className={styles.closeBtn} onClick={() => setShowCobrar(false)}>
-              <FontAwesomeIcon icon={faXmark} />
-            </button>
-            <Cobrar consultaId={consultaIdParaCobro} onCobrado={() => setShowCobrar(false)} />
-          </div>
-        </div>
+        <Cobrar
+          consultaId={consultaIdParaCobro}
+          onClose={() => setShowCobrar(false)}
+          onCobrado={() => setShowCobrar(false)}
+        />
       )}
 
       {/* ================= DRAWER: DETALLE DEL REGISTRO CLÍNICO ================= */}

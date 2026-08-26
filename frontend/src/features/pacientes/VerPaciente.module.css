@@ -460,8 +460,8 @@
 
 .closeBtn {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 14px;
+  right: 14px;
   width: 34px;
   height: 34px;
   border-radius: 50%;
@@ -472,7 +472,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 999;
+  z-index: 40;
   box-shadow: var(--shadow-hover);
   transition: all var(--transition-fast);
 }

@@ -145,7 +145,7 @@ const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes,
 
           <div className={styles.listaDia}>
             <h4>{fechaLabel || 'Selecciona un día'}</h4>
-
+            <h4 className={styles.subtitulo}>Citas</h4>
             {citasDelDiaSeleccionado.length === 0 ? (
               <p className={styles.sinCitas}>No hay citas registradas este día.</p>
             ) : (

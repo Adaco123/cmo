@@ -175,8 +175,51 @@ class PacientesNuevos_Resource(Resource):
         }, 200
 
 
+class PacientesAtendidosHoy_Resource(Resource):
+    """Pacientes atendidos hoy, comparado con ayer (variación porcentual)."""
+
+    @jwt_required()
+    def get(self):
+        hoy = date.today()
+        ayer = hoy - timedelta(days=1)
+
+        total_hoy = (
+            db.session.query(func.count(func.distinct(Consulta.paciente_id)))
+            .filter(Consulta.fecha == hoy)
+            .scalar()
+        ) or 0
+
+        total_ayer = (
+            db.session.query(func.count(func.distinct(Consulta.paciente_id)))
+            .filter(Consulta.fecha == ayer)
+            .scalar()
+        ) or 0
+
+        if total_ayer == 0:
+            variacion_porcentual = 100.0 if total_hoy > 0 else 0.0
+        else:
+            variacion_porcentual = round(
+                ((total_hoy - total_ayer) / total_ayer) * 100, 2
+            )
+
+        paciente_ids = (
+            db.session.query(Consulta.paciente_id)
+            .filter(Consulta.fecha == hoy)
+            .distinct()
+        )
+        items = Paciente.query.filter(Paciente.id.in_(paciente_ids)).all()
+
+        return {
+            "total_hoy": total_hoy,
+            "total_ayer": total_ayer,
+            "variacion_porcentual": variacion_porcentual,
+            "pacientes": schema_list.dump(items),
+        }, 200
+
+
 api.add_resource(PacientesList_Resource, '/')
 api.add_resource(Paciente_Resource, '/<int:item_id>')
 api.add_resource(PacientesEstadisticasMes_Resource, '/estadisticas/mes')
 api.add_resource(PacientesFrecuentes_Resource, '/frecuentes')
 api.add_resource(PacientesNuevos_Resource, '/nuevos')
+api.add_resource(PacientesAtendidosHoy_Resource, '/atendidos-hoy')

@@ -535,6 +535,135 @@ class RegistroClinicoCompleto_Resource(Resource):
 
         return respuesta, 201
 
+
+class RegistroClinicoCompletoUpdate_Resource(Resource):
+    """
+    PUT /api/historial_clinico/registro-completo/<int:registro_id>
+
+    Actualiza, en una sola transacción: los campos editables de la
+    Consulta (motivo, diagnostico, fecha, hora, medico_id, estado —
+    paciente_id y cita_id quedan fijos, no se pueden cambiar acá) y los
+    datos del RegistroClinico (signos vitales, información clínica).
+
+    Si el body trae "examenes_complementarios", cada uno se procesa así:
+      - con "id"  -> actualiza el examen existente (debe pertenecer a
+                     este registro).
+      - sin "id"  -> crea un examen nuevo.
+    Este endpoint NUNCA borra un examen solo porque no venga en la
+    lista — si el examen ya existía y no lo mandas, simplemente lo deja
+    tal cual está, sin tocarlo. Borrar un examen es una acción aparte
+    (explícita), no algo que pase por omisión.
+
+    Las recetas NO se tocan en este endpoint — se editan con sus propios
+    endpoints (PUT /recetas/<id>, /recetas/<id>/medicamentos,
+    /recetas/examenes/<id>, /recetas/formulas/<id>).
+    """
+
+    @jwt_required()
+    def put(self, registro_id):
+        registro = RegistroClinico.get_by_id(registro_id)
+        if not registro:
+            return {"error": "Registro clínico no encontrado"}, 404
+
+        consulta = registro.consulta
+        body = request.get_json(force=True) or {}
+        consulta_data = dict(body.get("consulta") or {})
+        registro_data = body.get("registro", {}) or {}
+        examenes_data = body.get("examenes_complementarios")  # None = no tocar
+
+        # --- Validación de forma ---
+        # paciente_id y cita_id no se editan acá aunque vengan en el body.
+        consulta_data.pop("paciente_id", None)
+        consulta_data.pop("cita_id", None)
+        try:
+            consulta_validated = consulta_schema.load(consulta_data, partial=True)
+        except ValidationError as err:
+            return {"consulta": err.messages}, 400
+
+        try:
+            registro_validated = registro_schema.load(registro_data, partial=True)
+        except ValidationError as err:
+            return {"registro": err.messages}, 400
+        registro_validated.pop("consulta_id", None)
+        registro_validated.pop("historia_clinica_id", None)
+
+        # --- Validación de relaciones ---
+        if "medico_id" in consulta_validated and not Medico.get_by_id(consulta_validated["medico_id"]):
+            return {"error": "El médico indicado no existe"}, 404
+
+        examenes_actualizar = []  # [(instancia_existente, datos_dict)]
+        examenes_crear = []       # [datos_dict]
+
+        if examenes_data is not None:
+            for i, ex in enumerate(examenes_data):
+                categoria_nombre = ex.get("categoria")
+                if categoria_nombre not in CATEGORIAS_EXAMEN_VALIDAS:
+                    return {
+                        "examenes_complementarios": {
+                            i: {"categoria": [f"Debe ser una de: {sorted(CATEGORIAS_EXAMEN_VALIDAS)}"]}
+                        }
+                    }, 400
+                nombre_examen = (ex.get("nombre_examen") or "").strip()
+                if not nombre_examen:
+                    return {"examenes_complementarios": {i: {"nombre_examen": ["Requerido"]}}}, 400
+
+                datos = {
+                    "categoria_nombre": categoria_nombre,
+                    "nombre_examen": nombre_examen,
+                    "resultado": (ex.get("resultado") or "").strip() or None,
+                    "observaciones": (ex.get("observaciones") or "").strip() or None,
+                }
+
+                examen_id = ex.get("id")
+                if examen_id:
+                    examen_existente = ExamenComplementario.get_by_id(int(examen_id))
+                    if not examen_existente or examen_existente.registro_clinico_id != registro.id:
+                        return {
+                            "examenes_complementarios": {i: {"id": ["No pertenece a este registro clínico"]}}
+                        }, 404
+                    examenes_actualizar.append((examen_existente, datos))
+                else:
+                    examenes_crear.append(datos)
+
+        # --- Transacción: todo o nada ---
+        try:
+            for key, value in consulta_validated.items():
+                setattr(consulta, key, value)
+
+            for key, value in registro_validated.items():
+                setattr(registro, key, value)
+
+            for examen_existente, datos in examenes_actualizar:
+                categoria = _get_or_create_categoria_examen(datos["categoria_nombre"])
+                examen_existente.categoria_id = categoria.id
+                examen_existente.nombre_examen = datos["nombre_examen"]
+                examen_existente.resultado = datos["resultado"]
+                examen_existente.observaciones = datos["observaciones"]
+
+            for datos in examenes_crear:
+                categoria = _get_or_create_categoria_examen(datos["categoria_nombre"])
+                db.session.add(ExamenComplementario(
+                    registro_clinico_id=registro.id,
+                    categoria_id=categoria.id,
+                    nombre_examen=datos["nombre_examen"],
+                    resultado=datos["resultado"],
+                    observaciones=datos["observaciones"],
+                ))
+
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Error actualizando registro clínico completo")
+            return {"error": "No se pudo actualizar el registro clínico completo"}, 500
+
+        return {
+            "consulta": consulta_schema.dump(consulta),
+            "registro": registro_schema.dump(registro),
+            "examenes_complementarios": examen_complementario_schema.dump(
+                registro.examenes_complementarios, many=True
+            ),
+        }, 200
+
 # ---------------------------------------------------------------------------
 # Seguimientos de control (día 15, 22, 29... cada visita posterior)
 # ---------------------------------------------------------------------------
@@ -641,10 +770,26 @@ class RegistroClinicoDetalleCompleto_Resource(Resource):
             "recetas": receta_schema.dump(registro.recetas, many=True),
             "seguimientos_control": seguimiento_schema_list.dump(seguimientos),
         }, 200
+class SeguimientoControlList_Resource(Resource):
+    """
+    GET /api/historial_clinico/seguimientos
 
+    Listado global de seguimientos de control (todos los registros),
+    usado por el calendario del dashboard.
+    """
 
+    @jwt_required()
+    def get(self):
+        seguimientos = (
+            SeguimientoControl.query
+            .order_by(SeguimientoControl.fecha.asc())
+            .all()
+        )
+        return seguimiento_schema_list.dump(seguimientos), 200
+api.add_resource(SeguimientoControlList_Resource, "/seguimientos")
 api.add_resource(RegistroClinicoDetalleCompleto_Resource, "/registros/<int:registro_id>/completo")
 api.add_resource(RegistroClinicoCompleto_Resource, "/registro-completo")
+api.add_resource(RegistroClinicoCompletoUpdate_Resource, "/registro-completo/<int:registro_id>")
 
 api.add_resource(HistoriaClinicaList_Resource, "/historias")
 api.add_resource(HistoriaClinica_Resource, "/historias/<int:historia_id>")

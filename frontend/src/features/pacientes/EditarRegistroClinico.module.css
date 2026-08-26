@@ -1,84 +1,11 @@
 /* ============================================================
-   RegistroClinico.module.css — rediseño con paleta clara global
-   Reutiliza EXCLUSIVAMENTE las variables reales definidas en tu
-   index.css. Donde no existía un token equivalente (radios 2xl/
-   3xl/4xl, sombras "save"/"dock", glow de foco, --cmo-secondary-
-   -dark), se generó a partir de tokens que sí tienes (--primary,
-   --primary-light, --primary-dark, --status-inactive, --shadow-
-   hover) con color-mix(), en vez de inventar variables nuevas.
-   Única excepción: --warn / --warn-bg / --warn-line, que no
-   tienen ningún equivalente semántico en tu paleta actual — se
-   dejaron con un valor de respaldo vía var(--warn, #C08A2E) para
-   que funcionen ya mismo y se puedan sobreescribir si agregas
-   ese token a :root más adelante.
-
-   FIX de contraste: .page y .topbar viven directo sobre el fondo
-   azul (--bg-body), no dentro de una card clara. Antes usaban
-   --text-main/--text-muted (pensados para texto DENTRO de
-   --bg-card) y quedaban casi invisibles sobre el azul. Ahora usan
-   el par --text-on-dark/--text-on-dark-muted, igual que en
-   VerPaciente.module.css. Todo lo que sí vive dentro de una card
-   clara (.card, .field, .pacienteCard, .dockBtn, etc.) se dejó
-   con --text-main/--text-muted, que es lo correcto ahí.
-
-   MODAL AUTOCONTENIDO: el componente ahora trae su propio
-   .backdrop + .modalWide + .closeBtn (mismo patrón que
-   CrearCita.module.css / Control.module.css), así que ya no
-   depende de que VerPaciente.tsx lo envuelva en su propio modal.
-   .page dejó de forzar min-height:100vh porque ahora vive dentro
-   de .modalWide, que ya controla el alto máximo y el scroll.
+   EditarRegistroClinico.module.css — copia 1:1 del sistema de
+   diseño de RegistroClinico.module.css (mismos tokens de index.css,
+   mismo look). Se agregan solo las clases nuevas que necesita el
+   modo edición: estado de carga inicial y la lista de exámenes
+   complementarios editable (sin drawer, inline).
    ============================================================ */
 
-/* ----- BACKDROP + WRAPPER (modal autocontenido) ----- */
-.backdrop {
-  position: fixed;
-  inset: 0;
-  background: color-mix(in srgb, var(--text-main) 50%, transparent);
-  backdrop-filter: blur(3px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  padding: 24px;
-}
-
-.modalWide {
-  position: relative;
-  width: 100%;
-  max-width: 1100px;
-  max-height: 92vh;
-  overflow-y: auto;
-  border-radius: 20px;
-}
-
-.closeBtn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid var(--border-color);
-  background: var(--bg-card);
-  color: var(--text-main);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: var(--shadow-hover);
-  transition: var(--transition-fast);
-  z-index: 40;
-}
-
-.closeBtn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.closeBtn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
 
 .page * {
   box-sizing: border-box;
@@ -89,6 +16,7 @@
   color: var(--text-on-dark);
   font-family: var(--sans);
   width: 100%;
+  min-height: 100vh;
   padding: 26px 28px 40px;
   border-radius: 20px;
   overflow: visible;
@@ -883,14 +811,113 @@
   border-color: var(--border-color);
 }
 
-/* ----- Responsive ----- */
-@media (max-width: 700px) {
-  .backdrop {
-    padding: 12px;
-  }
-  .modalWide {
-    max-height: 95vh;
-  }
+/* ============================================================
+   NUEVO — estado de carga inicial (mientras se trae el registro
+   existente desde el backend, antes de mostrar el formulario).
+   ============================================================ */
+.loadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: var(--text-on-dark-muted);
+  font-size: 14px;
+}
+
+.loadingState i {
+  font-size: 24px;
+  color: var(--primary);
+}
+
+/* ============================================================
+   NUEVO — lista de exámenes complementarios editable (inline,
+   sin drawer). Cada fila es un examen ya guardado (editable, sin
+   botón de borrar) o uno nuevo agregado en esta sesión (con botón
+   de quitar, porque todavía no se guardó).
+   ============================================================ */
+.examenesLista {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.examenRow {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 14px;
+  background: var(--bg-input);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.examenRowHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.examenRowHead select {
+  font-family: var(--sans);
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+}
+
+.examenBadgeGuardado {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--primary-dark);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 3px 10px;
+}
+
+.examenQuitarBtn {
+  background: none;
+  border: none;
+  color: var(--status-inactive);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 8px;
+}
+
+.examenRow input[type="text"],
+.examenRow textarea {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  resize: vertical;
+}
+
+.agregarExamenBtn {
+  align-self: flex-start;
+  background: var(--bg-card);
+  border: 1.5px dashed var(--border-color);
+  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.agregarExamenBtn:hover {
+  background: var(--bg-card-hover);
 }
 
 /* ============================================================

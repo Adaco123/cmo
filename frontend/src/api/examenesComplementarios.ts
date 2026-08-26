@@ -16,6 +16,17 @@ export interface ExamenComplementarioItemPayload {
   observaciones?: string | null;
 }
 
+/**
+ * Igual que ExamenComplementarioItemPayload, pero para el PUT de edición
+ * (registro-completo/<id>): si trae "id", el backend actualiza ese
+ * examen existente; si no trae "id", crea uno nuevo. El que no se
+ * incluya en la lista queda intacto (el backend nunca borra por
+ * omisión).
+ */
+export interface ExamenComplementarioUpdateItemPayload extends ExamenComplementarioItemPayload {
+  id?: number;
+}
+
 /** Lo que devuelve el backend al leer un examen ya guardado. */
 export interface ExamenComplementario {
   id: number;

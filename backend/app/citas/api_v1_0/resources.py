@@ -28,6 +28,18 @@ def _validar_referencias(data):
     return None
 
 
+def _existe_choque_horario(medico_id, fecha, hora_inicio, hora_fin, excluir_id=None):
+    query = Cita.query.filter(
+        Cita.medico_id == medico_id,
+        Cita.fecha == fecha,
+        Cita.hora_inicio < hora_fin,
+        Cita.hora_fin > hora_inicio,
+    )
+    if excluir_id is not None:
+        query = query.filter(Cita.id != excluir_id)
+    return query.first() is not None
+
+
 class CitasList_Resource(Resource):
     @jwt_required()
     def get(self):
@@ -44,6 +56,9 @@ class CitasList_Resource(Resource):
         error = _validar_referencias(data)
         if error:
             return error
+
+        if _existe_choque_horario(data["medico_id"], data["fecha"], data["hora_inicio"], data["hora_fin"]):
+            return {"error": "Ya existe una cita registrada con ese médico a esa misma hora"}, 409
 
         item = Cita(**data)
         item.save()

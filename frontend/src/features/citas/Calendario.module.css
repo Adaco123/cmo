@@ -150,7 +150,7 @@
   opacity: 0.55;
 }
 
-.diaConCitas::after {
+.diaConCitas::before {
   content: '';
   position: absolute;
   top: 4px;
@@ -179,7 +179,7 @@
   color: #fff !important;
 }
 
-.diaSeleccionado.diaConCitas::after,
+.diaSeleccionado.diaConCitas::before,
 .diaSeleccionado.diaConSeguimientos::after {
   background: #fff;
 }

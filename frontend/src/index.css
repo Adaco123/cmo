@@ -1,30 +1,32 @@
 :root {
   /* ---- Paleta base ---- */
-  /* Fondo general: navy profundo, ahora con un segundo tono para crear
-     un leve degradado en vez de un plano sólido y "muerto". */
+  /* Fondo general: navy profundo, sólido (el cliente pidió que el fondo
+     sea siempre --bg-body, sin degradado). */
   --bg-body: #0a2f4d;
-  --bg-body-alt: #123b5e;
-  --bg-body-gradient: radial-gradient(
-    circle at 20% 0%,
-    var(--bg-body-alt) 0%,
-    var(--bg-body) 55%
-  );
 
   --bg-card: #EAF2F9;
   --bg-card-hover: #DCE8F3;
   --bg-input: #F4F9FC;
   --border-color: #2A5578; /* visible tanto sobre body oscuro como sobre cards claras */
 
+  /* ---- Superficies oscuras ----
+     Para tarjetas que flotan sobre --bg-body y deben verse "elevadas"
+     pero oscuras (ej. la tarjeta de login), en vez de las tarjetas
+     claras (--bg-card) usadas en el resto de la app. Colores tomados
+     directamente del diseño de referencia del login. */
+  --bg-card-dark: #080F1C;
+  --bg-input-dark: #151B28;
+
   /* ---- Texto: separado por contexto ----
      Antes --text-main se usaba tanto en el body (fondo oscuro) como
      dentro de las cards (fondo claro), y sobre el body quedaba casi
      invisible por bajo contraste. Ahora hay un par explícito para
      cada superficie. */
-  --text-on-dark: #EFF6FC;        /* texto principal sobre --bg-body */
+  --text-on-dark: #EFF6FC;        /* texto principal sobre --bg-body y tarjetas oscuras */
   --text-on-dark-muted: #A9C6DD;  /* texto secundario sobre --bg-body */
 
-  --text-main: #12293F;    /* texto principal dentro de cards (fondo claro) */
-  --text-muted: #3E5A75;   /* texto secundario dentro de cards */
+  --text-main: #12293F;    /* texto principal dentro de cards claras */
+  --text-muted: #3E5A75;   /* texto secundario dentro de cards claras y en tarjetas oscuras (ver login) */
 
   --primary: #14b8a6;
   --primary-dark: #0d9488;
@@ -38,6 +40,10 @@
   --cmo-secondary: #2dd4bf;
   --cmo-accent: #A7F3D0;
   --login-gradient: linear-gradient(135deg, #14b8a6, #2dd4bf);
+
+  /* ---- Resplandor de tarjeta oscura (borde tipo neón del login) ---- */
+  --shadow-glow: 0 0 0 1.5px var(--primary),
+                 0 0 22px color-mix(in srgb, var(--primary) 55%, transparent);
 
   /* ---- Estado semántico ---- */
   --success: #2E8F63;
@@ -58,7 +64,7 @@
   --transition-spring: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* ---- Sombras ----
-     Las sombras de las cards ahora se calculan sobre negro puro, porque
+     Las sombras de las cards se calculan sobre negro puro, porque
      las cards flotan sobre un fondo oscuro (antes se calculaban sobre
      --text-main, pensado para fondo claro, y perdían fuerza aquí). */
   --shadow: rgba(0, 0, 0, 0.35) 0 10px 15px -3px,
@@ -69,8 +75,10 @@
   /* ---- Alias semánticos ----
      --text / --text-h ahora apuntan al par "sobre fondo oscuro" porque
      h1, h2, p, code (definidos más abajo) viven directamente sobre
-     --bg-body. Si algún componente de card necesita texto oscuro,
-     usa --text-main directamente en ese componente. */
+     --bg-body. Si algún componente de card CLARA necesita texto oscuro,
+     usa --text-main directamente en ese componente (ver Control.module.css).
+     Si el componente es una tarjeta OSCURA (ej. login), --text / --text-h
+     ya son correctos tal cual. */
   --text: var(--text-on-dark);
   --text-h: var(--text-on-dark);
   --bg: var(--bg-body);
@@ -90,7 +98,7 @@
   letter-spacing: 0.18px;
   color-scheme: dark;
   color: var(--text-on-dark);
-  background: var(--bg-body-gradient);
+  background: var(--bg-body);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -118,7 +126,7 @@ body {
   margin: 0;
   width: 100%;
   min-height: 100%;
-  background: var(--bg-body-gradient);
+  background: var(--bg-body);
 }
 
 h1,

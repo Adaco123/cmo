@@ -36,7 +36,16 @@ export interface PagosReporteMensual {
   total_pagado_mes: string;
   cantidad_pagos: number;
 }
-
+export interface PacientesAtendidosHoy{
+  total_hoy: number;
+  variacion_porcentual: number;
+  total_ayer: number;
+  pacientes: Paciente[];
+}
+export async function getPacientesAtendidosHoy():Promise<PacientesAtendidosHoy>{
+  const {data}=await api.get<PacientesAtendidosHoy>('/api/pacientes/atendidos-hoy');
+  return data;
+}
 export async function getEstadisticasPacientesMes(): Promise<EstadisticasPacientesMes> {
   const { data } = await api.get<EstadisticasPacientesMes>('/api/pacientes/estadisticas/mes');
   return data;

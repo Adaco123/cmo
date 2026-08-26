@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRefresh, faCalendarDays } from '@fortawesome/free-solid-svg-icons';
 import { type Paciente } from '../../../api/pacientes';
 import { type Cita, getCitas } from '../../../api/citas';
 import { type SeguimientoControl, getSeguimientos } from '../../../api/seguimientoControl'; // 👈 ajusta el nombre del archivo si es distinto
-import Calendario from '../../../features/citas/Calendario'
+import Calendario from '../../../features/citas/Calendario';
+import {
+  pagosHoy,
+  getPacientesAtendidosHoy,
+  type PagosResumenHoy,
+  type PacientesAtendidosHoy,
+} from '../../../api/reportes';
 
 interface InicioTabProps {
   active: boolean;
@@ -18,10 +24,12 @@ interface InicioTabProps {
   onFinalizar: (cita: Cita) => void;
 }
 
-/**
- * Reemplaza el bloque <div className="tab-content ... 'inicio'"> de
- * CMODashboard.tsx: stats-grid + tarjeta "Citas de hoy".
- */
+function formatMoney(value: string | number): string {
+  const num = typeof value === 'string' ? Number(value) : value;
+  if (Number.isNaN(num)) return 'Bs 0,00';
+  return `Bs ${num.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 const InicioTab: React.FC<InicioTabProps> = ({
   active,
   pacientes,
@@ -33,7 +41,38 @@ const InicioTab: React.FC<InicioTabProps> = ({
   onAtender,
   onFinalizar,
 }) => {
+  const [loading, setLoading] = useState(true);
+  const [pagosHoyData, setPagosHoyData] = useState<PagosResumenHoy | null>(null);
   const [calendarioAbierto, setCalendarioAbierto] = useState(false);
+  const [pacientesAtendidosHoy, setPacientesAtendidosHoy] = useState<PacientesAtendidosHoy | null>(null);
+  useEffect(() => {
+    let isMounted = true;
+
+    setLoading(true);
+    Promise.all([pagosHoy(), getPacientesAtendidosHoy()])
+      .then(([pagos, pacientes]) => {
+        if (isMounted) {
+          setPagosHoyData(pagos);
+          setPacientesAtendidosHoy(pacientes);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setPagosHoyData(null);
+          setPacientesAtendidosHoy(null);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoading(false);
+    
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Citas y seguimientos para el calendario (todos, no solo los de hoy).
   // Se cargan solo cuando el usuario realmente abre el calendario, así no
@@ -62,12 +101,20 @@ const InicioTab: React.FC<InicioTabProps> = ({
       <section className="stats-grid">
         <div className="stat-card scroll-animated">
           <div className="stat-label">Pacientes atendidos hoy</div>
-          <div className="stat-value">18</div>
-          <div className="stat-change positive">↑ 8% vs ayer</div>
+          <div className="stat-value">
+            {loading ? '--' : pacientesAtendidosHoy?.total_hoy}
+          </div>
+          <div className={`stat-change ${loading ? '' : (pacientesAtendidosHoy?.variacion_porcentual ?? 0) >= 0 ? 'positive' : 'negative'}`}>
+            {loading
+              ? '-'
+              : `${(pacientesAtendidosHoy?.variacion_porcentual ?? 0) >= 0 ? '↑' : '↓'} ${Math.abs(pacientesAtendidosHoy?.variacion_porcentual ?? 0)}% vs ayer`}
+          </div>
         </div>
         <div className="stat-card scroll-animated">
           <div className="stat-label">Pagos recibidos hoy</div>
-          <div className="stat-value">Bs 16.450</div>
+          <div className="stat-value">
+            {loading ? '--':formatMoney(pagosHoyData?.total_pagado_hoy ?? '0')}
+          </div>
           <div className="stat-change positive">↑ 18% vs ayer</div>
         </div>
 

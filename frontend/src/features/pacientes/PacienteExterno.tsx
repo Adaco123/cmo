@@ -25,6 +25,8 @@ import {
   faDownload,
   faSpinner,
   faExclamationCircle,
+  faEllipsisVertical,
+  faTrash,
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './PacienteExterno.module.css';
 
@@ -81,9 +83,12 @@ interface ArchivoPendiente {
  * Modal para pacientes externos (origen_id=2). Antes de seleccionar un
  * paciente: buscar o crear rápido. Una vez seleccionado: layout de dos
  * columnas (ficha + acciones a la izquierda, archivos a la derecha), con
- * "Crear cita" y "Adjuntar archivo" como modales centrados, y ver un
- * archivo como drawer lateral que entra deslizando de derecha a
- * izquierda (mismo patrón que RegistroClinicoDetalle en VerPaciente).
+ * "Adjuntar archivo" como modal centrado, "Crear cita" como modal
+ * autocontenido (trae su propio backdrop), y ver un archivo como drawer
+ * lateral que entra deslizando de derecha a izquierda (mismo patrón que
+ * RegistroClinicoDetalle en VerPaciente). La lista de archivos usa el
+ * mismo patrón de menú "..." (3 puntos) que el timeline de
+ * VerPaciente.tsx en vez de un botón de eliminar directo.
  */
 const PacienteExterno: React.FC<PacienteExternoProps> = ({
   pacientesExternos,
@@ -105,6 +110,10 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({
 
   const [showCrearCita, setShowCrearCita] = useState(false);
   const [showAdjuntar, setShowAdjuntar] = useState(false);
+
+  // Menú "..." de cada archivo (Descargar / Eliminar), igual patrón que
+  // el menú de 3 puntos de las tarjetas del timeline en VerPaciente.tsx.
+  const [menuAbiertoId, setMenuAbiertoId] = useState<number | null>(null);
 
   // ---- Visor de archivo (drawer lateral) ----
   const [archivoEnVisor, setArchivoEnVisor] = useState<ArchivoResponse | null>(null);
@@ -132,6 +141,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({
     setArchivosSubidos([]);
     setArchivosPendientes([]);
     setErrorArchivo(null);
+    setMenuAbiertoId(null);
     try {
       const archivos = await getArchivosPorPaciente(paciente.id);
       setArchivosSubidos(archivos);
@@ -147,15 +157,6 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({
       void seleccionarPaciente(pacienteInicial);
     }
   }, [pacienteInicial, seleccionarPaciente]);
-
-  const cambiarPaciente = () => {
-    setSelectedPaciente(null);
-    setArchivosSubidos([]);
-    setArchivosPendientes([]);
-    setErrorArchivo(null);
-    setShowCrearCita(false);
-    setShowAdjuntar(false);
-  };
 
   const handleFormChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -262,14 +263,42 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({
     }
   }, [selectedPaciente, archivosPendientes]);
 
+  // Abre/cierra el menú "..." de un archivo puntual (mismo patrón que
+  // toggleMenu en VerPaciente.tsx: stopPropagation + toggle por id).
+  const toggleMenuArchivo = useCallback((id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMenuAbiertoId((prev) => (prev === id ? null : id));
+  }, []);
+
   const handleEliminarArchivo = async (archivoId: number) => {
     try {
       await eliminarArchivoApi(archivoId);
       setArchivosSubidos((prev) => prev.filter((a) => a.id !== archivoId));
     } catch {
       setErrorArchivo('No se pudo eliminar el archivo.');
+    } finally {
+      setMenuAbiertoId(null);
     }
   };
+
+  // Descarga directa desde el menú "...", reutilizando el mismo blob que
+  // usa el visor lateral.
+  const handleDescargarArchivo = useCallback(async (archivo: ArchivoResponse) => {
+    setMenuAbiertoId(null);
+    try {
+      const blob = await descargarArchivoBlob(archivo.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = archivo.nombre_archivo;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setErrorArchivo('No se pudo descargar el archivo.');
+    }
+  }, []);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -332,7 +361,13 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({
     : '';
 
   return (
-    <div className={styles.container} onClick={(e) => e.stopPropagation()}>
+    <div
+      className={styles.container}
+      onClick={(e) => {
+        e.stopPropagation();
+        setMenuAbiertoId(null);
+      }}
+    >
       {onClose && (
         <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Cerrar">
           <FontAwesomeIcon icon={faXmark} />
@@ -494,9 +529,6 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({
               {selectedPaciente.telefono && (
                 <p className={styles.pacienteMeta}>{selectedPaciente.telefono}</p>
               )}
-              <button type="button" className={styles.btnCambiar} onClick={cambiarPaciente}>
-                Cambiar paciente
-              </button>
             </div>
 
             <div className={styles.acciones}>
@@ -549,13 +581,31 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({
                       <FontAwesomeIcon icon={esPdf(a.nombre_archivo) ? faFilePdf : faFileImage} />
                       <span>{a.nombre_archivo}</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleEliminarArchivo(a.id)}
-                      aria-label="Eliminar archivo"
-                    >
-                      <FontAwesomeIcon icon={faTimes} />
-                    </button>
+
+                    <div className={styles.archivoAcciones}>
+                      <button
+                        type="button"
+                        className={styles.menuBtn}
+                        onClick={(e) => toggleMenuArchivo(a.id, e)}
+                        aria-label="Más acciones"
+                      >
+                        <FontAwesomeIcon icon={faEllipsisVertical} />
+                      </button>
+                      {menuAbiertoId === a.id && (
+                        <div className={styles.menuDropdown} onClick={(e) => e.stopPropagation()}>
+                          <button type="button" onClick={() => void handleDescargarArchivo(a)}>
+                            <FontAwesomeIcon icon={faDownload} /> Descargar
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.menuDanger}
+                            onClick={() => handleEliminarArchivo(a.id)}
+                          >
+                            <FontAwesomeIcon icon={faTrash} /> Eliminar
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -564,20 +614,14 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({
         </div>
       )}
 
-      {/* ================= MODAL: CREAR CITA (igual que VerPaciente) ================= */}
+      {/* CrearCita es un modal autocontenido: trae su propio backdrop y
+          botón de cerrar, así que acá solo se monta condicionalmente. */}
       {showCrearCita && selectedPaciente && (
-        <div className={styles.backdrop} onClick={() => setShowCrearCita(false)}>
-          <div className={styles.backdropContent} onClick={(e) => e.stopPropagation()}>
-            <button type="button" className={styles.modalCloseBtn} onClick={() => setShowCrearCita(false)}>
-              <FontAwesomeIcon icon={faXmark} />
-            </button>
-            <CrearCita
-              paciente={selectedPaciente}
-              onClose={() => setShowCrearCita(false)}
-              onSuccess={() => setShowCrearCita(false)}
-            />
-          </div>
-        </div>
+        <CrearCita
+          paciente={selectedPaciente}
+          onClose={() => setShowCrearCita(false)}
+          onSuccess={() => setShowCrearCita(false)}
+        />
       )}
 
       {/* ================= MODAL: ADJUNTAR ARCHIVO (con Guardar) ================= */}

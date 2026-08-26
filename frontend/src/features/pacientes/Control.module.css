@@ -4,22 +4,78 @@
    Usa las variables de index.css (paleta clara / teal): --bg-card,
    --text-main, --border-color, --primary, --status-active/inactive,
    --radius-sm/md/xl, --shadow-card, --shadow-hover, etc.
+
+   El componente ahora es un modal autocontenido: trae su propio
+   .backdrop y .closeBtn (mismo patrón visual que .backdrop / .closeBtn
+   en CrearCita.module.css / VerPaciente.module.css), en vez de
+   depender de que VerPaciente.tsx lo envuelva en un modal genérico.
+
+   Nota: dentro de esta tarjeta el fondo es CLARO (--bg-card /
+   --bg-input), por lo que el texto usa --text-main / --text-muted
+   directamente en vez de los alias --text / --text-h (esos apuntan
+   a --text-on-dark, pensado para el fondo oscuro del body, y aquí
+   quedaba casi invisible).
    ============================================================ */
 
 .page * {
   box-sizing: border-box;
 }
 
+/* ----- BACKDROP ----- */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--text-main) 50%, transparent);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px;
+}
+
 .page {
+  position: relative;
   background: var(--bg-card);
-  color: var(--text);
+  color: var(--text-main);
   font-family: var(--sans);
   width: 100%;
   max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
   padding: 1.8rem 1.8rem 1.6rem;
   border-radius: 28px;
   border: 1px solid var(--border);
   box-shadow: var(--shadow-card);
+}
+
+.closeBtn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-hover);
+  transition: var(--transition-fast);
+  z-index: 2;
+}
+
+.closeBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.closeBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ============================================================
@@ -51,7 +107,7 @@
   margin: 0 0 4px;
   font-size: 1.2rem;
   font-weight: 700;
-  color: var(--text-h);
+  color: var(--text-main);
   letter-spacing: -0.01em;
 }
 
@@ -62,7 +118,7 @@
   line-height: 1.5;
 }
 .contexto b {
-  color: var(--text);
+  color: var(--text-main);
   font-weight: 600;
 }
 
@@ -89,7 +145,7 @@
   border: 1.5px solid var(--border-color);
   border-radius: var(--radius-md);
   outline: none;
-  color: var(--text);
+  color: var(--text-main);
   font-family: var(--sans);
   font-size: 14.5px;
   line-height: 1.6;
@@ -137,7 +193,7 @@
 }
 .chip:hover {
   background: var(--bg-card-hover);
-  color: var(--text);
+  color: var(--text-main);
 }
 .chip.active {
   border-color: var(--status-active);
@@ -184,7 +240,7 @@
   transition: all var(--transition-fast);
 }
 .btnGhost:hover {
-  color: var(--text);
+  color: var(--text-main);
   border-color: var(--accent-border);
 }
 .btnGhost:disabled {
@@ -241,7 +297,7 @@
 }
 .btnRx:hover {
   border-color: var(--primary);
-  color: var(--text);
+  color: var(--text-main);
 }
 
 .btnRxActive {
@@ -249,4 +305,15 @@
   border-color: var(--primary);
   background: var(--accent-bg);
   color: var(--primary-dark);
+}
+
+/* ----- Responsive ----- */
+@media (max-width: 560px) {
+  .backdrop {
+    padding: 16px;
+  }
+  .page {
+    padding: 1.4rem 1.3rem 1.2rem;
+    border-radius: var(--radius-md);
+  }
 }

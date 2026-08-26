@@ -15,9 +15,10 @@
    principal + tira de miniaturas + zoom a pantalla completa.
 
    Solo se usan tokens ya definidos en index.css (los mismos del
-   módulo anterior): --bg-card, --bg-input, --border-color,
-   --text-main, --text-muted, --primary, --primary-light,
-   --status-inactive, --radius-sm/md/xl, --shadow-card,
+   módulo anterior): --bg-card, --bg-card-hover, --bg-input,
+   --border-color, --text-main, --text-muted, --text-on-dark,
+   --primary, --primary-light, --primary-dark, --primary-gradient,
+   --status-inactive, --radius-sm/md/xl, --shadow-card, --shadow-hover,
    --transition-fast, --accent, --sans, --mono.
    ============================================================ */
 
@@ -592,7 +593,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  color: #eaf4f7;
+  color: var(--text-on-dark);
   font-size: 13px;
 }
 
@@ -956,4 +957,4 @@ section.section,
     max-width: 100%;
     padding: 24px 16px;
   }
-}
+}  

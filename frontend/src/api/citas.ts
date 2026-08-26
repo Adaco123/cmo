@@ -36,8 +36,16 @@ export async function getCitaById(citaId: number): Promise<Cita> {
 }
 
 export async function createCita(payload: CitaPayload): Promise<Cita> {
-  const { data } = await api.post<Cita>('/api/citas/', payload);
-  return data;
+  try {
+    const { data } = await api.post<Cita>('/api/citas/', payload);
+    return data;
+  } catch (error: any) {
+    const backendMessage = error?.response?.data?.error;
+    if (backendMessage) {
+      throw new Error(backendMessage);
+    }
+    throw error;
+  }
 }
 
 export async function updateCita(citaId: number, payload: Partial<CitaPayload>): Promise<Cita> {

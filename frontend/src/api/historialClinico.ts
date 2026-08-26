@@ -1,6 +1,10 @@
 import api from '../api';
 import type { ConsultaPayload, Consulta } from './consultas';
-import type { ExamenComplementarioItemPayload, ExamenComplementario } from './examenesComplementarios';
+import type {
+  ExamenComplementarioItemPayload,
+  ExamenComplementarioUpdateItemPayload,
+  ExamenComplementario,
+} from './examenesComplementarios';
 import type { RecetasPayload, Receta } from './recetas';
 import type { SeguimientoControlPayload, SeguimientoControl } from './seguimientoControl';
 export interface RegistroClinicoCompletoDetalle {
@@ -139,6 +143,43 @@ export async function createRegistroCompleto(
 ): Promise<RegistroCompletoResponse> {
   const { data } = await api.post<RegistroCompletoResponse>(
     '/api/historial_clinico/registro-completo',
+    payload,
+  );
+  return data;
+}
+
+/**
+ * Payload para PUT /registro-completo/<registro_id>: edita la Consulta
+ * (solo motivo, diagnostico, fecha, hora, medico_id — paciente_id y
+ * cita_id quedan fijos, el backend los ignora aunque los mandes) y el
+ * RegistroClinico. Todo es parcial: solo mandas lo que quieres cambiar.
+ *
+ * Si mandas `examenes_complementarios`, cada ítem con "id" actualiza ese
+ * examen existente y cada ítem sin "id" crea uno nuevo. Un examen que ya
+ * existía y no incluyas en la lista queda intacto — este endpoint nunca
+ * borra un examen por omisión.
+ *
+ * Las recetas NO se tocan acá: se editan con sus propios endpoints
+ * (updateReceta, etc. en api/recetas.ts).
+ */
+export interface RegistroCompletoUpdatePayload {
+  consulta?: Partial<Pick<ConsultaPayload, 'medico_id' | 'fecha' | 'hora' | 'motivo' | 'diagnostico'>>;
+  registro?: Partial<Omit<RegistroClinicoPayload, 'consulta_id'>>;
+  examenes_complementarios?: ExamenComplementarioUpdateItemPayload[];
+}
+
+export interface RegistroCompletoUpdateResponse {
+  consulta: Consulta;
+  registro: RegistroClinico;
+  examenes_complementarios: ExamenComplementario[];
+}
+
+export async function updateRegistroCompleto(
+  registroId: number,
+  payload: RegistroCompletoUpdatePayload,
+): Promise<RegistroCompletoUpdateResponse> {
+  const { data } = await api.put<RegistroCompletoUpdateResponse>(
+    `/api/historial_clinico/registro-completo/${registroId}`,
     payload,
   );
   return data;
