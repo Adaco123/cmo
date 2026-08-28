@@ -21,7 +21,8 @@ class SeguimientoControl(db.Model, BaseModelMixin):
     fecha = db.Column(db.Date, server_default=db.func.current_date(), nullable=False)
     evolucion = db.Column(db.Text, nullable=False)          # "sigue con fiebre", "mejoró", "sanó"
     proxima_fecha_control = db.Column(db.Date)               # NULL = ya no debe volver
-    #hora_inicio = db.Column(db.Time, nullable=True)
+    hora_inicio = db.Column(db.Time, nullable=True)           # hora del control agendado (opcional)
+    hora_fin = db.Column(db.Time, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now(), nullable=False)
     updated_at = db.Column(
         db.DateTime(timezone=True),
@@ -29,6 +30,7 @@ class SeguimientoControl(db.Model, BaseModelMixin):
         onupdate=db.func.now(),
         nullable=False,
     )
+
 
     registro_clinico = db.relationship("RegistroClinico", back_populates="seguimientos_control")
     medico = db.relationship("Medico", back_populates="seguimientos_control")

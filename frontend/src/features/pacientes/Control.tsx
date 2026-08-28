@@ -11,6 +11,15 @@ import styles from './Control.module.css';
 // TODO: reemplazar por el id del médico autenticado cuando exista login real
 const MEDICO_ID = 1;
 
+/** "YYYY-MM-DD" en fecha LOCAL, a diferencia de toISOString() que usa UTC
+ *  y puede adelantar un día en horas de la noche (Bolivia es UTC-4). */
+function toLocalDateString(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 interface Props {
   registroClinico: RegistroClinico;
   pacienteNombre?: string;
@@ -53,6 +62,8 @@ const Control: React.FC<Props> = ({
 }) => {
   const [evolucion, setEvolucion] = useState('');
   const [controlDias, setControlDias] = useState('');
+  const [horaInicio, setHoraInicio] = useState('');
+  const [horaFin, setHoraFin] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const evolucionRef = useRef<HTMLTextAreaElement>(null);
@@ -70,7 +81,7 @@ const Control: React.FC<Props> = ({
     if (!controlDias.trim()) return null;
     const d = new Date();
     d.setDate(d.getDate() + parseInt(controlDias, 10));
-    return d.toISOString().slice(0, 10);
+    return toLocalDateString(d);
   })();
 
   const proximaFechaLegible = proximaFechaControl
@@ -103,6 +114,8 @@ const Control: React.FC<Props> = ({
         medico_id: MEDICO_ID,
         evolucion: texto,
         proxima_fecha_control: proximaFechaControl,
+        hora_inicio: horaInicio.trim() || null,
+        hora_fin: horaFin.trim() || null,
         recetas: recetaPayload || {},
       });
 
@@ -162,6 +175,15 @@ const Control: React.FC<Props> = ({
             ))}
           </div>
           {proximaFechaLegible && <div className={styles.subhint}>Próximo control: {proximaFechaLegible}</div>}
+          {controlDias.trim() && (
+            <div className={styles.horaRow}>
+              <span>Hora</span>
+              <input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
+              <span>a</span>
+              <input type="time" value={horaFin} onChange={(e) => setHoraFin(e.target.value)} />
+              <span className={styles.subhint}>(opcional)</span>
+            </div>
+          )}
         </div>
 
         {/* ---- Receta del seguimiento (opcional) ---- */}

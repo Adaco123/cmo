@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Paciente as ApiPaciente } from '../../api/pacientes';
-import { downloadRegistroClinicoPdf, getExpedientePaciente } from '../../api/historialClinico';
+import { downloadRegistroClinicoPdf, downloadConsentimientoPdf, getExpedientePaciente } from '../../api/historialClinico';
 import type { RegistroClinico, RegistroCompletoResponse } from '../../api/historialClinico';
 import type { SeguimientoControlResponse } from '../../api/seguimientoControl';
 import HistoriaClinica from './RegistroClinico';
@@ -26,6 +26,7 @@ import {
   faPen,
   faTrash,
   faDownload,
+  faFileSignature,
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -53,10 +54,19 @@ function extractErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
+/** "YYYY-MM-DD" en fecha LOCAL, a diferencia de toISOString() que usa UTC
+ *  y puede adelantar el día en horas de la noche (Bolivia es UTC-4). */
+function toLocalDateString(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function formatearFechaRelativa(fechaStr: string): string {
   if (!fechaStr) return 'Sin fecha';
   const cleanDate = fechaStr.split('T')[0];
-  const hoyStr = new Date().toISOString().split('T')[0];
+  const hoyStr = toLocalDateString(new Date());
   const hoyUTC = new Date(hoyStr);
   const fechaUTC = new Date(cleanDate);
   if (isNaN(fechaUTC.getTime())) return fechaStr;
@@ -146,6 +156,7 @@ interface RegistroCardProps {
   onEditar: (id: number) => void;
   onEliminar: (id: number) => void;
   onDescargarPdf: (id: number) => void;
+  onDescargarConsentimiento: (id: number) => void;
 }
 
 const RegistroCard: React.FC<RegistroCardProps> = React.memo(function RegistroCard({
@@ -157,6 +168,7 @@ const RegistroCard: React.FC<RegistroCardProps> = React.memo(function RegistroCa
   onEditar,
   onEliminar,
   onDescargarPdf,
+  onDescargarConsentimiento,
 }) {
   return (
     <div className={styles.timelineItem}>
@@ -196,6 +208,9 @@ const RegistroCard: React.FC<RegistroCardProps> = React.memo(function RegistroCa
                 </button>
                 <button type="button" onClick={() => onDescargarPdf(registro.id)}>
                   <FontAwesomeIcon icon={faDownload} /> Descargar PDF
+                </button>
+                <button type="button" onClick={() => onDescargarConsentimiento(registro.id)}>
+                  <FontAwesomeIcon icon={faFileSignature} /> Descargar consentimiento
                 </button>
                 <button type="button" className={styles.menuDanger} onClick={() => onEliminar(registro.id)}>
                   <FontAwesomeIcon icon={faTrash} /> Eliminar
@@ -324,6 +339,10 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
     void downloadRegistroClinicoPdf(registroId);
   }, []);
 
+  const handleDescargarConsentimiento = useCallback((registroId: number) => {
+    void downloadConsentimientoPdf(registroId);
+  }, []);
+
   const handleRegistroGuardado = useCallback((resultado: RegistroCompletoResponse) => {
     setExpediente((prev) => {
       if (!prev) return prev;
@@ -407,6 +426,7 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
                 onEditar={handleEditarRegistro}
                 onEliminar={handleEliminarRegistro}
                 onDescargarPdf={handleDescargarPdf}
+                onDescargarConsentimiento={handleDescargarConsentimiento}
               />
             ))}
           </div>
@@ -485,7 +505,7 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
             <button type="button" className={styles.closeBtn} onClick={cerrarDetalle}>
               <FontAwesomeIcon icon={faXmark} />
             </button>
-            <RegistroClinicoDetalle registroId={registroIdDetalle} />
+            <RegistroClinicoDetalle registroId={registroIdDetalle} paciente={paciente ?? undefined} />
           </div>
         </div>
       )}

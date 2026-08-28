@@ -238,3 +238,23 @@ export async function downloadRegistroClinicoPdf(registroId: number): Promise<vo
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
 }
+
+export async function downloadConsentimientoPdf(registroId: number): Promise<void> {
+  const response = await api.get(
+    `/api/historial_clinico/reportes/registro/${registroId}/consentimiento`,
+    { responseType: 'blob' },
+  );
+
+  const contentDisposition = response.headers['content-disposition'] || '';
+  const match = contentDisposition.match(/filename\*?=(?:UTF-8''|"?)([^";]+)(?:"|$)/i) || [];
+  const filename = match[1] || `consentimiento_${registroId}.pdf`;
+  const blob = new Blob([response.data], { type: 'application/pdf' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+}

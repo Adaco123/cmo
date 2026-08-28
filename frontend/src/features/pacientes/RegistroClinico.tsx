@@ -74,7 +74,7 @@ const SECTIONS = [
   { key: 'examen_fisico', label: 'Examen físico', icon: 'fa-stethoscope', placeholder: 'Hallazgos al examen físico por sistemas...' },
   { key: 'hallazgos_ecograficos', label: 'Hallazgos ecográficos', icon: 'fa-wave-square', placeholder: 'Hallazgos observados en la ecografía...' },
   { key: 'diagnostico', label: 'Diagnóstico', icon: 'fa-diagnoses', placeholder: 'Diagnóstico presuntivo o definitivo, CIE-10 si aplica...' },
-  { key: 'tratamiento', label: 'Tratamiento', icon: 'fa-prescription-bottle-alt', placeholder: 'Se completa automáticamente al recetar medicamentos...' },
+  { key: 'tratamiento', label: 'Tratamiento', icon: 'fa-prescription-bottle-alt', placeholder: 'Se completa automáticamente al recetar medicamentos, exámenes o fórmulas...' },
   { key: 'observaciones', label: 'Observaciones', icon: 'fa-comment-medical', placeholder: 'Notas adicionales (opcional)...' },
 ] as const;
 
@@ -131,6 +131,8 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
 
   const [controlNota, setControlNota] = useState('');
   const [controlDias, setControlDias] = useState('');
+  const [controlHoraInicio, setControlHoraInicio] = useState('');
+  const [controlHoraFin, setControlHoraFin] = useState('');
 
   const vitalRefs = useRef<Record<VitalKey, HTMLInputElement | null>>({
     pa_sys: null, pa_dia: null, fc: null, fr: null, sat: null, temp: null, peso: null, talla: null, glu: null,
@@ -165,10 +167,10 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
 
   const handleControlChip = (val: string) => setControlDias(val);
 
-  // Recibe el texto ya armado desde Receta.tsx (pestaña Medicamentos) y lo
-  // vuelca en secciones.tratamiento. Este es el ÚNICO lugar donde
-  // secciones.tratamiento cambia — el textarea correspondiente es de solo
-  // lectura, así que no hay otra vía de escritura para ese campo.
+  // Recibe el texto ya armado desde Receta.tsx (medicamentos, exámenes y
+  // fórmulas) y lo vuelca en secciones.tratamiento. Este es el ÚNICO lugar
+  // donde secciones.tratamiento cambia — el textarea correspondiente es de
+  // solo lectura, así que no hay otra vía de escritura para ese campo.
   const handleTratamientoChange = (texto: string) => {
     setSecciones(prev => ({ ...prev, tratamiento: texto }));
   };
@@ -283,7 +285,8 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
       payload.seguimiento_control = {
         evolucion: controlNota.trim(),
         proxima_fecha_control: proximaFechaControl,
-        
+        hora_inicio: controlHoraInicio.trim() || null,
+        hora_fin: controlHoraFin.trim() || null,
       };
     }
 
@@ -360,7 +363,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [vitales, secciones, alergias, controlNota, controlDias, examCount]);
+  }, [vitales, secciones, alergias, controlNota, controlDias, controlHoraInicio, controlHoraFin, examCount]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -587,6 +590,17 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                     </div>
                   ))}
                 </div>
+                {controlDias.trim() && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Hora</span>
+                    <input type="time" value={controlHoraInicio} onChange={e => setControlHoraInicio(e.target.value)}
+                      style={{ background: 'var(--bg-input)', border: '1.5px solid var(--border-color)', borderRadius: 10, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, padding: '8px 6px', color: 'var(--text-main)' }} />
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>a</span>
+                    <input type="time" value={controlHoraFin} onChange={e => setControlHoraFin(e.target.value)}
+                      style={{ background: 'var(--bg-input)', border: '1.5px solid var(--border-color)', borderRadius: 10, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, padding: '8px 6px', color: 'var(--text-main)' }} />
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>(opcional)</span>
+                  </div>
+                )}
                 {controlFechaLegible && <div className={styles.subhint}>Próximo control: {controlFechaLegible}</div>}
                 {!controlNota.trim() && controlDias.trim() && (
                   <div className={styles.subhint} style={{ color: 'var(--warn, #C08A2E)' }}>

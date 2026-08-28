@@ -344,22 +344,64 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   const totalItemsTab = flatten(gruposOfTab(tab)).length;
   const gruposConItemsTab = gruposOfTab(tab).filter((g) => g.items.length);
 
-  /* ---------- texto de tratamiento derivado de medicamentos ---------- */
-  const buildTratamientoTexto = useCallback((meds: MedItem[]): string => {
-    if (!meds.length) return "";
-    return meds
-      .map((m, i) => {
-        const dosis = m.dosis ? ` ${m.dosis}` : "";
-        const partes = [m.via_administracion, m.frecuencia, m.duracion].filter(Boolean).join(" · ");
-        return `${i + 1}. ${m.medicamento}${dosis}${partes ? " — " + partes : ""}`;
+  /* ---------- texto de tratamiento derivado de las 3 categorías ----------
+     Si una categoría tiene una sola receta, se lista sin encabezado.
+     Si tiene varias (multi-receta), cada una se etiqueta "Receta N:
+     <nombres de sus ítems>" — igual que ya se numeran las pestañas
+     ("Receta 1", "Receta 2"...) más abajo en el formulario. */
+  const formatMed = (m: MedItem) => {
+    const dosis = m.dosis ? ` ${m.dosis}` : "";
+    const partes = [m.via_administracion, m.frecuencia, m.duracion].filter(Boolean).join(" · ");
+    return `${m.medicamento}${dosis}${partes ? " — " + partes : ""}`;
+  };
+
+  const formatExam = (e: ExamItem) => {
+    const partes = [e.tipo_examen, e.urgencia].filter(Boolean).join(" · ");
+    return `${e.nombre_examen}${partes ? " — " + partes : ""}`;
+  };
+
+  const formatFormula = (f: FormItem) => {
+    const partes = [f.forma_farmaceutica, f.via_administracion].filter(Boolean).join(" · ");
+    return `${f.nombre_formula}${partes ? " — " + partes : ""}`;
+  };
+
+  const bloqueCategoria = <T,>(
+    titulo: string,
+    grupos: Grupo<T>[],
+    getNombre: (it: T) => string,
+    formatItem: (it: T) => string
+  ): string => {
+    const gruposConItems = grupos.filter((g) => g.items.length);
+    if (!gruposConItems.length) return "";
+    const multiReceta = gruposConItems.length > 1;
+    const cuerpo = gruposConItems
+      .map((g, gi) => {
+        const encabezado = multiReceta
+          ? `Receta ${gi + 1}: ${g.items.map(getNombre).filter(Boolean).join(", ")}\n`
+          : "";
+        const items = g.items.map((it, i) => `${i + 1}. ${formatItem(it)}`).join("\n");
+        return `${encabezado}${items}`;
       })
-      .join("\n");
-  }, []);
+      .join("\n\n");
+    return `${titulo}\n${cuerpo}`;
+  };
+
+  const buildTratamientoTexto = useCallback(
+    (meds: Grupo<MedItem>[], exams: Grupo<ExamItem>[], forms: Grupo<FormItem>[]): string => {
+      const bloques = [
+        bloqueCategoria("MEDICAMENTOS", meds, (m) => m.medicamento, formatMed),
+        bloqueCategoria("EXÁMENES", exams, (e) => e.nombre_examen, formatExam),
+        bloqueCategoria("FÓRMULAS", forms, (f) => f.nombre_formula, formatFormula),
+      ].filter(Boolean);
+      return bloques.join("\n\n");
+    },
+    []
+  );
 
   useEffect(() => {
-    onTratamientoChange?.(buildTratamientoTexto(flatten(medGrupos)));
+    onTratamientoChange?.(buildTratamientoTexto(medGrupos, examGrupos, formGrupos));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [medGrupos]);
+  }, [medGrupos, examGrupos, formGrupos]);
 
   /* ---------- handle expuesto al padre ---------- */
   useImperativeHandle(ref, () => ({

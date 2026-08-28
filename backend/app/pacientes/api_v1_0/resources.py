@@ -32,6 +32,10 @@ class PacientesList_Resource(Resource):
         except ValidationError as err:
             return err.messages, 400
 
+        existente = Paciente.query.filter_by(documento=data.get("documento")).first()
+        if existente is not None:
+            return {"error": "Ya existe un paciente registrado con ese número de documento (CI)."}, 409
+
         item = Paciente(**data)
         item.save()
 
@@ -59,6 +63,16 @@ class Paciente_Resource(Resource):
             data = schema.load(request.get_json(force=True) or {}, partial=True)
         except ValidationError as err:
             return err.messages, 400
+
+        nuevo_documento = data.get("documento")
+        if nuevo_documento is not None:
+            existente = (
+                Paciente.query
+                .filter(Paciente.documento == nuevo_documento, Paciente.id != item_id)
+                .first()
+            )
+            if existente is not None:
+                return {"error": "Ya existe otro paciente registrado con ese número de documento (CI)."}, 409
 
         for key, value in data.items():
             setattr(item, key, value)

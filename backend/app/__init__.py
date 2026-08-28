@@ -26,6 +26,7 @@ from app.pacientes.api_v1_0 import pacientes_bp
 from app.pagos.api_v1_0 import pagos_bp
 from app.historial_clinico.api_v1_0 import historial_clinico_bp
 from app.historial_clinico.api_v1_0.reporte import historial_clinico_reportes_bp
+from app.historial_clinico.api_v1_0.consentimiento import historial_clinico_consentimiento_bp
 from app.roles.api_v1_0 import roles_bp
 from app.tipos_archivo.api_v1_0 import tipos_archivo_bp
 from app.usuarios.api_v1_0 import usuarios_bp
@@ -46,6 +47,7 @@ BLUEPRINTS = (
     (estados_cobro_bp, "/api/estados_cobro"),
     (historial_clinico_bp, "/api/historial_clinico"),
     (historial_clinico_reportes_bp, "/api/historial_clinico/reportes"),
+    (historial_clinico_consentimiento_bp, "/api/historial_clinico/reportes"),
     (informes_ecografia_bp, "/api/informes_ecografia"),
     (medicos_bp, "/api/medicos"),
     (metodos_pago_bp, "/api/metodos_pago"),

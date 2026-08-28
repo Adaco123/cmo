@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { getRegistroClinicoCompleto } from '../../api/historialClinico';
 import type { RegistroClinicoCompletoDetalle } from '../../api/historialClinico';
 import type { Receta } from '../../api/recetas';
+import type { Paciente } from '../../api/pacientes';
 import { getArchivosPorExamen, descargarArchivoBlob } from '../../api/archivos';
 import type { ArchivoResponse } from '../../api/archivos';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -11,10 +12,14 @@ import {
   faNotesMedical, faTriangleExclamation, faStethoscope, faPen,
   faCapsules,
 } from '@fortawesome/free-solid-svg-icons';
+import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import styles from './RegistroClinicoDetalle.module.css';
 
 interface Props {
   registroId: number;
+  /** Paciente dueño del registro. Opcional: si no se pasa, simplemente no se
+   *  muestra el botón de "Enviar por WhatsApp" en las recetas. */
+  paciente?: Paciente;
 }
 
 type GaleriaPorExamen = Record<number, { archivo: ArchivoResponse; url: string }[]>;
@@ -53,13 +58,67 @@ const RANGOS = {
 const fueraDeRango = (valor: number, r: { bajo: number; alto: number }) =>
   valor < r.bajo || valor > r.alto;
 
-const RegistroClinicoDetalle: React.FC<Props> = ({ registroId }) => {
+// ---- Helpers de WhatsApp (mismo patrón que Calendario.tsx) ----
+function toWhatsAppNumber(telefono: string): string {
+  const digits = telefono.replace(/\D/g, '');
+  return digits.startsWith('591') ? digits : `591${digits}`;
+}
+
+function buildWhatsAppUrl(telefono: string, mensaje: string): string {
+  return `https://wa.me/${toWhatsAppNumber(telefono)}?text=${encodeURIComponent(mensaje)}`;
+}
+
+function formatFechaLabel(fecha: string): string {
+  const soloFecha = fecha.match(/^(\d{4})-(\d{2})-(\d{2})/)?.[0] ?? fecha;
+  return new Intl.DateTimeFormat('es-BO', { day: 'numeric', month: 'long', year: 'numeric' }).format(
+    new Date(`${soloFecha}T00:00:00`)
+  );
+}
+
+function mensajeReceta(nombrePaciente: string, fechaLabel: string, receta: Receta): string {
+  const lineas: string[] = [`Hola ${nombrePaciente}, esta es tu receta de CMO del ${fechaLabel}:`];
+
+  if (receta.indicaciones_generales) {
+    lineas.push('', receta.indicaciones_generales);
+  }
+
+  if (receta.medicamentos.length > 0) {
+    lineas.push('', '*Medicamentos*');
+    receta.medicamentos.forEach((m) => {
+      const detalle = [m.dosis, m.via_administracion, m.frecuencia, m.duracion].filter(Boolean).join(' · ');
+      lineas.push(`- ${m.medicamento}${detalle ? ` — ${detalle}` : ''}`);
+      if (m.indicaciones) lineas.push(`  ${m.indicaciones}`);
+    });
+  }
+
+  if (receta.formulas_magistrales.length > 0) {
+    lineas.push('', '*Fórmulas magistrales*');
+    receta.formulas_magistrales.forEach((f) => {
+      lineas.push(`- ${f.nombre_formula}: ${f.ingredientes}`);
+      const detalle = [f.forma_farmaceutica, f.cantidad_preparar, f.via_administracion].filter(Boolean).join(' · ');
+      if (detalle) lineas.push(`  ${detalle}`);
+    });
+  }
+
+  if (receta.examenes.length > 0) {
+    lineas.push('', '*Exámenes solicitados*');
+    receta.examenes.forEach((e) => {
+      lineas.push(`- ${e.nombre_examen}${e.urgencia === 'Urgente' ? ' (Urgente)' : ''}`);
+    });
+  }
+
+  return lineas.join('\n');
+}
+
+const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
   const [detalle, setDetalle] = useState<RegistroClinicoCompletoDetalle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [galeria, setGaleria] = useState<GaleriaPorExamen>({});
   const [imagenActiva, setImagenActiva] = useState<ImagenActiva | null>(null);
   const [visorIndex, setVisorIndex] = useState<Record<number, number>>({});
+
+  const nombrePacienteCompleto = paciente ? `${paciente.nombres} ${paciente.apellidos}`.trim() : '';
 
   useEffect(() => {
     let isMounted = true;
@@ -165,8 +224,27 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId }) => {
   });
 
   // Pinta una receta completa (medicamentos + fórmulas + exámenes pedidos).
-  const renderReceta = (receta: Receta) => (
+  // `fechaContexto` es la fecha de la consulta inicial o del seguimiento al
+  // que pertenece esta receta, usada para armar el mensaje de WhatsApp.
+  const renderReceta = (receta: Receta, fechaContexto: string) => (
     <div key={receta.id} className={styles.recetaCard}>
+      {paciente?.telefono && (
+        <div className={styles.recetaHeadRow}>
+          <a
+            className={styles.whatsappBtn}
+            href={buildWhatsAppUrl(
+              paciente.telefono,
+              mensajeReceta(nombrePacienteCompleto, formatFechaLabel(fechaContexto), receta)
+            )}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Enviar receta por WhatsApp"
+          >
+            <FontAwesomeIcon icon={faWhatsapp} /> Enviar por WhatsApp
+          </a>
+        </div>
+      )}
+
       {receta.indicaciones_generales && (
         <p className={styles.indicaciones}>{receta.indicaciones_generales}</p>
       )}
@@ -445,7 +523,7 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId }) => {
           <div className={styles.eyebrow}><FontAwesomeIcon icon={faPills} /> Receta inicial</div>
           {recetasIniciales.length === 0
             ? <p className={styles.vacio}>Sin receta en la consulta inicial.</p>
-            : recetasIniciales.map(renderReceta)}
+            : recetasIniciales.map((r) => renderReceta(r, registro.fecha))}
         </section>
 
         {/* ---- Línea de tiempo de seguimientos, cada uno con su propia receta ---- */}
@@ -456,10 +534,16 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId }) => {
             <div key={s.id} className={styles.seguimientoCard}>
               <div className={styles.seguimientoHead}>
                 <b>{s.fecha}</b>
-                {s.proxima_fecha_control && <span>Próximo: {s.proxima_fecha_control}</span>}
+                {s.proxima_fecha_control && (
+                  <span>
+                    Próximo: {s.proxima_fecha_control}
+                    {s.hora_inicio && ` · ${s.hora_inicio.slice(0, 5)}`}
+                    {s.hora_fin && ` a ${s.hora_fin.slice(0, 5)}`}
+                  </span>
+                )}
               </div>
               <p>{s.evolucion}</p>
-              {(recetasPorSeguimiento.get(s.id) || []).map(renderReceta)}
+              {(recetasPorSeguimiento.get(s.id) || []).map((r) => renderReceta(r, s.fecha))}
             </div>
           ))}
         </section>

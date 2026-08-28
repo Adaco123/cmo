@@ -9,5 +9,7 @@ class SeguimientoControlSchema(Schema):
     fecha = fields.Date(dump_only=True)
     evolucion = fields.Str(required=True, validate=validate.Length(min=1))
     proxima_fecha_control = fields.Date(allow_none=True, load_default=None)
+    hora_inicio = fields.Time(allow_none=True, load_default=None)
+    hora_fin = fields.Time(allow_none=True, load_default=None)
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)

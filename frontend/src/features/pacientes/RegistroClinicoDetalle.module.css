@@ -653,6 +653,35 @@
   margin-bottom: 0;
 }
 
+/* ---- Botón "Enviar por WhatsApp" dentro de cada receta ---- */
+.recetaHeadRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.whatsappBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+  background: #25D366;
+  border: none;
+  border-radius: var(--radius-xl);
+  padding: 6px 12px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: filter var(--transition-fast), transform var(--transition-fast);
+}
+
+.whatsappBtn:hover {
+  filter: brightness(1.08);
+  transform: scale(1.03);
+}
+
 .indicaciones {
   font-size: 13px;
   color: var(--text-main);
@@ -957,4 +986,4 @@ section.section,
     max-width: 100%;
     padding: 24px 16px;
   }
-}  
+}

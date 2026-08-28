@@ -85,6 +85,22 @@ def _parse_fecha(valor, campo: str = "proxima_fecha_control"):
         raise ValueError(f"{campo}: formato inválido, use YYYY-MM-DD") from e
 
 
+def _parse_hora(valor, campo: str):
+    """
+    Convierte 'HH:MM' o 'HH:MM:SS' a time, o None si viene vacío/None.
+    Mismo motivo que _parse_fecha: estos endpoints arman el dict a mano,
+    así que Marshmallow nunca convierte el string a time por sí solo.
+    """
+    if not valor:
+        return None
+    for fmt in ("%H:%M:%S", "%H:%M"):
+        try:
+            return datetime.strptime(valor, fmt).time()
+        except (ValueError, TypeError):
+            continue
+    raise ValueError(f"{campo}: formato inválido, use HH:MM")
+
+
 def _validar_bloques_recetas(recetas_data: dict):
     """Devuelve (recetas_validated, None) o (None, error_response).
 
@@ -432,9 +448,17 @@ class RegistroClinicoCompleto_Resource(Resource):
             except ValueError as err:
                 return {"seguimiento_control": {"proxima_fecha_control": [str(err)]}}, 400
 
+            try:
+                hora_inicio = _parse_hora(seguimiento_data.get("hora_inicio"), "hora_inicio")
+                hora_fin = _parse_hora(seguimiento_data.get("hora_fin"), "hora_fin")
+            except ValueError as err:
+                return {"seguimiento_control": {"hora": [str(err)]}}, 400
+
             seguimiento_validated = {
                 "evolucion": evolucion,
                 "proxima_fecha_control": proxima_fecha_control,
+                "hora_inicio": hora_inicio,
+                "hora_fin": hora_fin,
             }
             seguimiento_recetas_validated, error = _validar_bloques_recetas(
                 seguimiento_data.get("recetas", {}) or {}
@@ -505,6 +529,8 @@ class RegistroClinicoCompleto_Resource(Resource):
                     medico_id=medico_id,
                     evolucion=seguimiento_validated["evolucion"],
                     proxima_fecha_control=seguimiento_validated["proxima_fecha_control"],
+                    hora_inicio=seguimiento_validated["hora_inicio"],
+                    hora_fin=seguimiento_validated["hora_fin"],
                 )
                 db.session.add(seguimiento)
                 db.session.flush()
@@ -710,6 +736,12 @@ class SeguimientoControl_Resource(Resource):
         except ValueError as err:
             return {"proxima_fecha_control": [str(err)]}, 400
 
+        try:
+            hora_inicio = _parse_hora(body.get("hora_inicio"), "hora_inicio")
+            hora_fin = _parse_hora(body.get("hora_fin"), "hora_fin")
+        except ValueError as err:
+            return {"hora": [str(err)]}, 400
+
         recetas_validated, error = _validar_bloques_recetas(recetas_data)
         if error:
             return error
@@ -720,6 +752,8 @@ class SeguimientoControl_Resource(Resource):
                 medico_id=medico_id,
                 evolucion=evolucion,
                 proxima_fecha_control=proxima_fecha_control,
+                hora_inicio=hora_inicio,
+                hora_fin=hora_fin,
             )
             db.session.add(seguimiento)
             db.session.flush()

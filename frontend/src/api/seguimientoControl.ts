@@ -10,6 +10,8 @@ import type { RecetasPayload, Receta } from './recetas';
 export interface SeguimientoControlPayload {
   evolucion: string;
   proxima_fecha_control?: string | null;
+  hora_inicio?: string | null;
+  hora_fin?: string | null;
   recetas?: RecetasPayload;
 }
 
@@ -28,8 +30,11 @@ export interface SeguimientoControl {
   registro_clinico_id: number;
   medico_id: number;
   fecha: string;
+
   evolucion: string;
   proxima_fecha_control?: string | null;
+  hora_inicio?: string | null;
+  hora_fin?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -58,6 +63,7 @@ export async function getSeguimientosPorRegistro(registroId: number): Promise<Se
 }
 export async function getSeguimientos():Promise<SeguimientoControl[]>{
   const {data}=await api.get<SeguimientoControl[]>(
+
     `/api/historial_clinico/seguimientos`,
   );
   return data;
