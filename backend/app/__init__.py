@@ -68,7 +68,14 @@ BLUEPRINTS = (
 def create_app(settings_module):
     app = Flask(__name__)
     app.config.from_object(settings_module)
-    app.config["JWT_SECRET_KEY"] = app.config.get("SECRET_KEY") or os.environ.get("JWT_SECRET_KEY", "1a2v")
+
+    jwt_secret_key = app.config.get("SECRET_KEY") or os.environ.get("JWT_SECRET_KEY")
+    if not jwt_secret_key:
+        raise RuntimeError(
+            "Falta configurar SECRET_KEY (en backend/config/) o la variable de entorno "
+            "JWT_SECRET_KEY. La app no debe arrancar sin una clave real para firmar los JWT."
+        )
+    app.config["JWT_SECRET_KEY"] = jwt_secret_key
     app.config["JWT_TOKEN_LOCATION"] = ["headers"]
 
     cors_origins = app.config.get("CORS_ORIGINS", "")

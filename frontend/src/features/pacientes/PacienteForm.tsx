@@ -135,7 +135,12 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
       onSuccess?.();
       alert(' Paciente guardado correctamente');
     } catch (error: any) {
-      const backendMessage = error?.response?.data?.error || error?.response?.data?.msg || error?.message;
+      const data = error?.response?.data;
+      const primerErrorMarshmallow =
+        data && typeof data === 'object'
+          ? Object.values(data).flat().find((v) => typeof v === 'string')
+          : undefined;
+      const backendMessage = data?.error || data?.msg || primerErrorMarshmallow || error?.message;
       setSubmitError(backendMessage || 'No se pudo guardar el paciente.');
     } finally {
       setIsSubmitting(false);

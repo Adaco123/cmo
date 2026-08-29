@@ -10,6 +10,7 @@ from app.citas.api_v1_0 import citas_bp
 from app.pacientes.models import Paciente
 from app.medicos.models import Medico
 from app.estados_cita.models import EstadoCita
+from app.seguimiento_control.models import SeguimientoControl
 
 schema = CitaSchema()
 schema_list = CitaSchema(many=True)
@@ -40,6 +41,18 @@ def _existe_choque_horario(medico_id, fecha, hora_inicio, hora_fin, excluir_id=N
     return query.first() is not None
 
 
+def _existe_choque_seguimiento(medico_id, fecha, hora_inicio, hora_fin):
+    query = SeguimientoControl.query.filter(
+        SeguimientoControl.medico_id == medico_id,
+        SeguimientoControl.proxima_fecha_control == fecha,
+        SeguimientoControl.hora_inicio.isnot(None),
+        SeguimientoControl.hora_fin.isnot(None),
+        SeguimientoControl.hora_inicio < hora_fin,
+        SeguimientoControl.hora_fin > hora_inicio,
+    )
+    return query.first() is not None
+
+
 class CitasList_Resource(Resource):
     @jwt_required()
     def get(self):
@@ -59,6 +72,9 @@ class CitasList_Resource(Resource):
 
         if _existe_choque_horario(data["medico_id"], data["fecha"], data["hora_inicio"], data["hora_fin"]):
             return {"error": "Ya existe una cita registrada con ese médico a esa misma hora"}, 409
+
+        if _existe_choque_seguimiento(data["medico_id"], data["fecha"], data["hora_inicio"], data["hora_fin"]):
+            return {"error": "Ya existe un control de seguimiento agendado con ese médico a esa misma hora"}, 409
 
         item = Cita(**data)
         item.save()
@@ -93,7 +109,15 @@ class Cita_Resource(Resource):
 
         hora_inicio = data.get("hora_inicio", item.hora_inicio)
         hora_fin = data.get("hora_fin", item.hora_fin)
-        
+        medico_id = data.get("medico_id", item.medico_id)
+        fecha = data.get("fecha", item.fecha)
+
+        if _existe_choque_horario(medico_id, fecha, hora_inicio, hora_fin, excluir_id=item.id):
+            return {"error": "Ya existe una cita registrada con ese médico a esa misma hora"}, 409
+
+        if _existe_choque_seguimiento(medico_id, fecha, hora_inicio, hora_fin):
+            return {"error": "Ya existe un control de seguimiento agendado con ese médico a esa misma hora"}, 409
+
         for key, value in data.items():
             setattr(item, key, value)
         item.save()
