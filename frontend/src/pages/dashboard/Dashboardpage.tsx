@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { type DashboardTab } from '../../components/layout/Sidebar';
 import Modal from '../../components/ui/Modal';
+import { authStore } from '../../auth';
 import { type Paciente } from '../../api/pacientes';
 import { usePacientes } from '../../features/pacientes/hooks/UsePacientes';
 import { useCitasHoy } from '../../features/citas/hooks/Usecitashoy';
@@ -25,11 +27,17 @@ import '../../components/CrearCita.module.css';
  * usePacientes / useCitasHoy / useBuscarPaciente (dentro de NuevaAtencionTab).
  */
 const DashboardPage: React.FC = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<DashboardTab>('inicio');
   const [showPacienteForm, setShowPacienteForm] = useState(false);
   const [showPacienteExterno, setShowPacienteExterno] = useState(false);
   const [pacienteExternoInicial, setPacienteExternoInicial] = useState<Paciente | null>(null);
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
+
+  const handleLogout = () => {
+    authStore.logout();
+    navigate('/login');
+  };
 
   const {
     pacientes,
@@ -61,7 +69,7 @@ const DashboardPage: React.FC = () => {
       <DashboardLayout
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        onLogout={() => alert('Cerrando sesión…')}
+        onLogout={handleLogout}
       >
         <PagosHoyWidget monto={16450} cantidadPagos={12} loading={false} />
         <InicioTab

@@ -2,6 +2,8 @@ import React from 'react';
 import { type Paciente } from '../../../api/pacientes';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import ViewButton from '../../../components/ui/ViewButton';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPen, faToggleOn, faToggleOff } from '@fortawesome/free-solid-svg-icons';
 
 interface PacienteTableProps {
   titulo: string;
@@ -13,6 +15,11 @@ interface PacienteTableProps {
   onSearchChange: (value: string) => void;
   onAgregar: () => void;
   onVer: (paciente: Paciente) => void;
+  /** Abre el paciente en modo edición. Opcional: si no se pasa, el botón
+   *  igual se muestra pero solo avisa por consola (falta conectar). */
+  onEditar?: (paciente: Paciente) => void;
+  /** Activa/desactiva al paciente. Opcional por el mismo motivo. */
+  onCambiarEstado?: (paciente: Paciente) => void;
   emptyMessage: string;
 }
 
@@ -32,8 +39,20 @@ const PacienteTable: React.FC<PacienteTableProps> = ({
   onSearchChange,
   onAgregar,
   onVer,
+  onEditar,
+  onCambiarEstado,
   emptyMessage,
 }) => {
+  const handleEditar = (p: Paciente) => {
+    if (onEditar) onEditar(p);
+    else console.warn('PacienteTable: falta conectar onEditar');
+  };
+
+  const handleCambiarEstado = (p: Paciente) => {
+    if (onCambiarEstado) onCambiarEstado(p);
+    else console.warn('PacienteTable: falta conectar onCambiarEstado');
+  };
+
   return (
     <div className="table-card scroll-animated">
       <div className="card-header">
@@ -64,7 +83,7 @@ const PacienteTable: React.FC<PacienteTableProps> = ({
             <th>Teléfono</th>
             <th>Correo</th>
             <th>Estado</th>
-            <th>Ver</th>
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -77,14 +96,37 @@ const PacienteTable: React.FC<PacienteTableProps> = ({
           ) : (
             pacientes.map((p) => {
               const fullName = `${p.nombres} ${p.apellidos}`.trim();
+              const activo = Boolean(p.estado);
               return (
                 <tr key={p.id}>
                   <td className="patient-name">{fullName}</td>
                   <td>{p.documento}</td>
                   <td>{p.telefono || '—'}</td>
                   <td>{p.correo || '—'}</td>
-                  <td><StatusBadge activo={Boolean(p.estado)} /></td>
-                  <td><ViewButton name={fullName} onClick={() => onVer(p)} /></td>
+                  <td><StatusBadge activo={activo} /></td>
+                  <td>
+                    <div className="row-actions">
+                      <ViewButton name={fullName} onClick={() => onVer(p)} />
+                      <button
+                        type="button"
+                        className="icon-action-btn"
+                        aria-label={`Editar ${fullName}`}
+                        title="Editar"
+                        onClick={() => handleEditar(p)}
+                      >
+                        <FontAwesomeIcon icon={faPen} />
+                      </button>
+                      <button
+                        type="button"
+                        className={`icon-action-btn ${activo ? 'icon-action-btn-active' : 'icon-action-btn-inactive'}`}
+                        aria-label={activo ? `Desactivar ${fullName}` : `Activar ${fullName}`}
+                        title={activo ? 'Desactivar' : 'Activar'}
+                        onClick={() => handleCambiarEstado(p)}
+                      >
+                        <FontAwesomeIcon icon={activo ? faToggleOn : faToggleOff} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               );
             })

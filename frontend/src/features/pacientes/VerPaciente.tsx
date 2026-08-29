@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Paciente as ApiPaciente } from '../../api/pacientes';
-import { downloadRegistroClinicoPdf, downloadConsentimientoPdf, getExpedientePaciente } from '../../api/historialClinico';
+import { downloadRegistroClinicoPdf, downloadConsentimientoPdf, getExpedientePaciente, deleteRegistroCompleto } from '../../api/historialClinico';
 import type { RegistroClinico, RegistroCompletoResponse } from '../../api/historialClinico';
 import type { SeguimientoControlResponse } from '../../api/seguimientoControl';
 import HistoriaClinica from './RegistroClinico';
@@ -329,10 +329,25 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
   }, []);
 
   const handleEliminarRegistro = useCallback((registroId: number) => {
-    if (window.confirm(`¿Eliminar el registro clínico #${registroId}? Esta acción no se puede deshacer.`)) {
-      console.log('Eliminando registro ID:', registroId);
-    }
     setMenuAbiertoId(null);
+    if (!window.confirm(`¿Eliminar el registro clínico #${registroId}? Esta acción no se puede deshacer desde aquí.`)) {
+      return;
+    }
+    (async () => {
+      try {
+        await deleteRegistroCompleto(registroId);
+        setExpediente((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            registros_clinicos: (prev.registros_clinicos || []).filter((r) => r.id !== registroId),
+          };
+        });
+        setRegistroIdDetalle((prev) => (prev === registroId ? null : prev));
+      } catch (err: unknown) {
+        window.alert(extractErrorMessage(err, 'No se pudo eliminar el registro clínico.'));
+      }
+    })();
   }, []);
 
   const handleDescargarPdf = useCallback((registroId: number) => {

@@ -332,6 +332,7 @@ class RegistrosPorHistoria_Resource(Resource):
             RegistroClinico.query
             .join(Consulta, Consulta.id == RegistroClinico.consulta_id)
             .filter(RegistroClinico.historia_clinica_id == historia_id)
+            .filter(Consulta.estado.is_(True))
             .order_by(Consulta.fecha.desc(), Consulta.hora.desc())
             .all()
         )
@@ -358,6 +359,7 @@ class ExpedientePaciente_Resource(Resource):
             RegistroClinico.query
             .join(Consulta, Consulta.id == RegistroClinico.consulta_id)
             .filter(RegistroClinico.historia_clinica_id == historia.id)
+            .filter(Consulta.estado.is_(True))
             .order_by(Consulta.fecha.desc(), Consulta.hora.desc())
             .all()
         )
@@ -571,18 +573,17 @@ class RegistroClinicoCompletoUpdate_Resource(Resource):
     paciente_id y cita_id quedan fijos, no se pueden cambiar acá) y los
     datos del RegistroClinico (signos vitales, información clínica).
 
-    Si el body trae "examenes_complementarios", cada uno se procesa así:
-      - con "id"  -> actualiza el examen existente (debe pertenecer a
-                     este registro).
-      - sin "id"  -> crea un examen nuevo.
-    Este endpoint NUNCA borra un examen solo porque no venga en la
-    lista — si el examen ya existía y no lo mandas, simplemente lo deja
-    tal cual está, sin tocarlo. Borrar un examen es una acción aparte
-    (explícita), no algo que pase por omisión.
+    Este endpoint NO toca recetas ni examenes_complementarios aunque
+    vengan en el body — se ignoran. Cada uno se edita/elimina con sus
+    propios endpoints:
+      - Recetas: PUT /recetas/<id>, /recetas/<id>/medicamentos,
+        /recetas/examenes/<id>, /recetas/formulas/<id>.
+      - Exámenes complementarios: DELETE /api/examenes/<id>.
 
-    Las recetas NO se tocan en este endpoint — se editan con sus propios
-    endpoints (PUT /recetas/<id>, /recetas/<id>/medicamentos,
-    /recetas/examenes/<id>, /recetas/formulas/<id>).
+    DELETE /api/historial_clinico/registro-completo/<int:registro_id>
+
+    Soft delete (ver el método delete más abajo): no borra filas, solo
+    marca estado=False en cascada.
     """
 
     @jwt_required()
@@ -595,7 +596,6 @@ class RegistroClinicoCompletoUpdate_Resource(Resource):
         body = request.get_json(force=True) or {}
         consulta_data = dict(body.get("consulta") or {})
         registro_data = body.get("registro", {}) or {}
-        examenes_data = body.get("examenes_complementarios")  # None = no tocar
 
         # --- Validación de forma ---
         # paciente_id y cita_id no se editan acá aunque vengan en el body.
@@ -617,40 +617,6 @@ class RegistroClinicoCompletoUpdate_Resource(Resource):
         if "medico_id" in consulta_validated and not Medico.get_by_id(consulta_validated["medico_id"]):
             return {"error": "El médico indicado no existe"}, 404
 
-        examenes_actualizar = []  # [(instancia_existente, datos_dict)]
-        examenes_crear = []       # [datos_dict]
-
-        if examenes_data is not None:
-            for i, ex in enumerate(examenes_data):
-                categoria_nombre = ex.get("categoria")
-                if categoria_nombre not in CATEGORIAS_EXAMEN_VALIDAS:
-                    return {
-                        "examenes_complementarios": {
-                            i: {"categoria": [f"Debe ser una de: {sorted(CATEGORIAS_EXAMEN_VALIDAS)}"]}
-                        }
-                    }, 400
-                nombre_examen = (ex.get("nombre_examen") or "").strip()
-                if not nombre_examen:
-                    return {"examenes_complementarios": {i: {"nombre_examen": ["Requerido"]}}}, 400
-
-                datos = {
-                    "categoria_nombre": categoria_nombre,
-                    "nombre_examen": nombre_examen,
-                    "resultado": (ex.get("resultado") or "").strip() or None,
-                    "observaciones": (ex.get("observaciones") or "").strip() or None,
-                }
-
-                examen_id = ex.get("id")
-                if examen_id:
-                    examen_existente = ExamenComplementario.get_by_id(int(examen_id))
-                    if not examen_existente or examen_existente.registro_clinico_id != registro.id:
-                        return {
-                            "examenes_complementarios": {i: {"id": ["No pertenece a este registro clínico"]}}
-                        }, 404
-                    examenes_actualizar.append((examen_existente, datos))
-                else:
-                    examenes_crear.append(datos)
-
         # --- Transacción: todo o nada ---
         try:
             for key, value in consulta_validated.items():
@@ -658,23 +624,6 @@ class RegistroClinicoCompletoUpdate_Resource(Resource):
 
             for key, value in registro_validated.items():
                 setattr(registro, key, value)
-
-            for examen_existente, datos in examenes_actualizar:
-                categoria = _get_or_create_categoria_examen(datos["categoria_nombre"])
-                examen_existente.categoria_id = categoria.id
-                examen_existente.nombre_examen = datos["nombre_examen"]
-                examen_existente.resultado = datos["resultado"]
-                examen_existente.observaciones = datos["observaciones"]
-
-            for datos in examenes_crear:
-                categoria = _get_or_create_categoria_examen(datos["categoria_nombre"])
-                db.session.add(ExamenComplementario(
-                    registro_clinico_id=registro.id,
-                    categoria_id=categoria.id,
-                    nombre_examen=datos["nombre_examen"],
-                    resultado=datos["resultado"],
-                    observaciones=datos["observaciones"],
-                ))
 
             db.session.commit()
         except Exception:
@@ -689,6 +638,50 @@ class RegistroClinicoCompletoUpdate_Resource(Resource):
                 registro.examenes_complementarios, many=True
             ),
         }, 200
+
+    @jwt_required()
+    def delete(self, registro_id):
+        """
+        DELETE /api/historial_clinico/registro-completo/<int:registro_id>
+
+        Soft delete: no borra ninguna fila. Marca estado=False en la
+        Consulta (relación 1:1 con este RegistroClinico, así que
+        "consulta inactiva" == "registro clínico inactivo" — por eso
+        RegistroClinico no necesita su propia columna estado) y en
+        cada Receta y ExamenComplementario asociados, que sí tienen su
+        propio campo estado.
+
+        No toca archivos, informes de ecografía, seguimientos de
+        control, cobros ni pagos — quedan intactos por motivos legales
+        de conservación de la historia clínica.
+
+        Nota: por ahora ningún GET filtra por estado, así que esto
+        deja la marca en la base de datos pero no oculta nada todavía
+        en los listados existentes.
+        """
+        registro = RegistroClinico.get_by_id(registro_id)
+        if not registro:
+            return {"error": "Registro clínico no encontrado"}, 404
+
+        consulta = registro.consulta
+
+        try:
+            if consulta:
+                consulta.estado = False
+
+            for receta in registro.recetas:
+                receta.estado = False
+
+            for examen in registro.examenes_complementarios:
+                examen.estado = False
+
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Error desactivando registro clínico completo")
+            return {"error": "No se pudo eliminar el registro clínico completo"}, 500
+
+        return "", 204
 
 # ---------------------------------------------------------------------------
 # Seguimientos de control (día 15, 22, 29... cada visita posterior)
@@ -788,6 +781,8 @@ class RegistroClinicoDetalleCompleto_Resource(Resource):
         registro = RegistroClinico.get_by_id(registro_id)
         if not registro:
             return {"error": "Registro clínico no encontrado"}, 404
+        if registro.consulta and not registro.consulta.estado:
+            return {"error": "Registro clínico no encontrado"}, 404
 
         seguimientos = (
             SeguimientoControl.query
@@ -796,12 +791,15 @@ class RegistroClinicoDetalleCompleto_Resource(Resource):
             .all()
         )
 
+        examenes_activos = [e for e in registro.examenes_complementarios if e.estado]
+        recetas_activas = [r for r in registro.recetas if r.estado]
+
         return {
             "registro": registro_schema.dump(registro),
             "examenes_complementarios": examen_complementario_schema.dump(
-                registro.examenes_complementarios, many=True
+                examenes_activos, many=True
             ),
-            "recetas": receta_schema.dump(registro.recetas, many=True),
+            "recetas": receta_schema.dump(recetas_activas, many=True),
             "seguimientos_control": seguimiento_schema_list.dump(seguimientos),
         }, 200
 class SeguimientoControlList_Resource(Resource):

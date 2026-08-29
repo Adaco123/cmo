@@ -1,10 +1,11 @@
 /**
- * No hay creación/lectura independiente de exámenes complementarios
- * todavía (se crean únicamente como parte del payload combinado en
- * POST /historial_clinico/registro-completo). Este archivo solo
- * define los tipos — agrega funciones cuando tengas las rutas reales
- * de un CRUD independiente, si llegas a necesitarlo.
+ * CRUD independiente de exámenes complementarios: por ahora solo existe
+ * lectura/borrado (ver ExamenComplementario_Resource en el backend). La
+ * creación sigue siendo únicamente como parte del payload combinado en
+ * POST /historial_clinico/registro-completo; el PUT de edición de ese
+ * mismo endpoint ya NO crea ni edita exámenes, solo los deja tal cual.
  */
+import api from '../api';
 
 export type CategoriaExamenNombre = 'Laboratorio' | 'Imagenología' | 'Otro';
 
@@ -14,17 +15,6 @@ export interface ExamenComplementarioItemPayload {
   nombre_examen: string;
   resultado?: string | null;
   observaciones?: string | null;
-}
-
-/**
- * Igual que ExamenComplementarioItemPayload, pero para el PUT de edición
- * (registro-completo/<id>): si trae "id", el backend actualiza ese
- * examen existente; si no trae "id", crea uno nuevo. El que no se
- * incluya en la lista queda intacto (el backend nunca borra por
- * omisión).
- */
-export interface ExamenComplementarioUpdateItemPayload extends ExamenComplementarioItemPayload {
-  id?: number;
 }
 
 /** Lo que devuelve el backend al leer un examen ya guardado. */
@@ -40,4 +30,8 @@ export interface ExamenComplementario {
   estado: boolean;
   created_at?: string;
   updated_at?: string;
+}
+
+export async function deleteExamenComplementario(examenId: number): Promise<void> {
+  await api.delete(`/api/examenes/${examenId}`);
 }

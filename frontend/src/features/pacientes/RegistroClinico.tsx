@@ -160,6 +160,21 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
     }
   };
 
+  // Talla es un caso especial: en vez de obligar al usuario a escribir el
+  // punto decimal a mano ("1.80"), se toman solo los dígitos que escribe
+  // (máx. 3: 1 entero + 2 decimales) y se inserta el "." automáticamente
+  // después del primer dígito. Así el usuario solo teclea "180" y ve
+  // "1.80" en pantalla. Al completar los 3 dígitos salta al siguiente
+  // campo (glicemia), igual que el resto de los signos vitales.
+  const setTalla = (raw: string) => {
+    const digits = raw.replace(/[^0-9]/g, '').slice(0, 3);
+    const formatted = digits.length > 1 ? `${digits.slice(0, 1)}.${digits.slice(1)}` : digits;
+    setVitales(prev => ({ ...prev, talla: formatted }));
+    if (digits.length >= 3) {
+      vitalRefs.current.glu?.focus();
+    }
+  };
+
   const handleAlergiaChip = (val: string) => {
     setAlergiasRegistro(val);
     document.getElementById('sec_motivo')?.focus();
@@ -493,7 +508,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                     <label>Talla</label>
                     <div className={styles.vinputs}>
                       <input ref={setVitalRef('talla')} className={`${styles.wide} ${vitales.talla ? styles.ok : ''}`} value={vitales.talla}
-                        onChange={e => setVital('talla', e.target.value, 99, false)} placeholder="1.70" inputMode="decimal" />
+                        onChange={e => setTalla(e.target.value)} placeholder="1.70" inputMode="numeric" maxLength={4} />
                       <span className={styles.unit}>m</span>
                     </div>
                   </div>

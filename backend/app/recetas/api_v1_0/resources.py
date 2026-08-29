@@ -101,7 +101,7 @@ class RecetasPorRegistroClinico_Resource(Resource):
 
         recetas = (
             Receta.query
-            .filter_by(registro_clinico_id=registro_clinico_id)
+            .filter_by(registro_clinico_id=registro_clinico_id, estado=True)
             .order_by(Receta.fecha.desc())
             .all()
         )

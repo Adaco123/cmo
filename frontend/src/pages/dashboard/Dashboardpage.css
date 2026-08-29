@@ -308,39 +308,41 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* ── Sidebar footer ── */
+/* ── Sidebar footer ──
+   Rediseño: tarjeta oscura tipo "B", sin el círculo de avatar.
+   Solo se muestra el nombre y el botón de salir. */
 .sidebar-footer {
-  background: #B0C8DA;  /* color claro indicado */
-  border-top: 1px solid var(--border-color);
-  padding: 20px 16px 12px; margin-top: 20px;
-  display: flex; align-items: center; gap: 14px;
-  border-radius: 16px 16px 0 0;
+  background: var(--bg-body);
+  border-top: none;
+  padding: 16px; margin-top: 20px;
+  display: flex; align-items: center; gap: 12px;
+  border-radius: 16px;
 }
 
+/* El avatar se oculta (ya no se usa en este diseño) */
 .sidebar-footer .avatar {
-  width: 44px; height: 44px; border-radius: 50%;
-  background: var(--primary-gradient);
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 1.1rem; color: #fff; flex-shrink: 0;
-  box-shadow: 0 0 20px rgba(132, 167, 190, 0.3);
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  display: none;
 }
 
-.sidebar-footer .user-info { flex: 1; }
-.sidebar-footer .user-info .name { font-size: 0.95rem; font-weight: 600; color: var(--text-main); }
-.sidebar-footer .user-info .role { font-size: 0.75rem; color: var(--text-muted); opacity: 0.9; }
+.sidebar-footer .user-info { flex: 1; min-width: 0; }
+.sidebar-footer .user-info .name {
+  font-size: 0.95rem; font-weight: 600; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sidebar-footer .user-info .role { font-size: 0.75rem; color: rgba(255,255,255,0.65); opacity: 0.9; }
 
 .sidebar-footer .logout {
-  color: var(--text-muted); background: var(--bg-input);
-  border: 1px solid var(--border-color);
+  color: #fff; background: var(--bg-body);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   transition: all var(--transition-fast); cursor: pointer;
   padding: 8px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
 }
 
 .sidebar-footer .logout:hover {
-  background: rgba(193, 68, 63, 0.15);
-  color: var(--status-inactive);
-  border-color: rgba(193, 68, 63, 0.3);
+  background: var(--status-inactive);
+  border-color: var(--status-inactive);
+  color: #fff;
 }
 
 /* ── Main Content ── */
@@ -999,11 +1001,23 @@ body {
 .sidebar.collapsed .badge,
 .sidebar.collapsed .user-info { display: none; }
 
+/* Colapsado: se oculta el logo completo, el sidebar-top queda solo con
+   el botón de flecha, centrado (evita que el logo se vea recortado) */
+.sidebar.collapsed .sidebar-top {
+  justify-content: center;
+}
+
+.sidebar.collapsed .sidebar-brand {
+  display: none;
+}
+
 .sidebar.collapsed .sidebar-nav a { justify-content: center; padding: 13px; }
-.sidebar.collapsed .sidebar-footer { justify-content: center; }
-.sidebar.collapsed .sidebar-footer .avatar { margin: 0 auto; }
-.sidebar.collapsed .sidebar-brand-mark { width: 50px; height: 50px; }
-.sidebar.collapsed .sidebar-brand-mark img { width: 34px; height: 34px; }
+
+/* Footer colapsado: solo queda el botón de salir, centrado en la tarjeta oscura */
+.sidebar.collapsed .sidebar-footer {
+  justify-content: center;
+  padding: 12px 8px;
+}
 
 .sidebar.collapsed .sidebar-toggle-btn svg { transform: rotate(180deg); }
 
@@ -1017,7 +1031,7 @@ body {
   .sidebar-nav { flex-direction: row; flex-wrap: wrap; gap: 6px; flex: 1; }
   .sidebar-nav a { padding: 8px 14px; font-size: 0.82rem; }
   .sidebar-nav a .badge { display: none; }
-  .sidebar-footer { margin-top: 0; border-top: none; padding-top: 0; }
+  .sidebar-footer { margin-top: 0; border-top: none; padding-top: 12px; }
   .main-content { padding: 20px; height: auto; overflow-y: visible; }
   .header { flex-direction: column; align-items: flex-start; gap: 14px; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
@@ -1028,6 +1042,11 @@ body {
   .sidebar.collapsed .sidebar-brand-text,
   .sidebar.collapsed .sidebar-nav-label { display: inline; }
   .sidebar-toggle-btn { display: none; }
+
+  /* En mobile el toggle no aplica: se restaura el logo */
+  .sidebar.collapsed .sidebar-brand { display: flex; }
+  .sidebar.collapsed .sidebar-top { justify-content: space-between; }
+  .sidebar.collapsed .sidebar-footer { justify-content: flex-start; }
 }
 
 @media (max-width: 480px) {
@@ -1047,4 +1066,43 @@ body {
 .glow-btn.danger:hover {
   background: color-mix(in srgb, var(--status-inactive) 85%, black);
   box-shadow: 0 6px 18px rgba(193, 68, 63, 0.35);
+}
+/* ── Acciones de fila (Ver / Editar / Estado) ── */
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-action-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bg-input); border: 1px solid var(--border-color);
+  border-radius: 10px; width: 34px; height: 34px; padding: 0;
+  color: var(--text-muted);
+  cursor: pointer; transition: all var(--transition-fast);
+}
+
+.icon-action-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-color);
+  color: var(--text-main);
+  transform: scale(1.08);
+}
+
+.icon-action-btn-active {
+  color: var(--status-active);
+}
+
+.icon-action-btn-active:hover {
+  background: rgba(63, 143, 115, 0.12);
+  border-color: var(--status-active);
+}
+
+.icon-action-btn-inactive {
+  color: var(--status-inactive);
+}
+
+.icon-action-btn-inactive:hover {
+  background: rgba(193, 68, 63, 0.12);
+  border-color: var(--status-inactive);
 }

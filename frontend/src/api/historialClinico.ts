@@ -2,7 +2,6 @@ import api from '../api';
 import type { ConsultaPayload, Consulta } from './consultas';
 import type {
   ExamenComplementarioItemPayload,
-  ExamenComplementarioUpdateItemPayload,
   ExamenComplementario,
 } from './examenesComplementarios';
 import type { RecetasPayload, Receta } from './recetas';
@@ -152,20 +151,17 @@ export async function createRegistroCompleto(
  * Payload para PUT /registro-completo/<registro_id>: edita la Consulta
  * (solo motivo, diagnostico, fecha, hora, medico_id — paciente_id y
  * cita_id quedan fijos, el backend los ignora aunque los mandes) y el
- * RegistroClinico. Todo es parcial: solo mandas lo que quieres cambiar.
+ * RegistroClinico (signos vitales, información clínica). Todo es
+ * parcial: solo mandas lo que quieres cambiar.
  *
- * Si mandas `examenes_complementarios`, cada ítem con "id" actualiza ese
- * examen existente y cada ítem sin "id" crea uno nuevo. Un examen que ya
- * existía y no incluyas en la lista queda intacto — este endpoint nunca
- * borra un examen por omisión.
- *
- * Las recetas NO se tocan acá: se editan con sus propios endpoints
- * (updateReceta, etc. en api/recetas.ts).
+ * Este endpoint YA NO acepta examenes_complementarios ni recetas — se
+ * ignoran si los mandas. Los exámenes se eliminan con
+ * deleteExamenComplementario (más abajo); las recetas se editan con
+ * sus propios endpoints (updateReceta, etc. en api/recetas.ts).
  */
 export interface RegistroCompletoUpdatePayload {
   consulta?: Partial<Pick<ConsultaPayload, 'medico_id' | 'fecha' | 'hora' | 'motivo' | 'diagnostico'>>;
   registro?: Partial<Omit<RegistroClinicoPayload, 'consulta_id'>>;
-  examenes_complementarios?: ExamenComplementarioUpdateItemPayload[];
 }
 
 export interface RegistroCompletoUpdateResponse {
@@ -183,6 +179,16 @@ export async function updateRegistroCompleto(
     payload,
   );
   return data;
+}
+
+/**
+ * DELETE /registro-completo/<registro_id>: soft delete (el backend no
+ * borra filas, marca estado=False en la consulta, recetas y exámenes
+ * asociados). Hoy en día esto no oculta el registro de los listados
+ * existentes — solo queda marcado en la base de datos.
+ */
+export async function deleteRegistroCompleto(registroId: number): Promise<void> {
+  await api.delete(`/api/historial_clinico/registro-completo/${registroId}`);
 }
 
 export async function createHistoriaClinica(payload: HistoriaClinicaPayload): Promise<HistoriaClinica> {

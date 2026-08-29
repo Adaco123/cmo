@@ -6,7 +6,6 @@ import {
   updateRegistroCompleto,
 } from '../../api/historialClinico';
 import type { RegistroCompletoUpdateResponse } from '../../api/historialClinico';
-import type { CategoriaExamenNombre } from '../../api/examenesComplementarios';
 import styles from './EditarRegistroClinico.module.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUser, faSpinner } from '@fortawesome/free-solid-svg-icons';
@@ -27,6 +26,13 @@ type VitalKey = 'pa_sys' | 'pa_dia' | 'fc' | 'fr' | 'sat' | 'temp' | 'peso' | 't
 // lo sincronice automáticamente (las recetas se editan aparte, con sus
 // propios endpoints). Si el registro ya tenía texto de tratamiento
 // generado desde una receta, se puede seguir ajustando manualmente acá.
+//
+// NOTA 2: este formulario edita únicamente "consulta" (motivo,
+// diagnostico) y "registro" (signos vitales + secciones clínicas),
+// que es exactamente lo que acepta RegistroClinicoCompletoUpdate_Resource.
+// fecha, hora y medico_id ya no se muestran ni se envían porque ese
+// endpoint los ignora igual que a exámenes y recetas: no forman parte
+// de lo editable desde acá.
 const SECTIONS = [
   { key: 'motivo', label: 'Motivo de consulta', icon: 'fa-question-circle' },
   { key: 'enfermedad_actual', label: 'Enfermedad actual', icon: 'fa-history' },
@@ -38,21 +44,6 @@ const SECTIONS = [
   { key: 'consulta_control', label: 'Consulta control', icon: 'fa-calendar-check' },
 ] as const;
 type SectionKey = typeof SECTIONS[number]['key'];
-
-const CATEGORIAS: CategoriaExamenNombre[] = ['Laboratorio', 'Imagenología', 'Otro'];
-
-/** Fila de examen en el formulario. Si trae `id`, ya existe en el
- * backend (se actualiza al guardar). Si `id` es undefined, es una fila
- * nueva agregada en esta sesión (se crea al guardar, y se puede quitar
- * libremente de la lista antes de eso porque todavía no existe). */
-interface ExamenRow {
-  localId: string;
-  id?: number;
-  categoria: CategoriaExamenNombre;
-  nombre_examen: string;
-  resultado: string;
-  observaciones: string;
-}
 
 const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
   registroId,
@@ -67,10 +58,6 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [medicoId, setMedicoId] = useState<number>(1);
-  const [fecha, setFecha] = useState('');
-  const [hora, setHora] = useState('');
-
   const [vitales, setVitales] = useState<Record<VitalKey, string>>({
     pa_sys: '', pa_dia: '', fc: '', fr: '', sat: '', temp: '', peso: '', talla: '', glu: '',
   });
@@ -79,7 +66,6 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
     motivo: '', enfermedad_actual: '', examen_fisico: '', hallazgos_ecograficos: '',
     diagnostico: '', tratamiento: '', observaciones: '', consulta_control: '',
   });
-  const [examenes, setExamenes] = useState<ExamenRow[]>([]);
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -118,19 +104,6 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
           observaciones: r.observaciones || '',
           consulta_control: r.consulta_control || '',
         });
-        setMedicoId(r.medico_id);
-        setFecha(r.fecha);
-        setHora(r.hora);
-        setExamenes(
-          detalle.examenes_complementarios.map((ex) => ({
-            localId: `existente-${ex.id}`,
-            id: ex.id,
-            categoria: (ex.categoria?.nombre as CategoriaExamenNombre) || 'Otro',
-            nombre_examen: ex.nombre_examen,
-            resultado: ex.resultado || '',
-            observaciones: ex.observaciones || '',
-          }))
-        );
       } catch {
         if (!cancelado) setLoadError('No se pudo cargar el registro clínico. Intenta de nuevo.');
       } finally {
@@ -145,43 +118,8 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
     setVitales((prev) => ({ ...prev, [key]: clean }));
   };
 
-  const agregarExamen = () => {
-    setExamenes((prev) => [
-      ...prev,
-      {
-        localId: `nuevo-${Date.now()}`,
-        categoria: 'Laboratorio',
-        nombre_examen: '',
-        resultado: '',
-        observaciones: '',
-      },
-    ]);
-  };
-
-  // Solo se puede quitar de la lista una fila que TODAVÍA no existe en
-  // el backend (sin `id`). Un examen ya guardado no se borra desde acá
-  // — el PUT nunca borra por omisión, así que quitarlo de la lista no
-  // haría nada de todas formas; para no confundir, ni se muestra el
-  // botón de quitar en esos casos (ver JSX).
-  const quitarExamenNuevo = (localId: string) => {
-    setExamenes((prev) => prev.filter((e) => e.localId !== localId));
-  };
-
-  const actualizarExamen = (localId: string, campo: keyof ExamenRow, valor: string) => {
-    setExamenes((prev) =>
-      prev.map((e) => (e.localId === localId ? { ...e, [campo]: valor } : e))
-    );
-  };
-
   const handleGuardar = async () => {
     setSaveError(null);
-
-    // Exámenes nuevos sin nombre no tienen sentido mandarlos.
-    const examenesInvalidos = examenes.some((e) => !e.nombre_examen.trim());
-    if (examenesInvalidos) {
-      setSaveError('Todos los exámenes necesitan un nombre.');
-      return;
-    }
 
     setSaving(true);
     try {
@@ -192,9 +130,6 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
         consulta: {
           motivo: secciones.motivo.trim() || null,
           diagnostico: secciones.diagnostico.trim() || null,
-          fecha,
-          hora,
-          medico_id: medicoId,
         },
         registro: {
           presion_arterial: pa,
@@ -213,13 +148,6 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
           observaciones: secciones.observaciones.trim() || null,
           consulta_control: secciones.consulta_control.trim() || null,
         },
-        examenes_complementarios: examenes.map(({ id, categoria, nombre_examen, resultado, observaciones }) => ({
-          ...(id ? { id } : {}),
-          categoria,
-          nombre_examen: nombre_examen.trim(),
-          resultado: resultado.trim() || null,
-          observaciones: observaciones.trim() || null,
-        })),
       });
 
       if (pageRef.current) {
@@ -252,7 +180,7 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vitales, secciones, alergiasRegistro, examenes, fecha, hora, medicoId]);
+  }, [vitales, secciones, alergiasRegistro]);
 
   if (loading) {
     return (
@@ -292,11 +220,6 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
             <span>Registro #{registroId}</span>
           </div>
         </div>
-        {onClose && (
-          <button type="button" className={styles.btnSaveModern} onClick={onClose} disabled={saving}>
-            Cancelar
-          </button>
-        )}
       </div>
 
       <div className={`${styles.card} ${styles.pacienteCard}`}>
@@ -306,35 +229,6 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
               <i className={`fas fa-user ${styles.ficon}`}></i> Paciente
             </div>
             <div className={styles.pv}>{nombrePaciente}</div>
-          </div>
-          <div className={styles.pinfoItem}>
-            <div className={styles.pk}>
-              <i className={`fas fa-calendar ${styles.ficon}`}></i> Fecha
-            </div>
-            <div className={styles.pv}>
-              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-            </div>
-          </div>
-          <div className={styles.pinfoItem}>
-            <div className={styles.pk}>
-              <i className={`fas fa-clock ${styles.ficon}`}></i> Hora
-            </div>
-            <div className={styles.pv}>
-              <input type="time" step={1} value={hora} onChange={(e) => setHora(e.target.value)} />
-            </div>
-          </div>
-          <div className={styles.pinfoItem}>
-            <div className={styles.pk}>
-              <i className={`fas fa-user-doctor ${styles.ficon}`}></i> Médico (id)
-            </div>
-            <div className={styles.pv}>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={medicoId}
-                onChange={(e) => setMedicoId(parseInt(e.target.value.replace(/[^0-9]/g, ''), 10) || 0)}
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -431,71 +325,6 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
               />
             </div>
           ))}
-        </div>
-      </div>
-
-      <div className={styles.card}>
-        <div className={styles.field}>
-          <div className={styles.flabel}>
-            <i className={`fas fa-flask-vial ${styles.ficon}`}></i> Exámenes complementarios
-          </div>
-
-          {examenes.length === 0 && (
-            <p className={styles.subhint}>Este registro no tiene exámenes todavía.</p>
-          )}
-
-          <div className={styles.examenesLista}>
-            {examenes.map((ex) => (
-              <div className={styles.examenRow} key={ex.localId}>
-                <div className={styles.examenRowHead}>
-                  <select
-                    value={ex.categoria}
-                    onChange={(e) => actualizarExamen(ex.localId, 'categoria', e.target.value)}
-                  >
-                    {CATEGORIAS.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-
-                  {ex.id ? (
-                    <span className={styles.examenBadgeGuardado}>Ya guardado</span>
-                  ) : (
-                    <button
-                      type="button"
-                      className={styles.examenQuitarBtn}
-                      onClick={() => quitarExamenNuevo(ex.localId)}
-                      aria-label="Quitar examen"
-                    >
-                      Quitar
-                    </button>
-                  )}
-                </div>
-
-                <input
-                  type="text"
-                  placeholder="Nombre del examen (ej. Hemograma completo)"
-                  value={ex.nombre_examen}
-                  onChange={(e) => actualizarExamen(ex.localId, 'nombre_examen', e.target.value)}
-                />
-                <textarea
-                  rows={2}
-                  placeholder="Resultado..."
-                  value={ex.resultado}
-                  onChange={(e) => actualizarExamen(ex.localId, 'resultado', e.target.value)}
-                />
-                <textarea
-                  rows={1}
-                  placeholder="Observaciones (opcional)..."
-                  value={ex.observaciones}
-                  onChange={(e) => actualizarExamen(ex.localId, 'observaciones', e.target.value)}
-                />
-              </div>
-            ))}
-          </div>
-
-          <button type="button" className={styles.agregarExamenBtn} onClick={agregarExamen}>
-            + Agregar examen
-          </button>
         </div>
       </div>
 
