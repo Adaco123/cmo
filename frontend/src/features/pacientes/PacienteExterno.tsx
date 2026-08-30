@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { type Paciente } from '../../api/pacientes';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPaciente, type Paciente, type PacientePayload } from '../../api/pacientes';
 import {
   descargarArchivoBlob,
   eliminarArchivo as eliminarArchivoApi,
@@ -11,6 +11,8 @@ import CrearCita from '../../components/CrearCita';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faUserClock,
+  faSearch,
+  faUserPlus,
   faXmark,
   faPaperclip,
   faCloudUploadAlt,
@@ -28,6 +30,9 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './PacienteExterno.module.css';
 
+const ORIGEN_EXTERNO = 2;
+const CONSULTORIO_ID = 1;
+
 // Mismo criterio que RegistroClinico.tsx: 1 = imagen, 2 = pdf.
 const TIPO_ARCHIVO_POR_EXT: Record<string, number> = {
   jpg: 1,
@@ -41,13 +46,32 @@ const EXTENSIONES_VALIDAS = Object.keys(TIPO_ARCHIVO_POR_EXT);
 const esPdf = (nombreArchivo: string) => nombreArchivo.toLowerCase().endsWith('.pdf');
 
 interface PacienteExternoProps {
-  /** Paciente externo ya seleccionado (origen_id=2). La búsqueda y creación
-   * ahora viven fuera de este componente; acá solo se maneja la ficha,
-   * las acciones (cita/archivos) y el listado de archivos adjuntos. */
-  paciente?: Paciente;
-  pacienteInicial?: Paciente;
+  /** Lista de pacientes con origen_id=2 ya cargada (usePacientes -> filteredExternos). */
+  pacientesExternos: Paciente[];
   onClose?: () => void;
+  /** Se llama cuando se crea un paciente externo nuevo, para refrescar la lista del dashboard. */
+  onPacienteCreado?: () => void;
+  /** Si viene, el modal arranca directo en la vista del paciente (sin pasar por búsqueda/crear). */
+  pacienteInicial?: Paciente | null;
 }
+
+interface NuevoExternoForm {
+  nombres: string;
+  apellidos: string;
+  documento: string;
+  fecha_nacimiento: string;
+  sexo: string;
+  telefono: string;
+}
+
+const formInicial: NuevoExternoForm = {
+  nombres: '',
+  apellidos: '',
+  documento: '',
+  fecha_nacimiento: '',
+  sexo: '',
+  telefono: '',
+};
 
 /** Archivo en espera de subirse, con un id local para poder quitarlo de la lista. */
 interface ArchivoPendiente {
@@ -56,20 +80,28 @@ interface ArchivoPendiente {
 }
 
 /**
- * Modal para pacientes externos (origen_id=2). Ya no incluye búsqueda ni
- * alta rápida de paciente — recibe el paciente por props y muestra
- * directamente el layout de dos columnas (ficha + acciones a la izquierda,
- * archivos a la derecha), con "Adjuntar archivo" como modal centrado,
- * "Crear cita" como modal autocontenido (trae su propio backdrop), y ver
- * un archivo como drawer lateral que entra deslizando de derecha a
- * izquierda (mismo patrón que RegistroClinicoDetalle en VerPaciente). La
- * lista de archivos usa el mismo patrón de menú "..." (3 puntos) que el
- * timeline de VerPaciente.tsx en vez de un botón de eliminar directo.
+ * Modal para pacientes externos (origen_id=2). Antes de seleccionar un
+ * paciente: buscar o crear rápido. Una vez seleccionado: layout de dos
+ * columnas (ficha + acciones a la izquierda, archivos a la derecha), con
+ * "Adjuntar archivo" como modal centrado, "Crear cita" como modal
+ * autocontenido (trae su propio backdrop), y ver un archivo como drawer
+ * lateral que entra deslizando de derecha a izquierda (mismo patrón que
+ * RegistroClinicoDetalle en VerPaciente). La lista de archivos usa el
+ * mismo patrón de menú "..." (3 puntos) que el timeline de
+ * VerPaciente.tsx en vez de un botón de eliminar directo.
  */
-const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, pacienteInicial, onClose }) => {
-  const pacienteActivo = paciente ?? pacienteInicial;
-
-  if (!pacienteActivo) return null;
+const PacienteExterno: React.FC<PacienteExternoProps> = ({
+  pacientesExternos,
+  onClose,
+  onPacienteCreado,
+  pacienteInicial = null,
+}) => {
+  const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
+  const [modoCrear, setModoCrear] = useState(false);
+  const [busqueda, setBusqueda] = useState('');
+  const [formData, setFormData] = useState<NuevoExternoForm>(formInicial);
+  const [creando, setCreando] = useState(false);
+  const [errorCrear, setErrorCrear] = useState<string | null>(null);
 
   const [archivosSubidos, setArchivosSubidos] = useState<ArchivoResponse[]>([]);
   const [archivosPendientes, setArchivosPendientes] = useState<ArchivoPendiente[]>([]);
@@ -95,28 +127,92 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, pacienteIni
   const inputFileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
-  // Carga los archivos del paciente al montar y cada vez que cambie el
-  // paciente recibido por props.
-  useEffect(() => {
-    let cancelado = false;
+  const resultados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return pacientesExternos;
+    return pacientesExternos.filter((p) => {
+      const fullName = `${p.nombres} ${p.apellidos}`.toLowerCase();
+      return fullName.includes(q) || p.documento.toLowerCase().includes(q);
+    });
+  }, [busqueda, pacientesExternos]);
+
+  const seleccionarPaciente = useCallback(async (paciente: Paciente) => {
+    setSelectedPaciente(paciente);
     setArchivosSubidos([]);
     setArchivosPendientes([]);
     setErrorArchivo(null);
     setMenuAbiertoId(null);
+    try {
+      const archivos = await getArchivosPorPaciente(paciente.id);
+      setArchivosSubidos(archivos);
+    } catch {
+      // Si falla la carga de archivos previos igual se puede seguir subiendo.
+    }
+  }, []);
 
-    (async () => {
-      try {
-        const archivos = await getArchivosPorPaciente(pacienteActivo.id);
-        if (!cancelado) setArchivosSubidos(archivos);
-      } catch {
-        // Si falla la carga de archivos previos igual se puede seguir subiendo.
-      }
-    })();
+  // Si llega un pacienteInicial (clic en la tabla de externos), saltamos
+  // la búsqueda y vamos directo a la vista de ficha + acciones.
+  useEffect(() => {
+    if (pacienteInicial) {
+      void seleccionarPaciente(pacienteInicial);
+    }
+  }, [pacienteInicial, seleccionarPaciente]);
 
-    return () => {
-      cancelado = true;
+  const handleFormChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleCrearPaciente = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorCrear(null);
+
+    if (
+      !formData.nombres.trim() ||
+      !formData.apellidos.trim() ||
+      !formData.documento.trim() ||
+      !formData.fecha_nacimiento ||
+      !formData.sexo
+    ) {
+      setErrorCrear('Completa los campos obligatorios (*).');
+      return;
+    }
+
+    const sexoMap: Record<string, PacientePayload['sexo']> = {
+      masculino: 'M',
+      femenino: 'F',
+      otro: 'O',
     };
-  }, [pacienteActivo.id]);
+
+    const payload: PacientePayload = {
+      nombres: formData.nombres.trim(),
+      apellidos: formData.apellidos.trim(),
+      documento: formData.documento.trim(),
+      fecha_nacimiento: formData.fecha_nacimiento,
+      sexo: sexoMap[formData.sexo] ?? 'O',
+      telefono: formData.telefono.trim() || null,
+      origen_id: ORIGEN_EXTERNO,
+      consultorio_id: CONSULTORIO_ID,
+      estado: true,
+    };
+
+    try {
+      setCreando(true);
+      const nuevoPaciente = await createPaciente(payload);
+      onPacienteCreado?.();
+      setModoCrear(false);
+      setFormData(formInicial);
+      await seleccionarPaciente(nuevoPaciente);
+    } catch (error: any) {
+      const backendMessage =
+        error?.response?.data?.error || error?.response?.data?.msg || error?.message;
+      setErrorCrear(backendMessage || 'No se pudo crear el paciente.');
+    } finally {
+      setCreando(false);
+    }
+  };
 
   /** Agrega archivos elegidos (input o drag&drop) a la lista de pendientes, sin subirlos aún. */
   const agregarPendientes = useCallback((files: FileList | null) => {
@@ -147,14 +243,14 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, pacienteIni
 
   /** Sube al backend todos los archivos pendientes (botón "Guardar"). */
   const guardarPendientes = useCallback(async () => {
-    if (archivosPendientes.length === 0) return;
+    if (!selectedPaciente || archivosPendientes.length === 0) return;
     setErrorArchivo(null);
     setSubiendo(true);
     try {
       for (const pendiente of archivosPendientes) {
         const ext = pendiente.file.name.split('.').pop()?.toLowerCase() ?? '';
         const tipoArchivoId = TIPO_ARCHIVO_POR_EXT[ext] ?? 1;
-        const subido = await subirArchivoPaciente(pacienteActivo.id, pendiente.file, tipoArchivoId);
+        const subido = await subirArchivoPaciente(selectedPaciente.id, pendiente.file, tipoArchivoId);
         setArchivosSubidos((prev) => [subido, ...prev]);
       }
       setArchivosPendientes([]);
@@ -165,7 +261,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, pacienteIni
     } finally {
       setSubiendo(false);
     }
-  }, [pacienteActivo.id, archivosPendientes]);
+  }, [selectedPaciente, archivosPendientes]);
 
   // Abre/cierra el menú "..." de un archivo puntual (mismo patrón que
   // toggleMenu en VerPaciente.tsx: stopPropagation + toggle por id).
@@ -260,7 +356,9 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, pacienteIni
     return () => URL.revokeObjectURL(visorUrl);
   }, [visorUrl]);
 
-  const nombrePaciente = `${pacienteActivo.nombres} ${pacienteActivo.apellidos}`.trim();
+  const nombrePaciente = selectedPaciente
+    ? `${selectedPaciente.nombres} ${selectedPaciente.apellidos}`.trim()
+    : '';
 
   return (
     <div
@@ -276,115 +374,258 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, pacienteIni
         </button>
       )}
 
-      <div className={styles.header}>
-        <FontAwesomeIcon icon={faUserClock} />
-        <h1>Paciente Externo</h1>
-      </div>
-
-      <div className={styles.layout}>
-        {/* ================= SIDEBAR: FICHA + ACCIONES (igual que VerPaciente) ================= */}
-        <aside className={styles.sidebar}>
-          <div className={styles.pacienteCard}>
-            <div className={styles.avatar}>{nombrePaciente.charAt(0) || '?'}</div>
-            <h2 className={styles.pacienteNombre}>{nombrePaciente}</h2>
-            <p className={styles.pacienteMeta}>Doc: {paciente.documento}</p>
-            {paciente.telefono && <p className={styles.pacienteMeta}>{paciente.telefono}</p>}
+      {!selectedPaciente ? (
+        <>
+          <div className={styles.header}>
+            <FontAwesomeIcon icon={faUserClock} />
+            <h1>Paciente Externo</h1>
           </div>
 
-          <div className={styles.acciones}>
-            <button
-              type="button"
-              className={styles.accionBtn}
-              onClick={() => setShowCrearCita(true)}
-              title="Crear cita"
-            >
-              <FontAwesomeIcon icon={faCalendarCheck} />
-              <span>Crear cita</span>
-            </button>
-            <button
-              type="button"
-              className={styles.accionBtn}
-              onClick={() => setShowAdjuntar(true)}
-              title="Adjuntar archivo"
-            >
-              <FontAwesomeIcon icon={faPaperclip} />
-              <span>Adjuntar archivo</span>
-            </button>
-          </div>
-        </aside>
+          <div className={styles.section}>
+            {!modoCrear ? (
+              <>
+                <div className={styles.sectionTitle}>
+                  <FontAwesomeIcon icon={faSearch} /> Buscar paciente externo
+                </div>
+                <input
+                  type="text"
+                  className={styles.searchInput}
+                  placeholder="Buscar por nombre o documento..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                />
+                <div className={styles.listaResultados}>
+                  {resultados.length === 0 ? (
+                    <p className={styles.emptyText}>No se encontraron pacientes externos.</p>
+                  ) : (
+                    resultados.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className={styles.resultadoItem}
+                        onClick={() => seleccionarPaciente(p)}
+                      >
+                        <span className={styles.resultadoNombre}>
+                          {p.nombres} {p.apellidos}
+                        </span>
+                        <span className={styles.resultadoDoc}>{p.documento}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className={styles.btnSecundario}
+                  onClick={() => setModoCrear(true)}
+                >
+                  <FontAwesomeIcon icon={faUserPlus} /> Nuevo paciente externo
+                </button>
+              </>
+            ) : (
+              <>
+                <div className={styles.sectionTitle}>
+                  <FontAwesomeIcon icon={faUserPlus} /> Nuevo paciente externo
+                </div>
+                <form onSubmit={handleCrearPaciente}>
+                  <div className={styles.row}>
+                    <div className={styles.fieldGroup}>
+                      <label htmlFor="nombres">Nombres *</label>
+                      <input
+                        id="nombres"
+                        name="nombres"
+                        value={formData.nombres}
+                        onChange={handleFormChange}
+                        required
+                      />
+                    </div>
+                    <div className={styles.fieldGroup}>
+                      <label htmlFor="apellidos">Apellidos *</label>
+                      <input
+                        id="apellidos"
+                        name="apellidos"
+                        value={formData.apellidos}
+                        onChange={handleFormChange}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className={styles.row}>
+                    <div className={styles.fieldGroup}>
+                      <label htmlFor="documento">Documento *</label>
+                      <input
+                        id="documento"
+                        name="documento"
+                        value={formData.documento}
+                        onChange={handleFormChange}
+                        required
+                      />
+                    </div>
+                    <div className={styles.fieldGroup}>
+                      <label htmlFor="fecha_nacimiento">Fecha de nacimiento *</label>
+                      <input
+                        type="date"
+                        id="fecha_nacimiento"
+                        name="fecha_nacimiento"
+                        value={formData.fecha_nacimiento}
+                        onChange={handleFormChange}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className={styles.row}>
+                    <div className={styles.fieldGroup}>
+                      <label htmlFor="sexo">Sexo *</label>
+                      <select
+                        id="sexo"
+                        name="sexo"
+                        value={formData.sexo}
+                        onChange={handleFormChange}
+                        required
+                      >
+                        <option value="">Seleccione</option>
+                        <option value="masculino">Masculino</option>
+                        <option value="femenino">Femenino</option>
+                        <option value="otro">Otro</option>
+                      </select>
+                    </div>
+                    <div className={styles.fieldGroup}>
+                      <label htmlFor="telefono">Teléfono</label>
+                      <input
+                        id="telefono"
+                        name="telefono"
+                        value={formData.telefono}
+                        onChange={handleFormChange}
+                      />
+                    </div>
+                  </div>
 
-        {/* ================= MAIN: ARCHIVOS ================= */}
-        <main className={styles.main}>
-          <div className={styles.mainHead}>
-            <h1>Archivos adjuntos</h1>
-            <span className={styles.contador}>
-              {archivosSubidos.length} {archivosSubidos.length === 1 ? 'archivo' : 'archivos'}
-            </span>
-          </div>
+                  {errorCrear && <p className={styles.errorText}>{errorCrear}</p>}
 
-          {errorArchivo && !showAdjuntar && <p className={styles.errorText}>{errorArchivo}</p>}
-
-          {archivosSubidos.length === 0 ? (
-            <div className={styles.emptyState}>
-              <FontAwesomeIcon icon={faFileMedicalAlt} />
-              <p>No hay archivos adjuntos para este paciente todavía.</p>
-            </div>
-          ) : (
-            <ul className={styles.listaArchivos}>
-              {archivosSubidos.map((a) => (
-                <li key={a.id}>
-                  <button
-                    type="button"
-                    className={styles.archivoRowBtn}
-                    onClick={() => void abrirVisorArchivo(a)}
-                  >
-                    <FontAwesomeIcon icon={esPdf(a.nombre_archivo) ? faFilePdf : faFileImage} />
-                    <span>{a.nombre_archivo}</span>
-                  </button>
-
-                  <div className={styles.archivoAcciones}>
+                  <div className={styles.accionesForm}>
                     <button
                       type="button"
-                      className={styles.menuBtn}
-                      onClick={(e) => toggleMenuArchivo(a.id, e)}
-                      aria-label="Más acciones"
+                      className={styles.btnSecundario}
+                      onClick={() => setModoCrear(false)}
                     >
-                      <FontAwesomeIcon icon={faEllipsisVertical} />
+                      Volver a buscar
                     </button>
-                    {menuAbiertoId === a.id && (
-                      <div className={styles.menuDropdown} onClick={(e) => e.stopPropagation()}>
-                        <button type="button" onClick={() => void handleDescargarArchivo(a)}>
-                          <FontAwesomeIcon icon={faDownload} /> Descargar
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.menuDanger}
-                          onClick={() => handleEliminarArchivo(a.id)}
-                        >
-                          <FontAwesomeIcon icon={faTrash} /> Eliminar
-                        </button>
-                      </div>
-                    )}
+                    <button type="submit" className={styles.btnPrimario} disabled={creando}>
+                      {creando ? 'Guardando...' : 'Crear y continuar'}
+                    </button>
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </main>
-      </div>
+                </form>
+              </>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className={styles.layout}>
+          {/* ================= SIDEBAR: FICHA + ACCIONES (igual que VerPaciente) ================= */}
+          <aside className={styles.sidebar}>
+            <div className={styles.pacienteCard}>
+              <div className={styles.avatar}>{nombrePaciente.charAt(0) || '?'}</div>
+              <h2 className={styles.pacienteNombre}>{nombrePaciente}</h2>
+              <p className={styles.pacienteMeta}>Doc: {selectedPaciente?.documento}</p>
+              {selectedPaciente.telefono && (
+                <p className={styles.pacienteMeta}>{selectedPaciente.telefono}</p>
+              )}
+            </div>
+
+            <div className={styles.acciones}>
+              <button
+                type="button"
+                className={styles.accionBtn}
+                onClick={() => setShowCrearCita(true)}
+                title="Crear cita"
+              >
+                <FontAwesomeIcon icon={faCalendarCheck} />
+                <span>Crear cita</span>
+              </button>
+              <button
+                type="button"
+                className={styles.accionBtn}
+                onClick={() => setShowAdjuntar(true)}
+                title="Adjuntar archivo"
+              >
+                <FontAwesomeIcon icon={faPaperclip} />
+                <span>Adjuntar archivo</span>
+              </button>
+            </div>
+          </aside>
+
+          {/* ================= MAIN: ARCHIVOS ================= */}
+          <main className={styles.main}>
+            <div className={styles.mainHead}>
+              <h1>Archivos adjuntos</h1>
+              <span className={styles.contador}>
+                {archivosSubidos.length} {archivosSubidos.length === 1 ? 'archivo' : 'archivos'}
+              </span>
+            </div>
+
+            {errorArchivo && !showAdjuntar && <p className={styles.errorText}>{errorArchivo}</p>}
+
+            {archivosSubidos.length === 0 ? (
+              <div className={styles.emptyState}>
+                <FontAwesomeIcon icon={faFileMedicalAlt} />
+                <p>No hay archivos adjuntos para este paciente todavía.</p>
+              </div>
+            ) : (
+              <ul className={styles.listaArchivos}>
+                {archivosSubidos.map((a) => (
+                  <li key={a.id}>
+                    <button
+                      type="button"
+                      className={styles.archivoRowBtn}
+                      onClick={() => void abrirVisorArchivo(a)}
+                    >
+                      <FontAwesomeIcon icon={esPdf(a.nombre_archivo) ? faFilePdf : faFileImage} />
+                      <span>{a.nombre_archivo}</span>
+                    </button>
+
+                    <div className={styles.archivoAcciones}>
+                      <button
+                        type="button"
+                        className={styles.menuBtn}
+                        onClick={(e) => toggleMenuArchivo(a.id, e)}
+                        aria-label="Más acciones"
+                      >
+                        <FontAwesomeIcon icon={faEllipsisVertical} />
+                      </button>
+                      {menuAbiertoId === a.id && (
+                        <div className={styles.menuDropdown} onClick={(e) => e.stopPropagation()}>
+                          <button type="button" onClick={() => void handleDescargarArchivo(a)}>
+                            <FontAwesomeIcon icon={faDownload} /> Descargar
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.menuDanger}
+                            onClick={() => handleEliminarArchivo(a.id)}
+                          >
+                            <FontAwesomeIcon icon={faTrash} /> Eliminar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </main>
+        </div>
+      )}
 
       {/* CrearCita es un modal autocontenido: trae su propio backdrop y
           botón de cerrar, así que acá solo se monta condicionalmente. */}
-      {showCrearCita && (
+      {showCrearCita && selectedPaciente && (
         <CrearCita
-          paciente={paciente}
+          paciente={selectedPaciente}
           onClose={() => setShowCrearCita(false)}
           onSuccess={() => setShowCrearCita(false)}
         />
       )}
 
       {/* ================= MODAL: ADJUNTAR ARCHIVO (con Guardar) ================= */}
-      {showAdjuntar && (
+      {showAdjuntar && selectedPaciente && (
         <div className={styles.backdrop} onClick={cerrarModalAdjuntar}>
           <div className={styles.backdropContent} onClick={(e) => e.stopPropagation()}>
             <button type="button" className={styles.modalCloseBtn} onClick={cerrarModalAdjuntar}>

@@ -49,7 +49,7 @@
   color: var(--accent);
 }
 
-/* ----- Encabezado ----- */
+/* ----- Encabezado (pantalla de búsqueda/crear) ----- */
 .header {
   display: flex;
   align-items: center;
@@ -76,6 +76,13 @@
   margin: 0;
 }
 
+.section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.4rem 1.5rem;
+}
+
 .sectionTitle {
   display: flex;
   align-items: center;
@@ -93,6 +100,127 @@
   font-size: 0.85rem;
 }
 
+/* ----- Buscador de paciente ----- */
+.searchInput {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 0.65rem 0.9rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-main);
+  margin-bottom: 0.9rem;
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--accent-bg);
+}
+
+.listaResultados {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+}
+
+.resultadoItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.75rem 0.95rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: var(--transition-fast);
+}
+
+.resultadoItem:hover {
+  border-color: var(--primary);
+  background: var(--bg-card-hover);
+  transform: translateX(2px);
+}
+
+.resultadoNombre {
+  font-weight: 700;
+  color: var(--text-main);
+  font-size: 0.9rem;
+}
+
+.resultadoDoc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.emptyText {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding: 0.8rem 0.2rem;
+  text-align: center;
+}
+
+/* ----- Formulario crear paciente ----- */
+.row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem 1.4rem;
+  margin-bottom: 1rem;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.fieldGroup label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.fieldGroup input,
+.fieldGroup select {
+  font-family: inherit;
+  font-size: 0.88rem;
+  padding: 0.5rem 0.8rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-main);
+}
+
+.fieldGroup input:focus,
+.fieldGroup select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--accent-bg);
+}
+
+.accionesForm {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.3rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border-color);
+}
+
 .btnSecundario {
   font-family: inherit;
   font-size: 0.83rem;
@@ -107,6 +235,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  margin-top: 0.9rem;
 }
 
 .btnSecundario:hover {
@@ -146,7 +275,7 @@
 }
 
 /* ============================================================
-   LAYOUT DE FICHA — idéntico al de VerPaciente:
+   LAYOUT DE PACIENTE SELECCIONADO — idéntico al de VerPaciente:
    sidebar (ficha + acciones) + main (contenido).
    ============================================================ */
 .layout {
@@ -201,6 +330,25 @@
   margin: 0;
   font-size: 12.5px;
   color: var(--text-muted);
+}
+
+.btnCambiar {
+  margin-top: 14px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--primary-dark);
+  background: var(--bg-card);
+  border: 1.5px solid var(--primary);
+  border-radius: var(--radius-xl);
+  padding: 0.45rem 0.95rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btnCambiar:hover {
+  background: var(--primary);
+  color: #fff;
 }
 
 .acciones {
@@ -307,6 +455,9 @@
   color: var(--text-main);
 }
 
+/* Botón que ocupa la fila (nombre + ícono) y abre el visor de archivo.
+   Reemplaza los estilos "svg/span" sueltos que antes vivían directo en
+   .listaArchivos li, ahora agrupados en este botón interno. */
 .archivoRowBtn {
   display: flex;
   align-items: center;
@@ -512,11 +663,13 @@
   .container {
     padding: 1.5rem 1.3rem;
   }
+  .row {
+    grid-template-columns: 1fr;
+  }
   .header h1 {
     font-size: 1.1rem;
   }
 }
-
 /* ----- Lista de archivos pendientes (aún no guardados) ----- */
 .listaPendientes {
   list-style: none;
