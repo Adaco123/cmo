@@ -20,6 +20,9 @@ export interface PacientePayload {
 
 export interface Paciente extends PacientePayload {
   id: number;
+  edad?: number;
+  alergias?: string[];
+  diagnostico?: string | null;
   created_at?: string;
   updated_at?: string;
 }

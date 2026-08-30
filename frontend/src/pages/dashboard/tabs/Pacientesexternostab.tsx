@@ -11,6 +11,8 @@ interface PacientesExternosTabProps {
   onSearchChange: (value: string) => void;
   onAgregar: () => void;
   onVer: (paciente: Paciente) => void;
+  onEditar: (paciente: Paciente) => void;
+  onCambiarEstado: (paciente: Paciente) => void;
 }
 
 const PacientesExternosTab: React.FC<PacientesExternosTabProps> = (props) => {

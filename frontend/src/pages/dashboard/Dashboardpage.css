@@ -554,6 +554,13 @@ body {
   transition: color var(--transition-fast);
 }
 
+.table-card td.diagnostico-cell {
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .table-card tr:hover td { color: var(--text-main); }
 
 .table-card tr:last-child td { border-bottom: none; }
@@ -673,6 +680,9 @@ body {
 .new-attention-search-card {
   min-height: 240px;
   display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 32px;
+  background: #ffffff;
+  border: 1px solid rgba(42, 85, 120, 0.18);
+  box-shadow: 0 14px 30px rgba(10, 47, 77, 0.08);
 }
 
 .new-attention-search-card h4 {
@@ -688,20 +698,20 @@ body {
 .new-attention-actions .glow-btn { width: fit-content; }
 
 .new-attention-panel .setting-item {
-  background: rgba(180, 97, 74, 0.08);
-  border: 1px solid rgba(180, 97, 74, 0.25);
-  box-shadow: 0 10px 32px rgba(180, 97, 74, 0.1);
+  background: rgba(234, 242, 249, 0.9);
+  border: 1px solid rgba(42, 85, 120, 0.18);
+  box-shadow: 0 10px 32px rgba(10, 47, 77, 0.08);
 }
 
 .new-attention-panel .setting-item:hover {
   transform: translateY(-4px);
-  border-color: rgba(180, 97, 74, 0.4);
-  box-shadow: 0 16px 42px rgba(180, 97, 74, 0.15);
+  border-color: rgba(20, 184, 166, 0.38);
+  box-shadow: 0 16px 42px rgba(20, 184, 166, 0.12);
 }
 
 .new-attention-panel .toggle input[type="checkbox"]:checked {
-  background: var(--cmo-secondary);
-  border-color: #B4614A;
+  background: var(--cmo-primary);
+  border-color: var(--primary-dark);
 }
 
 .setting-item {
@@ -802,20 +812,20 @@ body {
 
 .search-input-wrapper {
   flex: 1; display: flex; align-items: center;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
+  background: #f8fbff;
+  border: 1px solid #cfe3f3;
   border-radius: 50px; padding: 10px 20px; gap: 12px;
   transition: all var(--transition-fast); min-width: 200px;
 }
 
 .search-input-wrapper:focus-within {
-  border-color: var(--border-color);
-  box-shadow: 0 0 0 4px rgba(132, 167, 190, 0.18);
-  background: var(--bg-input);
+  border-color: #8ecae6;
+  box-shadow: 0 0 0 4px rgba(142, 202, 230, 0.22);
+  background: #ffffff;
 }
 
 .search-input-wrapper .search-icon {
-  color: var(--text-muted); font-size: 1rem;
+  color: #4b6b85; font-size: 1rem;
 }
 
 .search-input-wrapper input {
@@ -824,30 +834,31 @@ body {
 }
 
 .search-input-wrapper input::placeholder {
-  color: var(--text-muted); opacity: 0.65;
+  color: #6b8aa1; opacity: 0.8;
 }
 
 /* ── Botón "Buscar" en Nueva atención ── */
 .new-attention-search-card .action-btn.primary {
   padding: 0.75em 1.8em; font-size: 13.5px; font-weight: 600;
   flex-shrink: 0; border-radius: var(--radius-xl);
-  border: 1px solid rgba(180, 97, 74, 0.35);
-  background: rgba(180, 97, 74, 0.1);
-  color: #fff;
-  box-shadow: none; text-shadow: none; text-transform: none; letter-spacing: 0.2px;
+  border: 1px solid #9edee4;
+  background: linear-gradient(135deg, #dff7ff 0%, #bfeaf5 100%);
+  color: #12314d;
+  box-shadow: 0 8px 20px rgba(142, 202, 230, 0.22);
+  text-shadow: none; text-transform: none; letter-spacing: 0.2px;
   transition: all var(--transition-fast);
 }
 
 .new-attention-search-card .action-btn.primary:hover {
-  background: rgba(180, 97, 74, 0.2);
-  border-color: var(--cmo-secondary);
-  box-shadow: 0 0 0 4px rgba(180, 97, 74, 0.14), 0 8px 24px rgba(180, 97, 74, 0.2);
+  background: linear-gradient(135deg, #d1f1ff 0%, #a8e5f7 100%);
+  border-color: #7ec7dc;
+  box-shadow: 0 0 0 4px rgba(142, 202, 230, 0.12), 0 10px 28px rgba(142, 202, 230, 0.28);
   transform: translateY(-2px);
 }
 
 .new-attention-search-card .action-btn.primary:active {
   transform: translateY(0);
-  box-shadow: 0 0 0 4px rgba(180, 97, 74, 0.14);
+  box-shadow: 0 0 0 4px rgba(142, 202, 230, 0.12);
 }
 
 .new-attention-search-card .action-btn.primary:disabled {

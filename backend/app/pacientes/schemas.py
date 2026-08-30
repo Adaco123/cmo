@@ -44,7 +44,7 @@ class PacienteSchema(ma.Schema):
             validate.Regexp(RE_DOCUMENTO, error="Formato de documento (CI) inválido."),
         ],
     )
-    fecha_nacimiento = fields.Date(required=True, load_only=True, validate=validar_fecha_nacimiento)
+    fecha_nacimiento = fields.Date(required=True, validate=validar_fecha_nacimiento)
     edad = fields.Method("calcular_edad", dump_only=True)
     alergias = fields.Method("obtener_alergias", dump_only=True)
     diagnostico = fields.Method("obtener_diagnostico", dump_only=True)

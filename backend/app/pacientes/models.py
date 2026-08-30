@@ -48,6 +48,9 @@ class Paciente(db.Model, BaseModelMixin):
 
         alergias = []
         for registro in self.historia_clinica.registros_clinicos or []:
+            if not registro.consulta or not registro.consulta.estado:
+                continue
+
             if not registro.alergias:
                 continue
 

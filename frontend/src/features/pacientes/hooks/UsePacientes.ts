@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { getPacientes, type Paciente } from '../../../api/pacientes';
+import { getPacientes, updatePaciente, type Paciente } from '../../../api/pacientes';
 
 interface PacienteFilters {
   misPacientes: string;
@@ -57,6 +57,29 @@ export function usePacientes() {
     (p) => p.origen_id === 2 && matchesSearch(p, filters.externos)
   );
 
+  /**
+   * Activa/desactiva un paciente (switch). Actualiza la lista al toque
+   * (optimista) para que se sienta instantáneo, y revierte si el
+   * backend rechaza el cambio.
+   */
+  const cambiarEstado = useCallback(async (paciente: Paciente) => {
+    const estadoAnterior = paciente.estado;
+    const nuevoEstado = !estadoAnterior;
+
+    setPacientes((prev) =>
+      prev.map((p) => (p.id === paciente.id ? { ...p, estado: nuevoEstado } : p)),
+    );
+
+    try {
+      await updatePaciente(paciente.id, { estado: nuevoEstado });
+    } catch (err) {
+      setPacientes((prev) =>
+        prev.map((p) => (p.id === paciente.id ? { ...p, estado: estadoAnterior } : p)),
+      );
+      throw err;
+    }
+  }, []);
+
   return {
     pacientes,
     loading,
@@ -66,5 +89,6 @@ export function usePacientes() {
     reload,
     filteredMisPacientes,
     filteredExternos,
+    cambiarEstado,
   };
 }

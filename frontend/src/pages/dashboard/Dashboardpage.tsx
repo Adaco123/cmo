@@ -8,9 +8,12 @@ import { type Paciente } from '../../api/pacientes';
 import { usePacientes } from '../../features/pacientes/hooks/UsePacientes';
 import { useCitasHoy } from '../../features/citas/hooks/Usecitashoy';
 import PacienteForm from '../../features/pacientes/PacienteForm';
+import EditarPacienteForm from '../../features/pacientes/EditarPacienteForm';
 import PacienteExterno from '../../features/pacientes/PacienteExterno';
 import VerPaciente from '../../features/pacientes/VerPaciente';
 import PagosHoyWidget from '../../components/PagosHoyWidget';
+import { useErrorToast } from '../../components/ErrorToastProvider';
+import { extractErrorMessage } from '../../utils/errors';
 
 import InicioTab from './tabs/Iniciotab';
 import NuevaAtencionTab from './tabs/Nuevaatenciontab';
@@ -30,6 +33,7 @@ const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<DashboardTab>('inicio');
   const [showPacienteForm, setShowPacienteForm] = useState(false);
+  const [pacienteAEditar, setPacienteAEditar] = useState<Paciente | null>(null);
   const [showPacienteExterno, setShowPacienteExterno] = useState(false);
   const [pacienteExternoInicial, setPacienteExternoInicial] = useState<Paciente | null>(null);
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
@@ -48,6 +52,7 @@ const DashboardPage: React.FC = () => {
     reload: loadPacientes,
     filteredMisPacientes,
     filteredExternos,
+    cambiarEstado,
   } = usePacientes();
 
   const {
@@ -62,6 +67,19 @@ const DashboardPage: React.FC = () => {
   const cerrarPacienteExterno = () => {
     setShowPacienteExterno(false);
     setPacienteExternoInicial(null);
+  };
+
+  const { showError, showSuccess } = useErrorToast();
+
+  const handleCambiarEstado = async (p: Paciente) => {
+    const nombreCompleto = `${p.nombres} ${p.apellidos}`.trim();
+    const activaba = !p.estado;
+    try {
+      await cambiarEstado(p);
+      showSuccess(`${nombreCompleto} ahora está ${activaba ? 'activo' : 'inactivo'}`);
+    } catch (err) {
+      showError(extractErrorMessage(err, 'No se pudo cambiar el estado del paciente.'));
+    }
   };
 
   return (
@@ -100,6 +118,8 @@ const DashboardPage: React.FC = () => {
           onSearchChange={(v) => handleFilterChange('misPacientes', v)}
           onAgregar={() => setShowPacienteForm(true)}
           onVer={(p) => setSelectedPaciente(p)}
+          onEditar={(p) => setPacienteAEditar(p)}
+          onCambiarEstado={handleCambiarEstado}
         />
 
         <PacientesExternosTab
@@ -117,6 +137,8 @@ const DashboardPage: React.FC = () => {
             setPacienteExternoInicial(p);
             setShowPacienteExterno(true);
           }}
+          onEditar={(p) => setPacienteAEditar(p)}
+          onCambiarEstado={handleCambiarEstado}
         />
 
         <ModelosTab active={activeTab === 'modelos'} searchValue="" />
@@ -143,6 +165,19 @@ const DashboardPage: React.FC = () => {
               void loadPacientes();
             }}
             onClose={() => setShowPacienteForm(false)}
+          />
+        </Modal>
+      )}
+
+      {pacienteAEditar && (
+        <Modal onClose={() => setPacienteAEditar(null)}>
+          <EditarPacienteForm
+            paciente={pacienteAEditar}
+            onSuccess={() => {
+              setPacienteAEditar(null);
+              void loadPacientes();
+            }}
+            onClose={() => setPacienteAEditar(null)}
           />
         </Modal>
       )}

@@ -13,6 +13,8 @@ import Cobrar from '../../features/pacientes/Cobrar';
 import styles from './VerPaciente.module.css';
 import '../../components/CrearCita.module.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { useErrorToast } from '../../components/ErrorToastProvider';
+import { extractErrorMessage } from '../../utils/errors';
 import {
   faCalendarCheck,
   faCirclePlus,
@@ -42,18 +44,6 @@ interface VerPacienteProps {
 }
 
 /** Extrae un mensaje de error legible de una respuesta de la API, con fallback genérico. */
-function extractErrorMessage(err: unknown, fallback: string): string {
-  if (
-    err && typeof err === 'object' && 'response' in err &&
-    err.response && typeof err.response === 'object' && 'data' in err.response &&
-    err.response.data && typeof err.response.data === 'object' && 'error' in err.response.data &&
-    typeof err.response.data.error === 'string'
-  ) {
-    return err.response.data.error;
-  }
-  return fallback;
-}
-
 /** "YYYY-MM-DD" en fecha LOCAL, a diferencia de toISOString() que usa UTC
  *  y puede adelantar el día en horas de la noche (Bolivia es UTC-4). */
 function toLocalDateString(d: Date): string {
@@ -184,11 +174,11 @@ const RegistroCard: React.FC<RegistroCardProps> = React.memo(function RegistroCa
               {formatearFechaRelativa(registro.fecha)}
               {registro.hora ? ` · ${registro.hora}` : ''}
             </span>
-            <span className={styles.cardTitulo}>
+            <span className={styles.cardTitulo} title={registro.diagnostico || registro.motivo_consulta || undefined}>
               {registro.diagnostico || registro.motivo_consulta || 'Consulta clínica'}
             </span>
             {registro.motivo_consulta && registro.diagnostico && (
-              <span className={styles.cardSub}>{registro.motivo_consulta}</span>
+              <span className={styles.cardSub} title={registro.motivo_consulta}>{registro.motivo_consulta}</span>
             )}
           </div>
 
@@ -232,6 +222,7 @@ const RegistroCard: React.FC<RegistroCardProps> = React.memo(function RegistroCa
 
 const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
   const [expediente, setExpediente] = useState<ExpedientePacienteResponse | null>(null);
+  const { showError, showSuccess } = useErrorToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -344,8 +335,9 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
           };
         });
         setRegistroIdDetalle((prev) => (prev === registroId ? null : prev));
+        showSuccess('Registro clínico eliminado correctamente');
       } catch (err: unknown) {
-        window.alert(extractErrorMessage(err, 'No se pudo eliminar el registro clínico.'));
+        showError(extractErrorMessage(err, 'No se pudo eliminar el registro clínico.'));
       }
     })();
   }, []);

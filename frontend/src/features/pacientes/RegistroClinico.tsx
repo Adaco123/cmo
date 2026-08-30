@@ -13,6 +13,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faUser, faCapsules, faFlaskVial, faXmark
 } from '@fortawesome/free-solid-svg-icons';
+import { useErrorToast } from '../../components/ErrorToastProvider';
+import { extractErrorMessage } from '../../utils/errors';
 
 const MEDICO_ID = 1;
 const TIPO_ARCHIVO_POR_EXT: Record<string, number> = {
@@ -309,6 +311,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
   };
 
   const [saveError, setSaveError] = useState<string | null>(null);
+  const { showError, showSuccess } = useErrorToast();
 
   const handleGuardar = async () => {
     if (!listoParaGuardar) {
@@ -348,6 +351,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
       examenesRef.current?.reset();
       setExamCount(0);
       recetaRef.current?.reset();
+      showSuccess('Registro clínico guardado correctamente');
 
       if (pageRef.current) {
         await new Promise<void>(resolve => {
@@ -363,7 +367,12 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
 
       await onSave?.(resultado);
     } catch (err) {
-      setSaveError('No se pudo guardar el registro clínico. Revisa los datos e intenta de nuevo.');
+      const mensaje = extractErrorMessage(
+        err,
+        'No se pudo guardar el registro clínico. Revisa los datos e intenta de nuevo.',
+      );
+      setSaveError(mensaje);
+      showError(mensaje);
     } finally {
       setSaving(false);
     }

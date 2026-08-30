@@ -11,6 +11,8 @@ interface MisPacientesTabProps {
   onSearchChange: (value: string) => void;
   onAgregar: () => void;
   onVer: (paciente: Paciente) => void;
+  onEditar: (paciente: Paciente) => void;
+  onCambiarEstado: (paciente: Paciente) => void;
 }
 
 const MisPacientesTab: React.FC<MisPacientesTabProps> = (props) => {
@@ -21,6 +23,7 @@ const MisPacientesTab: React.FC<MisPacientesTabProps> = (props) => {
         titulo="Mis Pacientes"
         searchPlaceholder="Buscar en mis pacientes..."
         emptyMessage="No hay pacientes de esta categoría."
+        mostrarDiagnostico
         {...tableProps}
       />
     </div>

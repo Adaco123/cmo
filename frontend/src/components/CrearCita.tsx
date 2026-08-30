@@ -3,6 +3,8 @@ import { createCita, type CitaPayload } from '../api/citas';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUser, faSpinner, faFloppyDisk, faXmark } from '@fortawesome/free-solid-svg-icons';
 import styles from './CrearCita.module.css';
+import { useErrorToast } from './ErrorToastProvider';
+import { extractErrorMessage } from '../utils/errors';
 
 interface CrearCitaProps {
   paciente?: { id?: number | null; nombres?: string; apellidos?: string } | null;
@@ -55,6 +57,7 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { showError, showSuccess } = useErrorToast();
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -90,7 +93,7 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
     };
 
     const data = await createCita(payload);
-    alert('Cita agendada exitosamente');
+    showSuccess('Cita agendada exitosamente');
 
     if (onSuccess) onSuccess(data);
 
@@ -106,7 +109,9 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
       estado_id: 1,
     });
   } catch (err) {
-    setError(err instanceof Error ? err.message : 'No se pudo guardar la cita.');
+    const mensaje = extractErrorMessage(err, 'No se pudo guardar la cita.');
+    setError(mensaje);
+    showError(mensaje);
   } finally {
     setLoading(false);
   }

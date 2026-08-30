@@ -67,8 +67,8 @@ const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes,
   const seguimientosPorFecha = useMemo(() => {
     const map = new Map<string, SeguimientoControl[]>();
     seguimientos.forEach((s) => {
-      if (!s.fecha) return;
-      const key = toDateKey(s.fecha);
+      if (!s.proxima_fecha_control) return;
+      const key = toDateKey(s.proxima_fecha_control);
       const arr = map.get(key) ?? [];
       arr.push(s);
       map.set(key, arr);
@@ -107,7 +107,7 @@ const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes,
     <div className="historia-backdrop" onClick={onClose}>
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
-          <h3>Calendario de citas</h3>
+          <h3>Calendario</h3>
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Cerrar">
             <FontAwesomeIcon icon={faXmark} />
           </button>
@@ -191,10 +191,16 @@ const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes,
               <>
                 <h4 className={styles.subtitulo}>Seguimientos de control</h4>
                 <ul className={styles.citasList}>
-                  {seguimientosDelDiaSeleccionado.map((s) => (
+                  {seguimientosDelDiaSeleccionado.map((s) => {
+                    const horaSeguimiento = s.hora_inicio ? String(s.hora_inicio).slice(0, 5) : '—';
+
+                    return (
                     <li key={s.id} className={styles.citaItem}>
                       <div className={styles.citaItemTop}>
                         <div className={styles.citaItemInfo}>
+                          <span className={styles.citaHora}>
+                            <FontAwesomeIcon icon={faClock} /> {horaSeguimiento}
+                          </span>
                           <span className={styles.citaNombre}>{nombrePaciente(s.paciente_id)}</span>
                           <span className={styles.citaMotivo}>{s.evolucion}</span>
                           {s.proxima_fecha_control && (
@@ -215,7 +221,7 @@ const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes,
                                   day: 'numeric',
                                   month: 'long',
                                   year: 'numeric',
-                                }).format(new Date(`${toDateKey(s.fecha)}T00:00:00`)),
+                                }).format(new Date(`${toDateKey(s.proxima_fecha_control!)}T00:00:00`)),
                                 s.evolucion
                               )
                             )}
@@ -229,7 +235,8 @@ const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes,
                         )}
                       </div>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               </>
             )}

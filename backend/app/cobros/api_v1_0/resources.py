@@ -51,7 +51,11 @@ class CobrosList_Resource(Resource):
 
         # El monto_final, el estado inicial y quién lo registró los calcula
         # el sistema; nunca se confían al cliente.
-        data["monto_final"] = monto - descuento
+        monto_final = monto - descuento
+        if monto_final <= 0:
+            return {"error": "El descuento no puede ser mayor o igual al monto."}, 400
+
+        data["monto_final"] = monto_final
         data["estado_id"] = estado_pendiente.id
         data["usuario_id"] = current_user.id
 

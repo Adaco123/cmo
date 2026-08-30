@@ -1,0 +1,44 @@
+/* Mismos tokens y estructura que el toast de Examenes.module.css,
+   centralizado acá para que cualquier componente lo use.
+   Dos variantes: error (default) y success, usando los tokens de
+   estado que ya existen en index.css (--status-inactive / --success). */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--bg-card-dark);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--status-inactive);
+  color: var(--text-on-dark);
+  padding: 0.7rem 1.1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  z-index: 1000;
+  box-shadow: var(--shadow-hover);
+  animation: errorToastIn 0.18s ease-out forwards;
+  max-width: min(90vw, 480px);
+}
+
+.toast.success {
+  border-left-color: var(--success);
+}
+
+@keyframes errorToastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.toast button {
+  background: none;
+  border: none;
+  color: var(--primary-light);
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: inherit;
+  flex-shrink: 0;
+}

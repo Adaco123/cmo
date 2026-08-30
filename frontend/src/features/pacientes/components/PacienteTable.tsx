@@ -1,9 +1,18 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { type Paciente } from '../../../api/pacientes';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import ViewButton from '../../../components/ui/ViewButton';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPen, faToggleOn, faToggleOff } from '@fortawesome/free-solid-svg-icons';
+import {
+  faPen,
+  faToggleOn,
+  faToggleOff,
+  faSort,
+  faSortUp,
+  faSortDown,
+} from '@fortawesome/free-solid-svg-icons';
+
+type OrdenEstado = 'activos_primero' | 'inactivos_primero' | null;
 
 interface PacienteTableProps {
   titulo: string;
@@ -21,6 +30,10 @@ interface PacienteTableProps {
   /** Activa/desactiva al paciente. Opcional por el mismo motivo. */
   onCambiarEstado?: (paciente: Paciente) => void;
   emptyMessage: string;
+  /** "Mis Pacientes" muestra el último diagnóstico en vez de correo;
+   *  "Pacientes Externos" no tiene diagnóstico, así que esa columna
+   *  no se muestra en absoluto (no solo vacía). */
+  mostrarDiagnostico?: boolean;
 }
 
 /**
@@ -42,7 +55,10 @@ const PacienteTable: React.FC<PacienteTableProps> = ({
   onEditar,
   onCambiarEstado,
   emptyMessage,
+  mostrarDiagnostico = false,
 }) => {
+  const [ordenEstado, setOrdenEstado] = useState<OrdenEstado>(null);
+
   const handleEditar = (p: Paciente) => {
     if (onEditar) onEditar(p);
     else console.warn('PacienteTable: falta conectar onEditar');
@@ -52,6 +68,23 @@ const PacienteTable: React.FC<PacienteTableProps> = ({
     if (onCambiarEstado) onCambiarEstado(p);
     else console.warn('PacienteTable: falta conectar onCambiarEstado');
   };
+
+  const toggleOrdenEstado = () => {
+    setOrdenEstado((prev) =>
+      prev === null ? 'activos_primero' : prev === 'activos_primero' ? 'inactivos_primero' : null,
+    );
+  };
+
+  const pacientesOrdenados = useMemo(() => {
+    if (!ordenEstado) return pacientes;
+    const signo = ordenEstado === 'activos_primero' ? -1 : 1;
+    return [...pacientes].sort((a, b) => signo * (Number(a.estado) - Number(b.estado)));
+  }, [pacientes, ordenEstado]);
+
+  const iconoOrden =
+    ordenEstado === 'activos_primero' ? faSortDown : ordenEstado === 'inactivos_primero' ? faSortUp : faSort;
+
+  const columnas = mostrarDiagnostico ? 5 : 4;
 
   return (
     <div className="table-card scroll-animated">
@@ -79,30 +112,57 @@ const PacienteTable: React.FC<PacienteTableProps> = ({
         <thead>
           <tr>
             <th>Nombre</th>
-            <th>Documento</th>
             <th>Teléfono</th>
-            <th>Correo</th>
-            <th>Estado</th>
+            {mostrarDiagnostico && <th>Último diagnóstico</th>}
+            <th>
+              <button
+                type="button"
+                onClick={toggleOrdenEstado}
+                title={
+                  ordenEstado === 'activos_primero'
+                    ? 'Ordenado: activos primero (clic para invertir)'
+                    : ordenEstado === 'inactivos_primero'
+                    ? 'Ordenado: inactivos primero (clic para quitar orden)'
+                    : 'Ordenar por estado'
+                }
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  font: 'inherit',
+                  color: 'inherit',
+                  cursor: 'pointer',
+                }}
+              >
+                Estado <FontAwesomeIcon icon={iconoOrden} />
+              </button>
+            </th>
             <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan={6}>Cargando pacientes...</td></tr>
+            <tr><td colSpan={columnas}>Cargando pacientes...</td></tr>
           ) : error ? (
-            <tr><td colSpan={6}>{error}</td></tr>
-          ) : pacientes.length === 0 ? (
-            <tr><td colSpan={6}>{emptyMessage}</td></tr>
+            <tr><td colSpan={columnas}>{error}</td></tr>
+          ) : pacientesOrdenados.length === 0 ? (
+            <tr><td colSpan={columnas}>{emptyMessage}</td></tr>
           ) : (
-            pacientes.map((p) => {
+            pacientesOrdenados.map((p) => {
               const fullName = `${p.nombres} ${p.apellidos}`.trim();
               const activo = Boolean(p.estado);
               return (
                 <tr key={p.id}>
                   <td className="patient-name">{fullName}</td>
-                  <td>{p.documento}</td>
                   <td>{p.telefono || '—'}</td>
-                  <td>{p.correo || '—'}</td>
+                  {mostrarDiagnostico && (
+                    <td className="diagnostico-cell" title={p.diagnostico || undefined}>
+                      {p.diagnostico || '—'}
+                    </td>
+                  )}
                   <td><StatusBadge activo={activo} /></td>
                   <td>
                     <div className="row-actions">

@@ -7,6 +7,8 @@ import type { RecetaHandle } from './Receta';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCalendarCheck, faSpinner, faSave, faCapsules, faXmark } from '@fortawesome/free-solid-svg-icons';
 import styles from './Control.module.css';
+import { useErrorToast } from '../../components/ErrorToastProvider';
+import { extractErrorMessage } from '../../utils/errors';
 
 // TODO: reemplazar por el id del médico autenticado cuando exista login real
 const MEDICO_ID = 1;
@@ -66,6 +68,7 @@ const Control: React.FC<Props> = ({
   const [horaFin, setHoraFin] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { showError, showSuccess } = useErrorToast();
   const evolucionRef = useRef<HTMLTextAreaElement>(null);
 
   // ---------- receta del seguimiento ----------
@@ -120,9 +123,12 @@ const Control: React.FC<Props> = ({
       });
 
       recetaRef.current?.reset();
+      showSuccess('Control guardado correctamente');
       onSaved?.(resultado);
     } catch (err) {
-      setError('No se pudo guardar el control. Intenta de nuevo.');
+      const mensaje = extractErrorMessage(err, 'No se pudo guardar el control. Intenta de nuevo.');
+      setError(mensaje);
+      showError(mensaje);
     } finally {
       setSaving(false);
     }

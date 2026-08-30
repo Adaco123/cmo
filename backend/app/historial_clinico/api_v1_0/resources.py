@@ -11,6 +11,10 @@ from app.medicos.models import Medico
 from app.citas.models import Cita
 from app.historial_clinico.models import HistoriaClinica, RegistroClinico
 from app.seguimiento_control.models import SeguimientoControl
+from app.shared.disponibilidad_medico import (
+    existe_choque_con_cita,
+    existe_choque_con_seguimiento,
+)
 from app.historial_clinico.schemas import (
     HistoriaClinicaSchema,
     RegistroClinicoSchema,
@@ -104,29 +108,6 @@ def _parse_hora(valor, campo: str):
 def _validar_orden_horario(hora_inicio, hora_fin):
     if hora_inicio and hora_fin and hora_fin <= hora_inicio:
         raise ValueError("hora_fin debe ser posterior a hora_inicio")
-
-
-def _existe_choque_cita(medico_id, fecha, hora_inicio, hora_fin):
-    return Cita.query.filter(
-        Cita.medico_id == medico_id,
-        Cita.fecha == fecha,
-        Cita.hora_inicio < hora_fin,
-        Cita.hora_fin > hora_inicio,
-    ).first() is not None
-
-
-def _existe_choque_seguimiento(medico_id, fecha, hora_inicio, hora_fin, excluir_id=None):
-    query = SeguimientoControl.query.filter(
-        SeguimientoControl.medico_id == medico_id,
-        SeguimientoControl.proxima_fecha_control == fecha,
-        SeguimientoControl.hora_inicio.isnot(None),
-        SeguimientoControl.hora_fin.isnot(None),
-        SeguimientoControl.hora_inicio < hora_fin,
-        SeguimientoControl.hora_fin > hora_inicio,
-    )
-    if excluir_id is not None:
-        query = query.filter(SeguimientoControl.id != excluir_id)
-    return query.first() is not None
 
 
 def _validar_bloques_recetas(recetas_data: dict):
@@ -522,9 +503,9 @@ class RegistroClinicoCompleto_Resource(Resource):
             sc_hora_inicio = seguimiento_validated["hora_inicio"]
             sc_hora_fin = seguimiento_validated["hora_fin"]
             if sc_fecha and sc_hora_inicio and sc_hora_fin:
-                if _existe_choque_cita(medico_id, sc_fecha, sc_hora_inicio, sc_hora_fin):
+                if existe_choque_con_cita(medico_id, sc_fecha, sc_hora_inicio, sc_hora_fin):
                     return {"error": "Ya existe una cita registrada con ese médico a esa misma hora"}, 409
-                if _existe_choque_seguimiento(medico_id, sc_fecha, sc_hora_inicio, sc_hora_fin):
+                if existe_choque_con_seguimiento(medico_id, sc_fecha, sc_hora_inicio, sc_hora_fin):
                     return {"error": "Ya existe otro control de seguimiento agendado con ese médico a esa misma hora"}, 409
 
         historias = HistoriaClinica.simple_filter(paciente_id=paciente_id)
@@ -788,10 +769,10 @@ class SeguimientoControl_Resource(Resource):
             return error
 
         if proxima_fecha_control and hora_inicio and hora_fin:
-            if _existe_choque_cita(medico_id, proxima_fecha_control, hora_inicio, hora_fin):
+            if existe_choque_con_cita(medico_id, proxima_fecha_control, hora_inicio, hora_fin):
                 return {"error": "Ya existe una cita registrada con ese médico a esa misma hora"}, 409
 
-            if _existe_choque_seguimiento(medico_id, proxima_fecha_control, hora_inicio, hora_fin):
+            if existe_choque_con_seguimiento(medico_id, proxima_fecha_control, hora_inicio, hora_fin):
                 return {"error": "Ya existe otro control de seguimiento agendado con ese médico a esa misma hora"}, 409
 
         try:
