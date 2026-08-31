@@ -269,31 +269,40 @@
    del membrete — conviene hacer una impresión de prueba y, si hace
    falta, (a) reexportar el membrete ya recortado a proporción
    8.5:5.5 para que calce exacto, o (b) reajustar estos % a mano.
+
+   ⚠️ Nota 2: de acá para abajo (.cmo-canvas, .cmo-slip, .cmo-rp*,
+   .cmo-fecha) las reglas NO llevan el prefijo ".receta-widget" que sí
+   usa el resto del archivo. Es a propósito: renderSlip() (que genera
+   estas clases) se usa tanto para la vista previa en pantalla —dentro
+   de .receta-widget— como para el bloque de impresión, que ahora se
+   renderiza vía createPortal directo a <body> (ver Receta.tsx), fuera
+   de .receta-widget. Si se le pone el prefijo de vuelta, el bloque
+   portaleado se queda sin estos estilos.
    ============================================================ */
 
-.receta-widget .cmo-canvas {
+.cmo-canvas {
   position: relative;
   width: 100%;
   container-type: inline-size;
 }
-.receta-widget .cmo-canvas img {
+.cmo-canvas img {
   width: 100%;
   display: block;
 }
 
-.receta-widget .cmo-slip {
+.cmo-slip {
   width: 8.5in;
   height: 5.5in;
   overflow: hidden;
   page-break-inside: avoid;
   break-inside: avoid;
 }
-.receta-widget .cmo-slip img {
+.cmo-slip img {
   height: 100%;
   object-fit: cover;
 }
 
-.receta-widget .cmo-rp {
+.cmo-rp {
   position: absolute;
   top: 27%;
   left: 8.5%;
@@ -303,9 +312,9 @@
   line-height: 1.9;
   color: #16233A;
 }
-.receta-widget .cmo-rp-line { margin-bottom: 0.35em; }
-.receta-widget .cmo-rp-meta { font-size: 0.8em; color: #555; }
-.receta-widget .cmo-fecha {
+.cmo-rp-line { margin-bottom: 0.35em; }
+.cmo-rp-meta { font-size: 0.8em; color: #555; }
+.cmo-fecha {
   position: absolute;
   top: 79%;
   left: 15.4%;
@@ -316,7 +325,7 @@
   text-align: center;
 }
 
-.receta-widget .cmo-rp-header {
+.cmo-rp-header {
   font-family: 'Great Vibes', cursive;
   font-weight: 900;
   display: flex;
@@ -329,19 +338,19 @@
   padding-left: 10%;
   text-align: left;
 }
-.receta-widget .cmo-rp-header strong { color: var(--primary, #14b8a6); font-weight: 700; }
-.receta-widget .cmo-rp-header-name { flex: 1; }
-.receta-widget .cmo-rp-header-age { flex: 0 0 auto; }
+.cmo-rp-header strong { color: var(--primary, #14b8a6); font-weight: 700; }
+.cmo-rp-header-name { flex: 1; }
+.cmo-rp-header-age { flex: 0 0 auto; }
 
-.receta-widget .cmo-rp-med-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.75em; gap: 1.5rem; }
-.receta-widget .cmo-rp-med-col-left { display: flex; align-items: baseline; gap: 0.5em; flex: 0 0 42%; min-width: 0; }
-.receta-widget .cmo-rp-num { font-weight: 700; color: var(--status-inactive, #C1443F); font-size: 0.95em; flex-shrink: 0; }
-.receta-widget .cmo-rp-med-name { font-weight: 600; color: #16233A; }
-.receta-widget .cmo-rp-med-col-right { flex: 0 0 50%; text-align: left; padding-left: 2cqw; }
-.receta-widget .cmo-rp-instrucciones { font-size: 0.9em; color: #333; font-weight: 500; line-height: 1.4; }
-.receta-widget .cmo-rp-horario { font-size: 0.82em; color: #555; margin-top: 0.2em; font-family: var(--sans, Arial, sans-serif); }
+.cmo-rp-med-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.75em; gap: 1.5rem; }
+.cmo-rp-med-col-left { display: flex; align-items: baseline; gap: 0.5em; flex: 0 0 42%; min-width: 0; }
+.cmo-rp-num { font-weight: 700; color: var(--status-inactive, #C1443F); font-size: 0.95em; flex-shrink: 0; }
+.cmo-rp-med-name { font-weight: 600; color: #16233A; }
+.cmo-rp-med-col-right { flex: 0 0 50%; text-align: left; padding-left: 2cqw; }
+.cmo-rp-instrucciones { font-size: 0.9em; color: #333; font-weight: 500; line-height: 1.4; }
+.cmo-rp-horario { font-size: 0.82em; color: #555; margin-top: 0.2em; font-family: var(--sans, Arial, sans-serif); }
 
-.receta-widget .cmo-rp-diagnostico {
+.cmo-rp-diagnostico {
   position: absolute;
   top: 73%;
   left: 8.5%;
@@ -354,11 +363,15 @@
   border-top: 1px solid rgba(22,35,58,0.18);
   text-align: justify;
 }
-.receta-widget .cmo-rp-diagnostico strong { color: var(--primary, #14b8a6); font-weight: 700; }
+.cmo-rp-diagnostico strong { color: var(--primary, #14b8a6); font-weight: 700; }
 
-/* ---------- área de impresión ---------- */
-.receta-widget .cmo-print-all { display: none; }
-.receta-widget .cmo-print-all .cmo-slip + .cmo-slip { margin-top: 0; }
+/* ---------- área de impresión ----------
+   #cmo-print-root vive fuera de .receta-widget (portaleado a <body>,
+   ver Receta.tsx), así que la regla de "ocultar todo menos esto" ya
+   no necesita el selector :has() ni depender del drawer: simplemente
+   se ocultan todos los hijos directos de <body> salvo el portal. */
+.cmo-print-all { display: none; }
+.cmo-print-all .cmo-slip + .cmo-slip { margin-top: 0; }
 
 @page {
   size: letter;
@@ -366,18 +379,13 @@
 }
 
 @media print {
-  body *:not(:has(.receta-widget)):not(.receta-widget):not(.receta-widget *) {
+  body > *:not(#cmo-print-root) {
     display: none !important;
   }
-  .receta-widget > .overlay,
-  .receta-widget > .drawer,
-  .receta-widget > .toast {
-    display: none !important;
-  }
-  .receta-widget .cmo-print-all {
+  #cmo-print-root {
     display: block !important;
   }
-  .receta-widget .cmo-slip {
+  .cmo-slip {
     position: relative;
     box-shadow: none !important;
   }

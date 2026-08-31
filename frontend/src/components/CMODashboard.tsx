@@ -222,7 +222,7 @@ const CMODashboard: React.FC = () => {
   return (
     <div className="app-layout">
       {/* ─── Ambient ─── */}
-      <PagosHoyWidget monto={16450} cantidadPagos={12} loading={false} />
+      <PagosHoyWidget />
       <div className="ambient-layer">
         <div className="ambient-orb ambient-orb-1"></div>
         <div className="ambient-orb ambient-orb-2"></div>

@@ -1,18 +1,13 @@
-"""Generación del PDF de consentimiento informado general — el
-documento que firma el paciente autorizando la atención/procedimiento
-indicado por el médico tratante.
+"""Generación del PDF de FIRMA DE CONSENTIMIENTO DEL PACIENTE EN CASO DE
+PROCEDIMIENTO — documento breve que firma el paciente autorizando un
+procedimiento específico indicado por el médico tratante, con espacio
+para describir el procedimiento y registrar la evolución.
 
 Mismo lenguaje visual "bajo consumo de tinta" que reporte.py: sin
 fondos de color sólido, sin degradados, solo texto y líneas finas.
 
 Se descarga directo (sin pedir datos adicionales) a partir de un
 registro clínico existente, igual que el reporte del registro.
-
-IMPORTANTE: el texto legal de este documento es una plantilla genérica
-de uso común en consentimientos informados. Antes de usarlo en
-producción, debe ser revisado por personal médico/legal del
-consultorio para asegurar que cumple con la normativa boliviana
-vigente.
 """
 import os
 from datetime import date, datetime
@@ -44,8 +39,8 @@ historial_clinico_consentimiento_bp = Blueprint("historial_clinico_consentimient
 # ---------------------------------------------------------------------------
 # Datos del consultorio (mismos que reporte.py — ajustar con la info real)
 # ---------------------------------------------------------------------------
-CONSULTORIO_NOMBRE_L1 = "CONSULTORIO"
-CONSULTORIO_NOMBRE_L2 = "DE ECOGRAFÍA"
+CONSULTORIO_NOMBRE_L1 = "CONSULTORES"
+CONSULTORIO_NOMBRE_L2 = "MEDICOS ORURO"
 CONSULTORIO_TELEFONO = ""
 CONSULTORIO_REGISTRO = ""
 
@@ -106,24 +101,12 @@ def _nombre_medico(registro):
     return f"{medico.empleado.nombres} {medico.empleado.apellidos}{matricula}"
 
 
-def _motivo_o_diagnostico(registro):
-    """Texto de contexto para la declaración: usa diagnóstico si existe,
-    si no el motivo de consulta, si no un texto genérico."""
-    diagnostico = getattr(registro, "diagnostico", None)
-    if diagnostico:
-        return _format_value(diagnostico)
-    motivo = getattr(registro, "motivo_consulta", None)
-    if motivo:
-        return _format_value(motivo)
-    return "la atención médica indicada"
-
-
 def _styles():
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle("ClinicaNombre", fontName="Helvetica-Bold", fontSize=12.5,
                                textColor=PRIMARY, leading=14))
-    styles.add(ParagraphStyle("DocTitulo", fontName="Helvetica-Bold", fontSize=15,
-                               textColor=PRIMARY, leading=18, alignment=1, spaceBefore=2))
+    styles.add(ParagraphStyle("DocTitulo", fontName="Helvetica-Bold", fontSize=14,
+                               textColor=PRIMARY, leading=17, alignment=1, spaceBefore=2))
     styles.add(ParagraphStyle("PacienteNombre", fontName="Helvetica-Bold", fontSize=13,
                                textColor=INK, leading=16))
     styles.add(ParagraphStyle("HeaderLabel", fontName="Helvetica-Bold", fontSize=6.6,
@@ -140,10 +123,10 @@ def _styles():
                                textColor=GRAY, leading=9, spaceAfter=1))
     styles.add(ParagraphStyle("Value", fontName="Helvetica", fontSize=8.8,
                                textColor=INK, leading=11.5))
-    styles.add(ParagraphStyle("Body", fontName="Helvetica", fontSize=9.2,
-                               textColor=INK, leading=14, alignment=4))  # justificado
     styles.add(ParagraphStyle("FirmaLabel", fontName="Helvetica", fontSize=7.6,
                                textColor=GRAY, leading=10, alignment=1))
+    styles.add(ParagraphStyle("CILabel", fontName="Helvetica-Bold", fontSize=9.5,
+                               textColor=INK, leading=12, alignment=0))
     return styles
 
 
@@ -154,14 +137,11 @@ def _draw_page_furniture(canvas, doc, registro, generado_en):
     canvas.saveState()
     canvas.setFillColor(GRAY)
     canvas.setFont("Helvetica-Oblique", 6.2)
-    aviso = (
-        f"Documento generado el {generado_en} · Plantilla de uso interno — "
-        "debe ser revisada por personal médico/legal antes de su uso clínico."
-    )
+    aviso = f"Documento generado el {generado_en}"
     canvas.drawString(MARGIN, 11.8 * mm, aviso)
 
     canvas.setFont("Helvetica", 6.6)
-    footer_left = f"Registro N.º {registro.id} · Consentimiento informado"
+    footer_left = f"Registro N.º {registro.id} · Consentimiento de procedimiento"
     if CONSULTORIO_TELEFONO or CONSULTORIO_REGISTRO:
         extra = " · ".join(filter(None, [CONSULTORIO_TELEFONO, CONSULTORIO_REGISTRO]))
         footer_left = f"{footer_left}   |   {extra}"
@@ -186,43 +166,19 @@ def _section_title(title, styles):
     return t
 
 
-def _kv_grid(rows, styles, ncols, avail_width):
-    cells = []
-    for label, value in rows:
-        cell = Table(
-            [[Paragraph(label.upper(), styles["Label"])], [Paragraph(str(value), styles["Value"])]],
-            colWidths=[None],
-        )
-        cells.append(cell)
-    grid_rows = []
-    for i in range(0, len(cells), ncols):
-        chunk = cells[i:i + ncols]
-        row = list(chunk)
-        while len(row) < ncols:
-            row.append("")
-        grid_rows.append(row)
-    col_w = avail_width / ncols
-    table = Table(grid_rows, colWidths=[col_w] * ncols)
-    table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("LINEBELOW", (0, 0), (-1, -2), 0.6, LINE),
-    ]))
-    return table
-
-
-def _section(title, rows, styles, ncols=2):
-    body = _kv_grid(rows, styles, ncols, CONTENT_W)
-    wrap = Table([[_section_title(title, styles)], [body]], colWidths=[CONTENT_W])
-    wrap.setStyle(TableStyle([
+def _blank_lines(n, line_height=9 * mm):
+    """N líneas horizontales en blanco para escribir a mano, espaciadas
+    uniformemente. Sin relleno de color."""
+    rows = [[""] for _ in range(n)]
+    t = Table(rows, colWidths=[CONTENT_W], rowHeights=[line_height] * n)
+    style = [
         ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (0, 0), 0), ("BOTTOMPADDING", (0, 0), (0, 0), 0),
-        ("TOPPADDING", (0, 1), (0, 1), 6), ("BOTTOMPADDING", (0, 1), (0, 1), 0),
-    ]))
-    return wrap
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]
+    for i in range(n):
+        style.append(("LINEBELOW", (0, i), (0, i), 0.6, LINE))
+    t.setStyle(TableStyle(style))
+    return t
 
 
 def _header_block(registro, styles):
@@ -282,7 +238,6 @@ def _paciente_block(paciente, styles):
         ("Edad · Sexo", f"{_calcular_edad(paciente.fecha_nacimiento) if paciente else '—'} · "
                         f"{_format_value(paciente.sexo) if paciente else '—'}"),
         ("Teléfono", _format_value(paciente.telefono) if paciente else "—"),
-        ("Dirección", _format_value(paciente.direccion) if paciente else "—"),
     ]
     cells = [
         Table(
@@ -305,19 +260,40 @@ def _paciente_block(paciente, styles):
     return block
 
 
-def _firma_block(label, styles):
-    """Línea en blanco para firmar a mano + etiqueta debajo. Sin relleno."""
-    t = Table(
-        [[""], [Paragraph(label, styles["FirmaLabel"])]],
+def _firma_ci_row(paciente, styles):
+    """Fila con la línea de firma a la izquierda y el C.I. del paciente
+    a la derecha."""
+    firma_cell = Table(
+        [[""], [Paragraph("Firma", styles["FirmaLabel"])]],
         colWidths=[None],
     )
-    t.setStyle(TableStyle([
+    firma_cell.setStyle(TableStyle([
         ("LINEBELOW", (0, 0), (0, 0), 0.8, INK),
         ("TOPPADDING", (0, 0), (0, 0), 26), ("BOTTOMPADDING", (0, 0), (0, 0), 2),
         ("TOPPADDING", (0, 1), (0, 1), 3), ("BOTTOMPADDING", (0, 1), (0, 1), 0),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("ALIGN", (0, 0), (0, 1), "LEFT"),
     ]))
-    return t
+
+    ci_valor = _format_value(paciente.documento) if paciente else "—"
+    ci_cell = Table(
+        [[Paragraph(f"C.I: {ci_valor}", styles["CILabel"])]],
+        colWidths=[None],
+    )
+    ci_cell.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+    ]))
+
+    row = Table([[firma_cell, ci_cell]], colWidths=[CONTENT_W * 0.62, CONTENT_W * 0.38])
+    row.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    return row
 
 
 def _build_consentimiento_pdf(registro: RegistroClinico) -> bytes:
@@ -345,7 +321,9 @@ def _build_consentimiento_pdf(registro: RegistroClinico) -> bytes:
     # ---------------- Encabezado ----------------
     story.append(_header_block(registro, styles))
     story.append(Spacer(1, 8))
-    story.append(Paragraph("CONSENTIMIENTO INFORMADO", styles["DocTitulo"]))
+    story.append(Paragraph(
+        "FIRMA DE CONSENTIMIENTO DEL PACIENTE EN CASO DE PROCEDIMIENTO", styles["DocTitulo"]
+    ))
     story.append(Spacer(1, 6))
     story.append(HRFlowable(width="100%", thickness=1.1, color=PRIMARY, spaceAfter=8))
 
@@ -354,39 +332,20 @@ def _build_consentimiento_pdf(registro: RegistroClinico) -> bytes:
     story.append(Spacer(1, 4))
     story.append(HRFlowable(width="100%", thickness=0.6, color=LINE, spaceAfter=10))
 
-    # ---------------- Datos de la atención ----------------
-    atencion_rows = [
-        ("Médico responsable", _nombre_medico(registro)),
-        ("Motivo / diagnóstico", _motivo_o_diagnostico(registro)),
-    ]
-    story.append(_section("DATOS DE LA ATENCIÓN", atencion_rows, styles, ncols=1))
-    story.append(Spacer(1, 12))
+    # ---------------- Descripción del procedimiento ----------------
+    story.append(_section_title("DESCRIPCIÓN DEL PROCEDIMIENTO:", styles))
+    story.append(Spacer(1, 8))
+    story.append(_blank_lines(2))
+    story.append(Spacer(1, 22))
 
-    # ---------------- Declaración del paciente ----------------
-    story.append(_section_title("DECLARACIÓN DEL PACIENTE", styles))
-    story.append(Spacer(1, 6))
-    declaracion = (
-        f"Declaro que el médico responsable me ha explicado, en términos que comprendo, la naturaleza del "
-        f"procedimiento o atención relacionada con <b>{_motivo_o_diagnostico(registro)}</b>, así como sus "
-        "beneficios esperados y los riesgos generales asociados a estudios y procedimientos médicos. He tenido "
-        "la oportunidad de formular preguntas y todas ellas han sido respondidas de manera satisfactoria. "
-        "Entiendo que la medicina no es una ciencia exacta y que no se me ha garantizado un resultado "
-        "específico. Autorizo de manera libre, voluntaria e informada la realización de la atención antes "
-        "descrita, así como los procedimientos adicionales que, a criterio médico, resulten necesarios."
-    )
-    story.append(Paragraph(declaracion, styles["Body"]))
-    story.append(Spacer(1, 26))
+    # ---------------- Firma + C.I. ----------------
+    story.append(_firma_ci_row(paciente, styles))
+    story.append(Spacer(1, 20))
 
-    # ---------------- Firmas ----------------
-    firma_paciente = _firma_block("Firma del paciente / representante legal", styles)
-    firma_medico = _firma_block("Firma del médico responsable", styles)
-    firmas = Table([[firma_paciente, firma_medico]], colWidths=[CONTENT_W / 2] * 2)
-    firmas.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]))
-    story.append(firmas)
+    # ---------------- Evolución ----------------
+    story.append(_section_title("EVOLUCIÓN", styles))
+    story.append(Spacer(1, 8))
+    story.append(_blank_lines(4))
 
     doc.build(story)
     return buffer.getvalue()

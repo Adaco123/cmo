@@ -83,6 +83,7 @@ const SECTIONS = [
 type SectionKey = typeof SECTIONS[number]['key'];
 
 const ALERGIA_CHIPS = ['Penicilina', 'AINES', 'Sulfas'];
+
 const CONTROL_CHIPS: { label: string; val: string }[] = [
   { label: '7 días', val: '7' },
   { label: '15 días', val: '15' },
@@ -115,17 +116,30 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
   const edadPaciente = paciente?.edad;
   const pacienteCi = paciente?.documento ?? '—';
   const pacienteIdFinal = paciente?.id ?? pacienteId;
-  const diagnostico_ant = paciente?.diagnostico;
+  const diagnostico_ant = paciente?.diagnostico ?? diagnosticoPrevio;
 
   const pageRef = useRef<HTMLDivElement | null>(null);
 
   const [vitales, setVitales] = useState<Record<VitalKey, string>>({
     pa_sys: '', pa_dia: '', fc: '', fr: '', sat: '', temp: '', peso: '', talla: '', glu: '',
   });
+  // Alergias: dos fuentes separadas.
+  // - alergiasPrevias: histórico del paciente (viene de consultas
+  //   anteriores vía Paciente.obtener_alergias() en el backend), de solo
+  //   lectura, nunca se edita desde este formulario.
+  // - alergiasRegistro: lo que el médico escribe/selecciona en ESTA
+  //   consulta (alergia nueva detectada ahora); arranca vacío a propósito
+  //   para no confundir "alergia nueva" con "alergia ya conocida", y es
+  //   lo único que se manda en el payload de este registro clínico.
+  // Para mostrar en el panel derecho (dock) y en el warning de
+  // Receta.tsx se combinan ambas, así el médico siempre ve el cuadro
+  // completo de alergias al recetar, incluida la que acaba de anotar.
+  const alergiasPrevias = Array.isArray(paciente?.alergias) ? paciente.alergias.join(', ') : '';
   const [alergiasRegistro, setAlergiasRegistro] = useState('');
-  const [alergias, setAlergias] = useState(
-    Array.isArray(paciente?.alergias) ? paciente.alergias.join(', ') : ''
-  );
+  const alergiasCombinadas = [alergiasPrevias, alergiasRegistro]
+    .map(s => s.trim())
+    .filter(Boolean)
+    .join(', ');
   const [secciones, setSecciones] = useState<Record<SectionKey, string>>({
     motivo: '', enfermedad_actual: '', examen_fisico: '', hallazgos_ecograficos: '',
     diagnostico: '', tratamiento: '', observaciones: '',
@@ -314,6 +328,11 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
   const { showError, showSuccess } = useErrorToast();
 
   const handleGuardar = async () => {
+    // Evita doble-submit: el botón ya se deshabilita con `saving`, pero
+    // el atajo Ctrl+Enter llama a handleGuardar() directo sin pasar por
+    // el `disabled` del botón, así que sin este guard dos Ctrl+Enter
+    // rápidos podían disparar dos POST y duplicar el registro clínico.
+    if (saving) return;
     if (!listoParaGuardar) {
       setShake(true);
       setTimeout(() => setShake(false), 400);
@@ -333,6 +352,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
 
       const resultado = await createRegistroCompleto(payload);
 
+      const archivosFallidos: string[] = [];
       for (let i = 0; i < examenesFlat.length; i++) {
         const examenCreado = resultado.examenes_complementarios[i];
         if (!examenCreado) continue;
@@ -344,6 +364,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
             await subirArchivoExamen(examenCreado.id, archivoObj, tipoArchivoId);
           } catch (errArchivo) {
             console.error(`No se pudo subir el archivo "${archivoObj.name}"`, errArchivo);
+            archivosFallidos.push(archivoObj.name);
           }
         }
       }
@@ -352,6 +373,16 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
       setExamCount(0);
       recetaRef.current?.reset();
       showSuccess('Registro clínico guardado correctamente');
+      // El registro y los exámenes ya se crearon aunque algún archivo no
+      // se haya podido subir — se avisa aparte (sin bloquear el flujo de
+      // guardado) para que no quede como un fallo silencioso en consola.
+      if (archivosFallidos.length) {
+        showError(
+          archivosFallidos.length === 1
+            ? `El registro se guardó, pero no se pudo subir el archivo "${archivosFallidos[0]}". Intenta subirlo de nuevo desde el examen.`
+            : `El registro se guardó, pero ${archivosFallidos.length} archivos no se pudieron subir: ${archivosFallidos.join(', ')}. Intenta subirlos de nuevo desde el examen.`
+        );
+      }
 
       if (pageRef.current) {
         await new Promise<void>(resolve => {
@@ -387,7 +418,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [vitales, secciones, alergias, controlNota, controlDias, controlHoraInicio, controlHoraFin, examCount]);
+  }, [vitales, secciones, alergiasRegistro, controlNota, controlDias, controlHoraInicio, controlHoraFin, examCount, saving]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -439,11 +470,11 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                 </div>
                 <div className={styles.pv}>{edadPaciente}</div>
               </div>
-              <div className={`${styles.pinfoItem} ${styles.pinfoAlert} ${alergias.trim() ? styles.tiene : ''}`}>
+              <div className={`${styles.pinfoItem} ${styles.pinfoAlert} ${alergiasCombinadas.trim() ? styles.tiene : ''}`}>
                 <div className={styles.pk}>
                   <i className={`fas fa-triangle-exclamation ${styles.ficon}`}></i> Alergias
                 </div>
-                <div className={styles.pv}>{alergias.trim() || 'No'}</div>
+                <div className={styles.pv}>{alergiasCombinadas.trim() || 'No'}</div>
               </div>
               <div className={styles.pinfoItem}>
                 <div className={styles.pk}>
@@ -536,18 +567,20 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
               <div className={`${styles.field} ${styles.fieldAlert}`}>
                 <div className={`${styles.flabel} ${styles.flabelAlert}`}>
                   <i className={`fas fa-allergies ${styles.ficon}`}></i> Alergias
-                  {alergias.trim() && <span className={styles.badgeOk}>✓</span>}
+                  {alergiasRegistro.trim() && <span className={styles.badgeOk}>✓</span>}
                 </div>
                 <input ref={alergiasRef} type="text" value={alergiasRegistro} onChange={e => setAlergiasRegistro(e.target.value)}
-                  placeholder="Escribe, o elige una opción rápida abajo..." />
+                  placeholder="Alergia nueva detectada en esta consulta..." />
                 <div className={styles.chips}>
                   {ALERGIA_CHIPS.map(val => (
-                    <div key={val} className={`${styles.chip} ${styles.chipAlert} ${alergias === val ? styles.active : ''}`} onClick={() => handleAlergiaChip(val)}>
+                    <div key={val} className={`${styles.chip} ${styles.chipAlert} ${alergiasRegistro === val ? styles.active : ''}`} onClick={() => handleAlergiaChip(val)}>
                       {val}
                     </div>
                   ))}
                 </div>
-                <div className={styles.subhint}><kbd>Tab</kbd> continúa a motivo de consulta</div>
+                {alergiasPrevias.trim() && (
+                  <div className={styles.subhint}>Ya registradas: {alergiasPrevias}</div>
+                )}
               </div>
 
               {SECTIONS.filter(s => s.key !== 'tratamiento').map(s => (
@@ -670,10 +703,10 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
               </span>
             </div>
 
-            {alergias.trim() && (
+            {alergiasCombinadas.trim() && (
               <div className={styles.allergyAlert}>
                 <i className={`fas fa-allergies ${styles.ficon}`}></i>
-                <span>Alergias: {alergias}</span>
+                <span>Alergias: {alergiasCombinadas}</span>
               </div>
             )}
 
@@ -702,7 +735,6 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
             isOpen={drawerExamOpen}
             onClose={() => setDrawerExamOpen(false)}
             contexto={{
-              registro_clinico_id: pacienteIdFinal ?? 0,
               medico_id: MEDICO_ID,
               paciente_nombre: nombrePaciente,
               registro_numero: consultaId ? `#RC-${consultaId}` : '#RC-00128',
@@ -718,7 +750,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
             pacienteNombre={nombrePaciente}
             pacienteEdad={edadPaciente != null ? String(edadPaciente) : pacienteEdad}
             pacienteCi={pacienteCi}
-            alergias={alergias}
+            alergias={alergiasCombinadas}
             medicoNombre={medicoNombre}
             diagnostico={secciones.diagnostico}
             onTratamientoChange={handleTratamientoChange}

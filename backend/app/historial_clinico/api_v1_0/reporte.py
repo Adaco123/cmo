@@ -35,8 +35,8 @@ historial_clinico_reportes_bp = Blueprint("historial_clinico_reportes", __name__
 # ---------------------------------------------------------------------------
 # Datos del consultorio (ajustar con la información real)
 # ---------------------------------------------------------------------------
-CONSULTORIO_NOMBRE_L1 = "CONSULTORIO"
-CONSULTORIO_NOMBRE_L2 = "DE ECOGRAFÍA"
+CONSULTORIO_NOMBRE_L1 = "CONSULTORES"
+CONSULTORIO_NOMBRE_L2 = "MEDICOS ORURO"
 CONSULTORIO_DIRECCION = ""   # ej. "Av. 6 de Agosto #123, La Paz"
 CONSULTORIO_TELEFONO = ""    # ej. "+591 700 00000"
 CONSULTORIO_REGISTRO = ""    # ej. "Reg. Sanitario N.º 0000"

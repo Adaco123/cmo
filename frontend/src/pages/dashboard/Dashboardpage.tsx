@@ -89,7 +89,7 @@ const DashboardPage: React.FC = () => {
         onTabChange={setActiveTab}
         onLogout={handleLogout}
       >
-        <PagosHoyWidget monto={16450} cantidadPagos={12} loading={false} />
+        <PagosHoyWidget />
         <InicioTab
           active={activeTab === 'inicio'}
           pacientes={pacientes}

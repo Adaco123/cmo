@@ -7,6 +7,7 @@ import React, {
   useState,
   forwardRef,
 } from "react";
+import { createPortal } from "react-dom";
 import styles from "./Receta.module.css";
 import RecetaImprimir from "../../assets/mosol.png"
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -597,13 +598,19 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   const undoLast = () => {
     // Busca el ítem con mayor id (el último agregado) en toda la
     // pestaña, sin importar en qué receta haya quedado.
-    let target: { grupoId: number; itemId: number } | null = null;
-    let maxId = -1;
-    gruposOfTab(tab).forEach((g) => {
-      g.items.forEach((it) => {
-        if (it.id > maxId) { maxId = it.id; target = { grupoId: g.id, itemId: it.id }; }
-      });
-    });
+    // Nota: antes esto se armaba con un `let target = null` reasignado
+    // dentro de un forEach anidado — TypeScript no logra rastrear esa
+    // reasignación a través del closure y termina angostando `target` a
+    // `never` en el `if (target)` de abajo (TS2339), lo cual rompe
+    // `tsc -b` y por lo tanto `npm run build` completo. Usar reduce()
+    // sobre una lista aplanada evita el problema de raíz.
+    const candidatos = gruposOfTab(tab).flatMap((g) =>
+      g.items.map((it) => ({ grupoId: g.id, itemId: it.id }))
+    );
+    const target = candidatos.reduce<typeof candidatos[number] | null>(
+      (max, c) => (!max || c.itemId > max.itemId ? c : max),
+      null
+    );
     if (target) removeItem(tab, target.grupoId, target.itemId);
   };
 
@@ -699,7 +706,17 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!isOpen) return;
-      if (e.key === "Escape") { closeDrawer(); }
+      if (e.key === "Escape") {
+        // Mismo criterio que Examenes.tsx: no cerrar el drawer completo
+        // si el usuario está escribiendo en un campo. El campo de nombre
+        // con autocompletado ya maneja su propio Escape (con
+        // stopPropagation, más arriba en onNameFieldKeyDown); esto cubre
+        // el resto de los campos (dosis, frecuencia, indicaciones, etc.)
+        // que antes cerraban todo el panel de "Recetar" sin querer.
+        const activeTag = (document.activeElement?.tagName || "").toLowerCase();
+        const enUnCampo = activeTag === "input" || activeTag === "textarea" || activeTag === "select";
+        if (!enUnCampo) { closeDrawer(); }
+      }
       if (e.altKey && ["1", "2", "3"].includes(e.key)) {
         e.preventDefault();
         const t = (["medicamentos", "examenes", "formulas"] as Tab[])[Number(e.key) - 1];
@@ -1128,13 +1145,23 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
         </div>
       </div>
 
-      {/* ================= ÁREA DE IMPRESIÓN (solo existe mientras se imprime) =================
-         Cada receta ocupa un bloque fijo de 8.5in x 5.5in (media
-         carta). Dos bloques seguidos = 11in = una hoja carta completa,
-         así que al imprimir varias recetas caen 2 por página sin
-         configuración extra. */}
-      {imprimir && (
-        <div className={styles["cmo-print-all"]}>
+      {/* ================= ÁREA DE IMPRESIÓN (portal fuera del drawer) =================
+         Antes este bloque vivía DENTRO de .drawer (position:fixed,
+         overflow-y:auto) y se ocultaba/mostraba con un selector CSS
+         `:not(:has(.receta-widget))` bastante frágil. En la práctica
+         esto podía terminar imprimiendo la vista previa en pantalla
+         (angosta, una sola receta, sin el tamaño 8.5x5.5in forzado) en
+         vez de este bloque — exactamente el síntoma de "se ve una sola
+         receta, ocupa toda la hoja, y solo la mitad izquierda del
+         membrete". Con createPortal lo sacamos directo a <body>, fuera
+         del drawer, para que la impresión no dependa en absoluto de la
+         posición/estado del drawer ni de que el navegador soporte
+         :has(). Cada receta ocupa un bloque fijo de 8.5in x 5.5in
+         (media hoja carta). Dos bloques seguidos = 11in = una hoja
+         carta completa, así que al imprimir varias caen 2 por página
+         sin configuración extra. */}
+      {imprimir && createPortal(
+        <div id="cmo-print-root" className={styles["cmo-print-all"]}>
           {imprimir.grupoIds.map((gid, i) => (
             <div
               key={gid}
@@ -1145,7 +1172,8 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
               {renderSlip(imprimir.tab, gid)}
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
 
       <div className={cx(styles.toast, toast && styles.show)}>
