@@ -78,7 +78,8 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   contexto: {
-    registro_clinico_id: number;
+    /** Opcional: no existe aún al crear un registro clínico nuevo. No se usa dentro de este componente. */
+    registro_clinico_id?: number;
     medico_id: number;
     paciente_nombre: string;
     registro_numero: string;

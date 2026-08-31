@@ -738,14 +738,23 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
      (media hoja carta). Al imprimir varias, se apilan de a dos por
      página porque 5.5in + 5.5in = 11in = alto de una hoja carta. */
   const handleImprimirUna = (grupoId: number) => {
-    if (!gruposConItemsTab.length) return;
-    setImprimir({ tab, grupoIds: [grupoId] });
+    const grupo = gruposOfTab(tab).find((g) => g.id === grupoId);
+    if (!grupo?.items.length) return;
+
+    setImprimir({
+      tab,
+      grupoIds: [grupoId],
+    });
   };
 
   const handleImprimirTodas = () => {
     const ids = gruposConItemsTab.map((g) => g.id);
     if (!ids.length) return;
-    setImprimir({ tab, grupoIds: ids });
+
+    setImprimir({
+      tab,
+      grupoIds: ids,
+    });
   };
 
   useEffect(() => {
@@ -1160,21 +1169,21 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
          (media hoja carta). Dos bloques seguidos = 11in = una hoja
          carta completa, así que al imprimir varias caen 2 por página
          sin configuración extra. */}
-      {imprimir && createPortal(
-        <div id="cmo-print-root" className={styles["cmo-print-all"]}>
-          {imprimir.grupoIds.map((gid, i) => (
-            <div
-              key={gid}
-              className={cx(styles["cmo-canvas"], styles["cmo-slip"])}
-              style={i % 2 === 1 && i !== imprimir.grupoIds.length - 1 ? { breakAfter: "page" } : undefined}
-            >
-              <img src={RecetaImprimir} alt="Receta CMO" />
-              {renderSlip(imprimir.tab, gid)}
-            </div>
-          ))}
-        </div>,
-        document.body
-      )}
+      {imprimir &&
+        createPortal(
+          <div id="cmo-print-root" className={styles["cmo-print-all"]}>
+            {imprimir.grupoIds.map((gid) => (
+              <div
+                key={gid}
+                className={cx(styles["cmo-canvas"], styles["cmo-slip"])}
+              >
+                <img src={RecetaImprimir} alt="Receta CMO" />
+                {renderSlip(imprimir.tab, gid)}
+              </div>
+            ))}
+          </div>,
+          document.body
+        )}
 
       <div className={cx(styles.toast, toast && styles.show)}>
         <span>{toast?.msg}</span>

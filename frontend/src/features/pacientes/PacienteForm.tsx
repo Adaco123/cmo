@@ -17,6 +17,8 @@ import {
   faSave,
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
+import { useErrorToast } from '../../components/ErrorToastProvider';
+import { extractErrorMessage } from '../../utils/errors';
 
 interface PacienteFormData {
   nombres: string;
@@ -41,6 +43,8 @@ const ORIGEN_EXTERNO = 2;
 interface PacienteFormProps {
   onSuccess?: () => void;
   onClose?: () => void;
+  /** Origen preseleccionado en el dropdown (por defecto "Mis pacientes"). */
+  origenInicial?: number;
 }
 
 const initialFormData: PacienteFormData = {
@@ -58,14 +62,15 @@ const initialFormData: PacienteFormData = {
   estado: true,
 };
 
-const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
+const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose, origenInicial }) => {
   const [currentDate, setCurrentDate] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const { showError, showSuccess } = useErrorToast();
 
   const [formData, setFormData] = useState<PacienteFormData>({
     ...initialFormData,
-    origen_id: String(ORIGEN_MIS_PACIENTES),
+    origen_id: String(origenInicial ?? ORIGEN_MIS_PACIENTES),
     consultorio_id: String(CONSULTORIO_ID),
   });
 
@@ -129,19 +134,15 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose }) => {
       await createPaciente(payload);
       setFormData({
         ...initialFormData,
-        origen_id: String(ORIGEN_MIS_PACIENTES),
+        origen_id: String(origenInicial ?? ORIGEN_MIS_PACIENTES),
         consultorio_id: String(CONSULTORIO_ID),
       });
       onSuccess?.();
-      alert(' Paciente guardado correctamente');
-    } catch (error: any) {
-      const data = error?.response?.data;
-      const primerErrorMarshmallow =
-        data && typeof data === 'object'
-          ? Object.values(data).flat().find((v) => typeof v === 'string')
-          : undefined;
-      const backendMessage = data?.error || data?.msg || primerErrorMarshmallow || error?.message;
-      setSubmitError(backendMessage || 'No se pudo guardar el paciente.');
+      showSuccess('Paciente guardado correctamente');
+    } catch (error: unknown) {
+      const mensaje = extractErrorMessage(error, 'No se pudo guardar el paciente.');
+      setSubmitError(mensaje);
+      showError(mensaje);
     } finally {
       setIsSubmitting(false);
     }

@@ -26,6 +26,14 @@ def _estado_pagado():
     return EstadoCobro.get_by_id(ESTADO_PAGADO_ID)
 
 
+def _estado_por_nombre(nombre):
+    # Mismo patrón que cobros/api_v1_0/resources.py: no asumimos un id fijo
+    # para "Pendiente" porque, a diferencia de "Pagado", no hay una
+    # constante establecida para él en este módulo.
+    encontrados = EstadoCobro.simple_filter(nombre=nombre)
+    return encontrados[0] if encontrados else None
+
+
 def _to_decimal(valor, default="0"):
     """Convierte un valor crudo del JSON (float/int/str/None) a Decimal
     de forma segura, pasando siempre por str() para no heredar el error
@@ -42,9 +50,18 @@ def _recalcular_estado_cobro(cobro):
     pagos = Pago.simple_filter(cobro_id=cobro.id)
     total_pagado = sum(p.monto for p in pagos)
 
-    estado_pagado = _estado_pagado()
-    if estado_pagado:
-        cobro.estado_id = estado_pagado.id
+    # Antes esto marcaba "Pagado" incondicionalmente en cada llamada, sin
+    # comparar contra el saldo real: un pago parcial (o incluso anular el
+    # único pago de un cobro) dejaba el cobro como "Pagado" igual, y como
+    # PagosList_Resource.post rechaza nuevos pagos sobre un cobro ya
+    # "Pagado", el saldo restante quedaba imposible de cobrar.
+    if total_pagado >= cobro.monto_final:
+        nuevo_estado = _estado_pagado()
+    else:
+        nuevo_estado = _estado_por_nombre("Pendiente")
+
+    if nuevo_estado:
+        cobro.estado_id = nuevo_estado.id
         cobro.save()
 
     return total_pagado

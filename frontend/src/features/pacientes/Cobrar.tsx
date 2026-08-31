@@ -4,6 +4,8 @@ import { crearPago, type PagoPayload } from '../../api/pagos';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
 import styles from './Cobrar.module.css';
+import { useErrorToast } from '../../components/ErrorToastProvider';
+import { extractErrorMessage } from '../../utils/errors';
 
 interface CobrarProps {
   consultaId?: number | null;
@@ -40,6 +42,7 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado, onClose }) => {
   // Estados de la petición al backend
   const [enviando, setEnviando] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const { showError, showSuccess } = useErrorToast();
 
   // Cálculos derivados
   const baseNum = parseFloat(montoBase) || 0;
@@ -55,13 +58,17 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado, onClose }) => {
     setError(null);
 
     if (totalPagar <= 0) {
-      alert('El total a pagar debe ser mayor a 0.');
+      const mensaje = 'El total a pagar debe ser mayor a 0.';
+      setError(mensaje);
+      showError(mensaje);
       return;
     }
 
     if (metodoPago === 'Efectivo') {
       if (isNaN(recibidoNum) || recibidoNum < totalPagar) {
-        alert('El monto recibido debe ser igual o mayor al total.');
+        const mensaje = 'El monto recibido debe ser igual o mayor al total.';
+        setError(mensaje);
+        showError(mensaje);
         return;
       }
     }
@@ -78,15 +85,15 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado, onClose }) => {
     try {
       setEnviando(true);
       const pago = await crearPago(payload);
-      alert(
-        ` Pago confirmado:\nMonto: Bs ${totalPagar.toFixed(2)}\nMétodo: ${metodoPago}\nRecibo: ${pago.numero_recibo_pago}`
+      showSuccess(
+        `Pago confirmado: Bs ${totalPagar.toFixed(2)} (${metodoPago}) — Recibo ${pago.numero_recibo_pago}`
       );
       handleLimpiar();
       onCobrado?.();
-    } catch (err: any) {
-      const mensaje =
-        err?.response?.data?.error || 'Ocurrió un error al registrar el pago.';
+    } catch (err: unknown) {
+      const mensaje = extractErrorMessage(err, 'Ocurrió un error al registrar el pago.');
       setError(mensaje);
+      showError(mensaje);
     } finally {
       setEnviando(false);
     }

@@ -23,6 +23,10 @@ import ModelosTab from './tabs/Modelostab';
 import ReportesTab from './tabs/Reportestab';
 import './Dashboardpage.css';
 import '../../components/CrearCita.module.css';
+
+// Mismo criterio que PacienteForm.tsx / usePacientes.ts.
+const ORIGEN_EXTERNO = 2;
+
 /**
  * Reemplaza CMODashboard.tsx. Solo coordina: qué tab está activo,
  * qué modal está abierto, y pasa los datos de los hooks hacia los
@@ -33,9 +37,9 @@ const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<DashboardTab>('inicio');
   const [showPacienteForm, setShowPacienteForm] = useState(false);
+  const [origenPacienteForm, setOrigenPacienteForm] = useState<number | undefined>(undefined);
   const [pacienteAEditar, setPacienteAEditar] = useState<Paciente | null>(null);
-  const [showPacienteExterno, setShowPacienteExterno] = useState(false);
-  const [pacienteExternoInicial, setPacienteExternoInicial] = useState<Paciente | null>(null);
+  const [pacienteExternoSeleccionado, setPacienteExternoSeleccionado] = useState<Paciente | null>(null);
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
 
   const handleLogout = () => {
@@ -63,11 +67,6 @@ const DashboardPage: React.FC = () => {
     reload: loadCitas,
     finalizar: finalizarCita,
   } = useCitasHoy();
-
-  const cerrarPacienteExterno = () => {
-    setShowPacienteExterno(false);
-    setPacienteExternoInicial(null);
-  };
 
   const { showError, showSuccess } = useErrorToast();
 
@@ -130,13 +129,10 @@ const DashboardPage: React.FC = () => {
           searchValue={filters.externos}
           onSearchChange={(v) => handleFilterChange('externos', v)}
           onAgregar={() => {
-            setPacienteExternoInicial(null);
-            setShowPacienteExterno(true);
+            setOrigenPacienteForm(ORIGEN_EXTERNO);
+            setShowPacienteForm(true);
           }}
-          onVer={(p) => {
-            setPacienteExternoInicial(p);
-            setShowPacienteExterno(true);
-          }}
+          onVer={(p) => setPacienteExternoSeleccionado(p)}
           onEditar={(p) => setPacienteAEditar(p)}
           onCambiarEstado={handleCambiarEstado}
         />
@@ -146,25 +142,33 @@ const DashboardPage: React.FC = () => {
         <ReportesTab active={activeTab === 'reportes'} />
       </DashboardLayout>
 
-      {showPacienteExterno && (
-        <Modal onClose={cerrarPacienteExterno}>
+      {pacienteExternoSeleccionado && (
+        <Modal onClose={() => setPacienteExternoSeleccionado(null)}>
           <PacienteExterno
-            pacientesExternos={filteredExternos}
-            pacienteInicial={pacienteExternoInicial}
-            onClose={cerrarPacienteExterno}
-            onPacienteCreado={() => void loadPacientes()}
+            paciente={pacienteExternoSeleccionado}
+            onClose={() => setPacienteExternoSeleccionado(null)}
           />
         </Modal>
       )}
 
       {showPacienteForm && (
-        <Modal onClose={() => setShowPacienteForm(false)}>
+        <Modal
+          onClose={() => {
+            setShowPacienteForm(false);
+            setOrigenPacienteForm(undefined);
+          }}
+        >
           <PacienteForm
+            origenInicial={origenPacienteForm}
             onSuccess={() => {
               setShowPacienteForm(false);
+              setOrigenPacienteForm(undefined);
               void loadPacientes();
             }}
-            onClose={() => setShowPacienteForm(false)}
+            onClose={() => {
+              setShowPacienteForm(false);
+              setOrigenPacienteForm(undefined);
+            }}
           />
         </Modal>
       )}
