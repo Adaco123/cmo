@@ -307,8 +307,9 @@
   top: 27%;
   left: 8.5%;
   width: 83%;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 1.5cqw;
+  
+  font-family: "Monotype Corsiva", cursive;
+  font-size: 12pt;
   line-height: 1.9;
   color: #16233A;
 }
@@ -326,7 +327,7 @@
 }
 
 .cmo-rp-header {
-  font-family: 'Great Vibes', cursive;
+  font-family: 'Harlow Solid Italic', cursive;
   font-weight: 900;
   display: flex;
   gap: 2.5rem;
@@ -342,13 +343,13 @@
 .cmo-rp-header-name { flex: 1; }
 .cmo-rp-header-age { flex: 0 0 auto; }
 
-.cmo-rp-med-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.75em; gap: 1.5rem; }
+.cmo-rp-med-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.1em; gap: 1.5rem; }
 .cmo-rp-med-col-left { display: flex; align-items: baseline; gap: 0.5em; flex: 0 0 42%; min-width: 0; }
 .cmo-rp-num { font-weight: 700; color: var(--status-inactive, #C1443F); font-size: 0.95em; flex-shrink: 0; }
 .cmo-rp-med-name { font-weight: 600; color: #16233A; }
 .cmo-rp-med-col-right { flex: 0 0 50%; text-align: left; padding-left: 2cqw; }
 .cmo-rp-instrucciones { font-size: 0.9em; color: #333; font-weight: 500; line-height: 1.4; }
-.cmo-rp-horario { font-size: 0.82em; color: #555; margin-top: 0.2em; font-family: var(--sans, Arial, sans-serif); }
+.cmo-rp-horario { font-size: 0.82em; color: #555; margin-top: 0em; font-family: var(--sans, Arial, sans-serif); }
 
 .cmo-rp-diagnostico {
   position: absolute;

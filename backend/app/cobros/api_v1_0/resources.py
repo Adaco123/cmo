@@ -10,6 +10,7 @@ from app.cobros.api_v1_0 import cobros_bp
 from app.consultas.models import Consulta
 from app.pacientes.models import Paciente
 from app.estados_cobro.models import EstadoCobro
+from app.pagos.models import Pago
 
 schema = CobroSchema()
 schema_list = CobroSchema(many=True)
@@ -91,7 +92,10 @@ class Cobro_Resource(Resource):
         if "monto" in data or "descuento" in data:
             monto = data.get("monto", item.monto)
             descuento = data.get("descuento", item.descuento)
-            item.monto_final = monto - descuento
+            nuevo_monto_final = monto - descuento
+            if nuevo_monto_final <= 0:
+                return {"error": "El descuento no puede ser mayor o igual al monto."}, 400
+            item.monto_final = nuevo_monto_final
 
         for key, value in data.items():
             setattr(item, key, value)
@@ -103,6 +107,10 @@ class Cobro_Resource(Resource):
         item = Cobro.get_by_id(item_id)
         if not item:
             return {"error": "Cobro no encontrado"}, 404
+        if Pago.simple_filter(cobro_id=item.id):
+            return {
+                "error": "Este cobro ya tiene pagos registrados y no se puede eliminar"
+            }, 409
         item.delete()
         return "", 204
 

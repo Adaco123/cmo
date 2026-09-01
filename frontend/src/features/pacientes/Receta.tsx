@@ -785,7 +785,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
       const partes = [med.via_administracion, med.frecuencia, med.duracion, med.cantidad].filter(Boolean);
       t2 = partes.join(" · ");
       if (med.indicaciones) t2 += (t2 ? "  ·  " : "") + med.indicaciones;
-      if (med.horario) t2 += (t2 ? "  ·  " : "") + "🕐 " + med.horario.join(" - ");
+      if (med.horario) t2 += (t2 ? "  ·  " : "") + med.horario.join(" - ");
     } else if (tab === "examenes") {
       const ex = it as ExamItem;
       t1 = ex.nombre_examen;
@@ -863,7 +863,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
                 <div className={styles["cmo-rp-med-col-right"]}>
                   {instrucciones && <div className={styles["cmo-rp-instrucciones"]}>{instrucciones}</div>}
                   {m.horario && m.horario.length > 0 && (
-                    <div className={styles["cmo-rp-horario"]}>🕐 {m.horario.join(" · ")}</div>
+                    <div className={styles["cmo-rp-horario"]}> {m.horario.join(" · ")}</div>
                   )}
                 </div>
               </div>

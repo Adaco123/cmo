@@ -16,7 +16,6 @@ from app.consultorios.api_v1_0 import consultorios_bp
 from app.empleados.api_v1_0 import empleados_bp
 from app.estados_cita.api_v1_0 import estados_cita_bp
 from app.estados_cobro.api_v1_0 import estados_cobro_bp
-from app.seguimiento_control.api_v1_0 import seguimiento_bp
 from app.informes_ecografia.api_v1_0 import informes_ecografia_bp
 from app.medicos.api_v1_0 import medicos_bp
 from app.metodos_pago.api_v1_0 import metodos_pago_bp
@@ -60,8 +59,6 @@ BLUEPRINTS = (
     (usuarios_bp, "/api/usuarios"),
     (recetas_bp,"/api/recetas"),
     (examenes_complementarios_bp,"api/examenes"),
-    (seguimiento_bp,"api/seguimiento")
-    
 )
 
 

@@ -9,8 +9,7 @@ from app.db import db
 from app.consultas.schemas import ConsultaSchema
 from app.medicos.models import Medico
 from app.citas.models import Cita
-from app.historial_clinico.models import HistoriaClinica, RegistroClinico
-from app.seguimiento_control.models import SeguimientoControl
+from app.historial_clinico.models import HistoriaClinica, RegistroClinico, SeguimientoControl
 from app.shared.disponibilidad_medico import (
     existe_choque_con_cita,
     existe_choque_con_seguimiento,

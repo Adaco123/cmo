@@ -8,7 +8,7 @@ módulos consumen, no algo que le pertenezca a citas ni a historial_clinico.
 """
 from app.citas.models import Cita
 from app.estados_cita.models import EstadoCita
-from app.seguimiento_control.models import SeguimientoControl
+from app.historial_clinico.models import SeguimientoControl
 
 
 def _estado_cancelada_id():

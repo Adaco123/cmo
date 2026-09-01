@@ -21,6 +21,7 @@ from app.archivos.schemas import ArchivoSchema
 from app.examenes_complementarios.models import ExamenComplementario
 from app.historial_clinico.models import RegistroClinico, HistoriaClinica
 from app.pacientes.models import Paciente
+from app.tipos_archivo.models import TipoArchivo
 archivo_schema_list = ArchivoSchema(many=True)
 schema = ArchivoSchema()
 schema_list = ArchivoSchema(many=True)
@@ -60,6 +61,12 @@ class ArchivoUpload_Resource(Resource):
         tipo_archivo_id = request.form.get("tipo_archivo_id")
         if not tipo_archivo_id:
             return {"tipo_archivo_id": ["Requerido"]}, 400
+        try:
+            tipo_archivo_id = int(tipo_archivo_id)
+        except (TypeError, ValueError):
+            return {"tipo_archivo_id": ["Debe ser un número entero"]}, 400
+        if not TipoArchivo.get_by_id(tipo_archivo_id):
+            return {"error": "El tipo_archivo_id indicado no existe"}, 404
 
         # Validar que se mandó exactamente un destino, y que ese registro exista.
         destino_campo = None
@@ -69,10 +76,14 @@ class ArchivoUpload_Resource(Resource):
             if valor:
                 if destino_campo is not None:
                     return {"error": "Solo se puede vincular el archivo a un destino a la vez"}, 400
-                if not Modelo.get_by_id(int(valor)):
+                try:
+                    valor_id = int(valor)
+                except (TypeError, ValueError):
+                    return {"error": f"El {campo} debe ser un número entero"}, 400
+                if not Modelo.get_by_id(valor_id):
                     return {"error": f"El {campo} indicado no existe"}, 404
                 destino_campo = campo
-                destino_id = int(valor)
+                destino_id = valor_id
 
         if destino_campo is None:
             return {"error": "Debe indicar a qué se vincula el archivo (examen, receta o registro clínico)"}, 400
@@ -85,7 +96,7 @@ class ArchivoUpload_Resource(Resource):
         usuario_id = get_jwt_identity()
 
         archivo = Archivo(
-            tipo_archivo_id=int(tipo_archivo_id),
+            tipo_archivo_id=tipo_archivo_id,
             subido_por_usuario_id=usuario_id,
             **datos_archivo,
             **{destino_campo: destino_id},
@@ -109,7 +120,19 @@ class Archivo_Resource(Resource):
         archivo = Archivo.get_by_id(archivo_id)
         if not archivo:
             return {"error": "Archivo no encontrado"}, 404
+
+        ruta_en_disco = os.path.join(BASE_UPLOAD_DIR, archivo.ruta_almacenamiento)
         archivo.delete()
+
+        try:
+            if os.path.isfile(ruta_en_disco):
+                os.remove(ruta_en_disco)
+        except OSError:
+            # El registro en BD ya se borró; si el archivo físico no se
+            # pudo eliminar (permisos, ya no está ahí, etc.) no bloqueamos
+            # la respuesta por eso.
+            pass
+
         return "", 204
 
 
