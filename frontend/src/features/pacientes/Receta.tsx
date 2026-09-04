@@ -296,6 +296,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   const [grupoActivoId, setGrupoActivoId] = useState<Record<Tab, number>>({
     medicamentos: 1, examenes: 1, formulas: 1,
   });
+
   // Receta que se está previsualizando / se imprimiría individualmente.
   // Sigue por defecto a la receta activa de cada categoría.
   const [grupoPreview, setGrupoPreview] = useState(1);
@@ -313,7 +314,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
 
   // Qué se está imprimiendo ahora mismo (null = nada). Contiene la
   // categoría y la lista de recetas (grupos) a imprimir, cada una en
-  // su propia media hoja carta — dos caben por página.
+  // su propio membrete Oficio (8.5in × 6.5in) — dos caben por hoja.
   const [imprimir, setImprimir] = useState<{ tab: Tab; grupoIds: number[] } | null>(null);
 
   const fieldRefs = useRef<Record<string, HTMLInputElement | HTMLSelectElement | null>>({});
@@ -457,6 +458,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
       setFormGrupos(grupoInicial());
       setIndicaciones("Tomar agua y descansar");
       setGrupoActivoId({ medicamentos: 1, examenes: 1, formulas: 1 });
+      setGrupoPreview(1);
       setDraft(emptyDraftFor(tab));
       grupoSeqRef.current = { medicamentos: 2, examenes: 2, formulas: 2 };
     },
@@ -733,10 +735,10 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, tab, medGrupos, examGrupos, formGrupos, draft, grupoActivoId]);
 
-  /* ---------- impresión (solo con membrete, media carta) ----------
-     Cada receta se imprime en un bloque fijo de 8.5in x 5.5in
-     (media hoja carta). Al imprimir varias, se apilan de a dos por
-     página porque 5.5in + 5.5in = 11in = alto de una hoja carta. */
+  /* ---------- impresión (membrete Oficio) ----------
+     Cada receta (grupo) se imprime en un bloque fijo de 8.5in × 6.5in
+     (un membrete Oficio). Al imprimir varias, se apilan de a dos por
+     hoja porque 6.5in + 6.5in = 13in = alto de una hoja Oficio. */
   const handleImprimirUna = (grupoId: number) => {
     const grupo = gruposOfTab(tab).find((g) => g.id === grupoId);
     if (!grupo?.items.length) return;
@@ -759,8 +761,49 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
 
   useEffect(() => {
     if (!imprimir) return;
-    const t = setTimeout(() => window.print(), 50);
-    return () => clearTimeout(t);
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const imprimirCuandoEsteListo = async () => {
+      // Esperamos a que React monte el portal y a que el membrete termine
+      // de cargar. Esto evita que Chrome abra la vista de impresión antes
+      // de que mosol.png tenga sus dimensiones y aparezca recortado/vacío.
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+
+      const root = document.getElementById("cmo-print-root");
+      if (!root || cancelled) return;
+
+      const images = Array.from(root.querySelectorAll("img"));
+      await Promise.all(
+        images.map(
+          (img) =>
+            img.complete
+              ? Promise.resolve()
+              : new Promise<void>((resolve) => {
+                  img.addEventListener("load", () => resolve(), { once: true });
+                  img.addEventListener("error", () => resolve(), { once: true });
+                })
+        )
+      );
+
+      if (cancelled) return;
+
+      // Un pequeño margen de tiempo permite que el navegador recalcule
+      // @page, container queries y el layout del portal antes de imprimir.
+      timer = setTimeout(() => {
+        if (!cancelled) window.print();
+      }, 100);
+    };
+
+    void imprimirCuandoEsteListo();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [imprimir]);
 
   useEffect(() => {
@@ -789,7 +832,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
     } else if (tab === "examenes") {
       const ex = it as ExamItem;
       t1 = ex.nombre_examen;
-      t2 = [ex.tipo_examen, ex.indicaciones_previas].filter(Boolean).join(" · ");
+      t2 = ex.indicaciones_previas || "";
     } else {
       const f = it as FormItem;
       t1 = f.nombre_formula;
@@ -820,10 +863,17 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   /* ---------- contenido de una receta para el membrete CMO ----------
      Compartido entre la vista previa en pantalla y la impresión final
      (una receta sola o todas apiladas) — mismo marcado siempre, para
-     que lo que el doctor ve en pantalla sea lo que se imprime. */
+     que lo que el doctor ve en pantalla sea lo que se imprime.
+
+     Los medicamentos van uno debajo de otro (una fila por ítem, con
+     nombre a la izquierda y vía/frecuencia/duración/horario a la
+     derecha) — igual que el resto de categorías, que listan sus
+     ítems numerados en una sola columna. Nombre y edad del paciente
+     van en un encabezado único arriba del listado. */
   const renderSlip = (t: Tab, grupoId: number) => {
     const grupo = gruposOfTab(t).find((g) => g.id === grupoId);
     const items = grupo ? grupo.items : [];
+    const fecha = `${fechaPartes.dia}/${fechaPartes.mes}/${fechaPartes.anio}`;
 
     const header = (
       <div className={styles["cmo-rp-header"]}>
@@ -840,9 +890,14 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
         <>
           {header}
           {exs.length ? exs.map((it, i) => (
-            <div key={it.id} className={styles["cmo-rp-line"]}>
-              {i + 1}. {it.nombre_examen}
-              {it.urgencia === "Urgente" && <span className={styles["cmo-rp-meta"]}> — URGENTE</span>}
+            <div key={it.id} className={styles["cmo-rp-exam-item"]}>
+              <div className={styles["cmo-rp-exam-linea"]}>
+                {i + 1}. {it.nombre_examen}
+                {it.urgencia === "Urgente" && <span className={styles["cmo-rp-meta"]}> — URGENTE</span>}
+              </div>
+              {it.indicaciones_previas && (
+                <div className={styles["cmo-rp-exam-previas"]}>{it.indicaciones_previas}</div>
+              )}
             </div>
           )) : <div className={styles["cmo-rp-line"]}>Sin exámenes</div>}
         </>
@@ -857,11 +912,15 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
             return (
               <div key={m.id} className={styles["cmo-rp-med-row"]}>
                 <div className={styles["cmo-rp-med-col-left"]}>
-                  <span className={styles["cmo-rp-num"]}>{i + 1}.</span>
-                  <span className={styles["cmo-rp-med-name"]}>{m.medicamento}{m.dosis ? ` ${m.dosis}` : ""}</span>
+                  <div className={styles["cmo-rp-med-name-line"]}>
+                    <span className={styles["cmo-rp-num"]}>{i + 1}.</span>
+                    <span className={styles["cmo-rp-med-name"]}>{m.medicamento}{m.dosis ? ` ${m.dosis}` : ""}</span>
+                  </div>
+                  <div className={styles["cmo-rp-med-cantidad"]}>{m.cantidad || "—"}</div>
                 </div>
                 <div className={styles["cmo-rp-med-col-right"]}>
-                  {instrucciones && <div className={styles["cmo-rp-instrucciones"]}>{instrucciones}</div>}
+                  {instrucciones && <div className={styles["cmo-rp-instrucciones"]}>- {instrucciones}</div>}
+                  {m.indicaciones && <div className={styles["cmo-rp-med-indicaciones"]}>{m.indicaciones}</div>}
                   {m.horario && m.horario.length > 0 && (
                     <div className={styles["cmo-rp-horario"]}> {m.horario.join(" · ")}</div>
                   )}
@@ -872,16 +931,52 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
         </>
       );
     } else {
+      // Fórmulas magistrales: cada fórmula es su propio contenedor visual.
+      // Los ingredientes (separados por "+" al escribirlos, ej.
+      // "Betametasona 0.1% + Ácido salicílico 3%") se listan uno debajo
+      // de otro a la izquierda; una llave "{" los abarca visualmente y
+      // apunta hacia el detalle de preparación a la derecha (cantidad a
+      // preparar, forma farmacéutica, vía, indicaciones).
       const forms = items as FormItem[];
       body = (
         <>
           {header}
-          {forms.length ? forms.map((it, i) => {
-            const meta = [it.ingredientes, it.forma_farmaceutica, it.via_administracion].filter(Boolean).join(" · ");
+          {forms.length ? forms.map((f) => {
+            const ingredientesList = f.ingredientes
+              .split("+")
+              .map((s) => s.trim())
+              .filter(Boolean);
             return (
-              <div key={it.id} className={styles["cmo-rp-line"]}>
-                {i + 1}. {it.nombre_formula}
-                {meta && <span className={styles["cmo-rp-meta"]}> — {meta}</span>}
+              <div key={f.id} className={styles["cmo-rp-formula-block"]}>
+                {f.nombre_formula && (
+                  <div className={styles["cmo-rp-formula-titulo"]}>{f.nombre_formula}</div>
+                )}
+                <div className={styles["cmo-rp-formula-row"]}>
+                  <div className={styles["cmo-rp-formula-ing-list"]}>
+                    {(ingredientesList.length ? ingredientesList : ["—"]).map((ing, ii) => (
+                      <div key={ii} className={styles["cmo-rp-formula-ing"]}>{ii + 1}. {ing}</div>
+                    ))}
+                  </div>
+                  <div className={styles["cmo-rp-formula-brace"]} aria-hidden="true">
+                    <svg viewBox="0 0 20 100" preserveAspectRatio="none">
+                      <path d="M 0 0 Q 4.80 0 3.20 25 T 8 50 M 0 100 Q 4.80 100 3.20 75 T 8 50" />
+                    </svg>
+                  </div>
+                  <div className={styles["cmo-rp-formula-detalle"]}>
+                    {f.cantidad_preparar && (
+                      <div className={styles["cmo-rp-formula-cantidad"]}><strong>Cantidad a preparar:</strong> {f.cantidad_preparar}</div>
+                    )}
+                    {f.forma_farmaceutica && (
+                      <div className={styles["cmo-rp-formula-forma"]}><strong>Forma:</strong> {f.forma_farmaceutica}</div>
+                    )}
+                    {f.via_administracion && (
+                      <div className={styles["cmo-rp-formula-via"]}><strong>Vía:</strong> {f.via_administracion}</div>
+                    )}
+                    {f.indicaciones && (
+                      <div className={styles["cmo-rp-formula-indicaciones"]}><strong>Indicaciones:</strong> {f.indicaciones}</div>
+                    )}
+                  </div>
+                </div>
               </div>
             );
           }) : <div className={styles["cmo-rp-line"]}>Sin fórmulas</div>}
@@ -898,9 +993,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
           </div>
         )}
         <div className={styles["cmo-fecha"]}>
-          <span>{fechaPartes.dia}</span>
-          <span>{fechaPartes.mes}</span>
-          <span>{fechaPartes.anio}</span>
+          <span>{fecha}</span>
         </div>
       </>
     );
@@ -1126,7 +1219,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
                 </div>
               )}
 
-              <div className={styles["cmo-canvas"]}>
+              <div className={cx(styles["cmo-canvas"], styles["cmo-preview"])}>
                 <img src={RecetaImprimir} alt="Vista previa receta CMO" />
                 {renderSlip(tab, grupoPreview)}
               </div>
@@ -1155,20 +1248,15 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
       </div>
 
       {/* ================= ÁREA DE IMPRESIÓN (portal fuera del drawer) =================
-         Antes este bloque vivía DENTRO de .drawer (position:fixed,
-         overflow-y:auto) y se ocultaba/mostraba con un selector CSS
-         `:not(:has(.receta-widget))` bastante frágil. En la práctica
-         esto podía terminar imprimiendo la vista previa en pantalla
-         (angosta, una sola receta, sin el tamaño 8.5x5.5in forzado) en
-         vez de este bloque — exactamente el síntoma de "se ve una sola
-         receta, ocupa toda la hoja, y solo la mitad izquierda del
-         membrete". Con createPortal lo sacamos directo a <body>, fuera
-         del drawer, para que la impresión no dependa en absoluto de la
-         posición/estado del drawer ni de que el navegador soporte
-         :has(). Cada receta ocupa un bloque fijo de 8.5in x 5.5in
-         (media hoja carta). Dos bloques seguidos = 11in = una hoja
-         carta completa, así que al imprimir varias caen 2 por página
-         sin configuración extra. */}
+         Este bloque vive fuera de .drawer (position:fixed, overflow-y:auto)
+         y se saca directo a <body> vía createPortal para que la impresión
+         no dependa en absoluto de la posición/estado del drawer.
+
+         Cada receta ocupa un bloque fijo de 8.5in × 6.5in (un membrete
+         Oficio). Dos membretes seguidos = 13in = una hoja Oficio
+         completa, así que al imprimir varias recetas caen 2 por página
+         sin configuración extra (ver .cmo-slip:nth-child(even) en
+         Receta.module.css). */}
       {imprimir &&
         createPortal(
           <div id="cmo-print-root" className={styles["cmo-print-all"]}>

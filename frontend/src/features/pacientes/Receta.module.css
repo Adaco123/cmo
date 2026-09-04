@@ -248,37 +248,73 @@
 
 /* ============================================================
    MEMBRETE CMO — lienzo compartido entre vista previa en pantalla
-   y las dos formas de impresión (una receta / todas). Mismo
-   marcado, misma imagen, mismo posicionamiento en % — así lo que
-   se ve en pantalla es fiel a lo impreso.
+   y las dos formas de impresión (una receta / todas).
+
+   MODELO: cada receta (grupo) ocupa UN membrete completo, con sus
+   ítems listados uno debajo de otro (igual que antes del refactor
+   a hoja Oficio) — NO se reparte en cuadrantes. Lo único que
+   cambió respecto a la versión anterior (hoja carta) es el tamaño
+   físico del membrete y de la hoja de impresión:
+
+   - Cada MEMBRETE (.cmo-slip / .cmo-preview) ahora mide
+     8.5in × 6.5in (antes 8.5in × 5.5in, tamaño carta).
+   - Cada hoja de impresión es Oficio: 8.5in × 13in (antes Letter,
+     8.5in × 11in). 2 membretes de 6.5in = 13in = 1 hoja Oficio
+     completa — igual que antes, 2 membretes por hoja.
 
    .cmo-canvas: contenedor "libre" — se usa tal cual para la vista
-   previa en pantalla, donde la imagen conserva su proporción
-   natural (sin recortar) para que el doctor vea el membrete completo
-   mientras edita.
+   previa en pantalla, respetando la MISMA proporción que se
+   imprime (8.5:6.5) en vez de la proporción cruda de la imagen del
+   membrete, para que la vista previa sea fiel a lo impreso.
 
    .cmo-slip: modificador que se aplica SOLO al imprimir. Fija el
-   bloque a 8.5in x 5.5in (media hoja carta) y la imagen se recorta
-   con object-fit:cover para llenar ese bloque exacto — así, dos
-   bloques seguidos suman 11in = una hoja carta completa.
+   bloque a 8.5in × 6.5in y la imagen del membrete llena ese bloque
+   exacto con object-fit:fill.
 
-   ⚠️ Nota: los % de .cmo-rp / .cmo-fecha / .cmo-rp-diagnostico están
-   calibrados sobre el membrete a tamaño completo (proporción
-   original). Al forzarlo a 8.5x5.5in en la impresión, el recorte de
-   la imagen puede desplazar ligeramente el texto respecto al diseño
-   del membrete — conviene hacer una impresión de prueba y, si hace
-   falta, (a) reexportar el membrete ya recortado a proporción
-   8.5:5.5 para que calce exacto, o (b) reajustar estos % a mano.
+   ⚠️ Nota sobre calibración: los % de .cmo-rp / .cmo-fecha /
+   .cmo-rp-diagnostico / .cmo-rp-header están calibrados a ojo para
+   el membrete anterior (8.5in × 5.5in). Al pasar a 6.5in de alto la
+   proporción cambia (el membrete queda más "cuadrado"), así que
+   convine hacer una impresión de prueba y, si el bloque de texto
+   queda muy arriba/abajo respecto al membrete impreso, ajustar estos
+   valores a mano (son los mismos nombres de siempre: cmo-rp top/left,
+   cmo-fecha top/left/gap, cmo-rp-diagnostico top).
 
    ⚠️ Nota 2: de acá para abajo (.cmo-canvas, .cmo-slip, .cmo-rp*,
    .cmo-fecha) las reglas NO llevan el prefijo ".receta-widget" que sí
    usa el resto del archivo. Es a propósito: renderSlip() (que genera
    estas clases) se usa tanto para la vista previa en pantalla —dentro
-   de .receta-widget— como para el bloque de impresión, que ahora se
+   de .receta-widget— como para el bloque de impresión, que se
    renderiza vía createPortal directo a <body> (ver Receta.tsx), fuera
    de .receta-widget. Si se le pone el prefijo de vuelta, el bloque
    portaleado se queda sin estos estilos.
    ============================================================ */
+
+/* ============================================================
+   TAMAÑOS DE LETRA AJUSTABLES A MANO
+   Para agrandar o achicar, cambiá solo el número de la variable
+   correspondiente (siempre en cqw, nunca pt/px/rem). cqw = % del
+   ancho del membrete, así el cambio se ve igual de grande/chico en
+   la vista previa angosta del drawer y en la hoja impresa a tamaño
+   real (8.5in de ancho). Como referencia: 1.96cqw ≈ 12pt de Word.
+   ============================================================ */
+:global(:root) {
+  /* Medicamentos: nombre, instrucciones, indicaciones y horario de
+     cada línea (todo lo demás dentro de la fila usa em, relativo a
+     esta). 2.94cqw ≈ 18pt de Word. */
+  --cmo-fs-medicamento: 2.94cqw;
+
+  /* Exámenes: nombre del examen + su indicación previa */
+  --cmo-fs-examen: 1.96cqw;
+
+  /* Fórmulas magistrales — columna izquierda (lista de ingredientes) */
+  --cmo-fs-formula-ingrediente: 1.9cqw;
+  /* Fórmulas magistrales — columna derecha (detalle de preparación) */
+  --cmo-fs-formula-cantidad: 1.7cqw;
+  --cmo-fs-formula-forma: 1.6cqw;
+  --cmo-fs-formula-via: 1.6cqw;
+  --cmo-fs-formula-indicaciones: 1.6cqw;
+}
 
 .cmo-canvas {
   position: relative;
@@ -290,16 +326,33 @@
   display: block;
 }
 
+/* Vista previa en pantalla: usa la MISMA proporción que se imprime
+   (8.5in × 6.5in por membrete) para que el drawer muestre
+   exactamente cómo va a salir en Oficio, y no la proporción cruda
+   del archivo mosol.png. */
+.cmo-preview {
+  width: 100%;
+  aspect-ratio: 8.5 / 6.5;
+  overflow: hidden;
+  position: relative;
+}
+.cmo-preview > img {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+
 .cmo-slip {
   width: 8.5in;
-  height: 5.5in;
+  height: 6.5in;
   overflow: hidden;
   page-break-inside: avoid;
   break-inside: avoid;
 }
 .cmo-slip img {
+  width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: fill;
 }
 
 .cmo-rp {
@@ -307,10 +360,16 @@
   top: 27%;
   left: 8.5%;
   width: 83%;
-  
+
   font-family: "Monotype Corsiva", cursive;
-  font-size: 12pt;
-  line-height: 1.9;
+  /* cqw (no pt/px) para que escale igual en la vista previa chica del
+     drawer y en la hoja impresa a tamaño real — 1.96cqw equivale a los
+     12pt originales sobre un membrete de 8.5in de ancho. Con unidades
+     fijas, la vista previa (contenedor angosto) mostraba el texto
+     "grande" respecto a la imagen y las líneas se salían del membrete,
+     aunque en la impresión real (8.5in físicas) sí entraban bien. */
+  font-size: 1.96cqw;
+  line-height: 1.42;
   color: #16233A;
 }
 .cmo-rp-line { margin-bottom: 0.35em; }
@@ -330,9 +389,9 @@
   font-family: 'Harlow Solid Italic', cursive;
   font-weight: 900;
   display: flex;
-  gap: 2.5rem;
-  margin-bottom: 1.4em;
-  padding-bottom: 0.7em;
+  gap: 5cqw;
+  margin-bottom: 0.9em;
+  padding-bottom: 0.5em;
   border-bottom: 1.5px solid rgba(22,35,58,0.18);
   font-size: 2cqw;
   color: #16233A;
@@ -343,13 +402,94 @@
 .cmo-rp-header-name { flex: 1; }
 .cmo-rp-header-age { flex: 0 0 auto; }
 
-.cmo-rp-med-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.1em; gap: 1.5rem; }
-.cmo-rp-med-col-left { display: flex; align-items: baseline; gap: 0.5em; flex: 0 0 42%; min-width: 0; }
+/* Los tamaños/gaps de acá para abajo son todos cqw o em (relativos al
+   font-size de .cmo-rp, que ya es cqw) — nunca rem/pt/px — para que 4
+   medicamentos escalen igual de chico en la vista previa del drawer
+   que en la hoja impresa a tamaño real, y no se corten en pantalla. */
+.cmo-rp-med-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.05em; gap: 3cqw; font-size: var(--cmo-fs-medicamento); }
+.cmo-rp-med-col-left { display: flex; flex-direction: column; gap: 0.02em; flex: 0 0 42%; min-width: 0; }
+.cmo-rp-med-name-line { display: flex; align-items: baseline; gap: 0.5em; }
 .cmo-rp-num { font-weight: 700; color: var(--status-inactive, #C1443F); font-size: 0.95em; flex-shrink: 0; }
 .cmo-rp-med-name { font-weight: 600; color: #16233A; }
+.cmo-rp-med-cantidad { font-size: 0.72em; color: #555; margin-left: 0; margin-top: -0.05em; font-family: var(--sans, Arial, sans-serif); }
 .cmo-rp-med-col-right { flex: 0 0 50%; text-align: left; padding-left: 2cqw; }
 .cmo-rp-instrucciones { font-size: 0.9em; color: #333; font-weight: 500; line-height: 1.4; }
+.cmo-rp-med-indicaciones { font-size: 0.85em; color: #333; font-style: italic; line-height: 1.4; }
 .cmo-rp-horario { font-size: 0.82em; color: #555; margin-top: 0em; font-family: var(--sans, Arial, sans-serif); }
+
+/* ---------- exámenes: tamaño de letra independiente (--cmo-fs-examen) ---------- */
+.cmo-rp-exam-item { margin-bottom: 0.55em; }
+.cmo-rp-exam-linea { font-size: var(--cmo-fs-examen); line-height: 1.5; }
+.cmo-rp-exam-previas {
+  font-size: calc(var(--cmo-fs-examen) * 0.8);
+  color: #555;
+  margin-top: 0.1em;
+  font-family: var(--sans, Arial, sans-serif);
+}
+
+/* ---------- fórmulas magistrales ----------
+   Un contenedor por fórmula: lista de ingredientes a la izquierda,
+   llave "{" en SVG (escala con el alto real de la lista, sin
+   depender de cuántos ingredientes tenga) y el detalle de
+   preparación a la derecha — cada dato con su propia variable de
+   tamaño (--cmo-fs-formula-*), ajustable arriba en :root. */
+.cmo-rp-formula-block {
+  margin-bottom: 1em;
+  padding-bottom: 0.9em;
+  border-bottom: 1px dashed rgba(22, 35, 58, 0.18);
+}
+.cmo-rp-formula-block:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+
+.cmo-rp-formula-titulo {
+  font-family: var(--sans, Arial, sans-serif);
+  font-weight: 700;
+  font-size: 1.5cqw;
+  color: var(--primary, #14b8a6);
+  margin-bottom: 0.5em;
+}
+
+.cmo-rp-formula-row { display: flex; align-items: stretch; gap: 0.6cqw; }
+
+.cmo-rp-formula-ing-list {
+  flex: 0 0 40%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: flex-end;
+  text-align: right;
+  font-family: "Monotype Corsiva", cursive;
+  color: #16233A;
+}
+.cmo-rp-formula-ing {
+  font-size: var(--cmo-fs-formula-ingrediente);
+  line-height: 1.4;
+}
+
+.cmo-rp-formula-brace {
+  flex: 0 0 2.6cqw;
+  align-self: stretch;
+  display: flex;
+}
+.cmo-rp-formula-brace svg { width: 100%; height: 100%; overflow: visible; display: block; }
+.cmo-rp-formula-brace path { fill: none; stroke: #16233A; stroke-width: 1.2; }
+
+.cmo-rp-formula-detalle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.3em;
+  padding-left: 0.6cqw;
+  font-family: var(--sans, Arial, sans-serif);
+  color: #16233A;
+}
+.cmo-rp-formula-detalle strong { color: var(--primary, #14b8a6); font-weight: 700; }
+.cmo-rp-formula-cantidad { font-size: var(--cmo-fs-formula-cantidad); }
+.cmo-rp-formula-forma { font-size: var(--cmo-fs-formula-forma); }
+.cmo-rp-formula-via { font-size: var(--cmo-fs-formula-via); }
+.cmo-rp-formula-indicaciones { font-size: var(--cmo-fs-formula-indicaciones); }
 
 .cmo-rp-diagnostico {
   position: absolute;
@@ -388,11 +528,17 @@
 }
 
 /*
-  Hoja carta vertical:
-  8.5in de ancho × 11in de alto.
+  Hoja Oficio vertical:
+  8.5in de ancho × 13in de alto.
+  2 membretes de 6.5in de alto = 13in = 1 hoja Oficio completa.
+
+  Nota: aunque tu impresora pregunte el tamaño de hoja antes de
+  imprimir, dejar @page en Oficio ayuda a que el diálogo (y los
+  "guardar como PDF") propongan Oficio por defecto — igual debes
+  confirmarlo tú en el diálogo si tu driver no lo detecta solo.
 */
 @page {
-  size: letter portrait;
+  size: 8.5in 13in;
   margin: 0;
 }
 
@@ -401,7 +547,7 @@
   /*
     Eliminar márgenes/padding que el navegador pueda aplicar al
     documento. Esto es importante para que 8.5in realmente ocupe
-    el ancho completo de la hoja carta.
+    el ancho completo de la hoja.
   */
   :global(html),
   :global(body) {
@@ -433,19 +579,18 @@
   }
 
   /*
-    Cada receta ocupa exactamente media hoja carta:
-    8.5in × 5.5in.
+    Cada membrete ocupa exactamente 8.5in × 6.5in.
   */
   .cmo-slip {
     position: relative;
 
     width: 8.5in !important;
-    height: 5.5in !important;
+    height: 6.5in !important;
 
     min-width: 8.5in !important;
     max-width: 8.5in !important;
-    min-height: 5.5in !important;
-    max-height: 5.5in !important;
+    min-height: 6.5in !important;
+    max-height: 6.5in !important;
 
     margin: 0 !important;
     padding: 0 !important;
@@ -461,10 +606,10 @@
   /*
     El membrete debe ocupar exactamente todo el bloque.
 
-    mosol.png = 1435 × 1096 y NO tiene la misma proporción que
-    8.5 × 5.5. Usamos fill para evitar que se recorte cualquier
-    parte del membrete. Puede existir una pequeña deformación,
-    pero no se pierde contenido de la imagen.
+    mosol.png = 1435 × 1096 y 8.5 × 6.5 tienen prácticamente la
+    misma proporción. Usamos fill para evitar que se recorte
+    cualquier parte del membrete. Puede existir una pequeña
+    deformación, pero no se pierde contenido de la imagen.
   */
   .cmo-slip img {
     display: block !important;
@@ -476,12 +621,12 @@
   }
 
   /*
-    Después de cada segunda receta comienza una nueva hoja,
-    excepto cuando esa segunda receta es la última.
+    Después de cada segundo membrete comienza una nueva hoja Oficio,
+    excepto cuando ese segundo membrete es el último.
 
-    1 + 2 = página 1
-    3 + 4 = página 2
-    5 + 6 = página 3
+    1 + 2 = hoja Oficio 1
+    3 + 4 = hoja Oficio 2
+    5 + 6 = hoja Oficio 3
     etc.
   */
   .cmo-slip:nth-child(even):not(:last-child) {
