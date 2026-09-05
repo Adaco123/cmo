@@ -1,0 +1,123 @@
+.capturaQrModal * {
+  box-sizing: border-box;
+}
+
+.capturaQrModal {
+  font-family: var(--sans);
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg-body) 55%, transparent);
+  backdrop-filter: blur(2px);
+  z-index: 250;
+}
+
+.panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 251;
+  width: 340px;
+  max-width: 92vw;
+  background: var(--bg-card-dark);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-hover);
+  padding: 28px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+}
+
+.cerrar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--text-on-dark, #E7EEF7);
+  opacity: 0.7;
+  cursor: pointer;
+  font-size: 16px;
+}
+.cerrar:hover { opacity: 1; }
+
+.titulo {
+  margin: 0;
+  color: var(--text-on-dark, #E7EEF7);
+  font-size: 18px;
+}
+
+.subtitulo {
+  margin: 0 0 10px;
+  color: var(--primary-light);
+  font-size: 13px;
+}
+
+.cargando {
+  color: var(--text-on-dark, #E7EEF7);
+  opacity: 0.8;
+  padding: 30px 0;
+}
+
+.qr {
+  background: #fff;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+.ayuda {
+  margin: 12px 0 2px;
+  color: var(--text-on-dark, #E7EEF7);
+  opacity: 0.85;
+  font-size: 13px;
+}
+
+.tiempo {
+  margin: 0 0 10px;
+  color: var(--text-on-dark, #E7EEF7);
+  opacity: 0.6;
+  font-size: 12px;
+}
+
+.estado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  min-height: 20px;
+}
+
+.estadoEsperando { color: var(--text-on-dark, #E7EEF7); opacity: 0.7; }
+.estadoOk { color: var(--primary-light); font-weight: 600; }
+.estadoFotos { color: var(--text-on-dark, #E7EEF7); }
+
+.expirado {
+  color: var(--status-inactive);
+  padding: 24px 0;
+  font-size: 14px;
+}
+
+.finalizado {
+  color: var(--primary-light);
+  padding: 20px 0 8px;
+  font-size: 14px;
+}
+
+.btnCerrar {
+  margin-top: 16px;
+  padding: 8px 22px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-on-dark, #E7EEF7);
+  cursor: pointer;
+  font-size: 13px;
+}
+.btnCerrar:hover { border-color: var(--primary); color: var(--primary-light); }

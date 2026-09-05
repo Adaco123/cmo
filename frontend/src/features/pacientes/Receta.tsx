@@ -134,13 +134,13 @@ const MED_FIELDS: FieldDef[] = [
   { key: "via_administracion", label: "Vía", placeholder: "VO", width: "sm", datalist: ["VO", "IV", "IM", "SC", "SL", "Inhalatoria", "Tópica"] },
   { key: "frecuencia", label: "Frecuencia", placeholder: "c/8h", width: "sm", required: true },
   { key: "duracion", label: "Duración", placeholder: "5 días", width: "sm" },
+  { key: "hora_inicio", label: "Inicia a las", placeholder: "08:00", width: "sm" },
   { key: "cantidad", label: "Cantidad", placeholder: "20 tabletas", width: "sm" },
   { key: "indicaciones", label: "Indicaciones", placeholder: "Con alimentos", width: "md" },
 ];
 
 const EXAM_FIELDS: FieldDef[] = [
   { key: "nombre_examen", label: "Examen", placeholder: "Hemograma completo", width: "lg", required: true, autocomplete: true },
-  { key: "tipo_examen", label: "Tipo", placeholder: "Laboratorio", width: "sm", datalist: ["Laboratorio", "Imagenología", "Gabinete", "General"] },
   { key: "urgencia", label: "Urgencia", width: "sm", select: ["Rutina", "Urgente"] },
   { key: "indicaciones_previas", label: "Indicaciones previas", placeholder: "En ayunas 8h", width: "md" },
 ];
@@ -175,56 +175,21 @@ function emptyDraftFor(t: Tab): Record<string, string> {
 
 /* ============================================================
    Bases de datos de sugerencias / chips rápidos
+   Sin datos precargados por pedido del usuario (setiembre 2026):
+   ya no se sugieren medicamentos/exámenes/fórmulas de ejemplo ni
+   se muestran chips rápidos. Se dejan los arrays vacíos (en vez de
+   borrar toda la lógica de autocompletado) por si en el futuro se
+   quiere volver a cargar una lista propia.
    ============================================================ */
 
-const MED_DB: Record<string, string>[] = [
-  { medicamento: "Paracetamol", dosis: "500mg", via_administracion: "VO", frecuencia: "c/8h", duracion: "5 días" },
-  { medicamento: "Ibuprofeno", dosis: "400mg", via_administracion: "VO", frecuencia: "c/8h", duracion: "5 días" },
-  { medicamento: "Amoxicilina", dosis: "500mg", via_administracion: "VO", frecuencia: "c/8h", duracion: "7 días" },
-  { medicamento: "Amoxicilina/Clavulánico", dosis: "875/125mg", via_administracion: "VO", frecuencia: "c/12h", duracion: "7 días" },
-  { medicamento: "Omeprazol", dosis: "20mg", via_administracion: "VO", frecuencia: "c/24h", duracion: "14 días" },
-  { medicamento: "Loratadina", dosis: "10mg", via_administracion: "VO", frecuencia: "c/24h", duracion: "7 días" },
-  { medicamento: "Metformina", dosis: "850mg", via_administracion: "VO", frecuencia: "c/12h", duracion: "Continuo" },
-  { medicamento: "Losartán", dosis: "50mg", via_administracion: "VO", frecuencia: "c/24h", duracion: "Continuo" },
-  { medicamento: "Diclofenaco", dosis: "50mg", via_administracion: "VO", frecuencia: "c/8h", duracion: "3 días" },
-  { medicamento: "Azitromicina", dosis: "500mg", via_administracion: "VO", frecuencia: "c/24h", duracion: "3 días" },
-  { medicamento: "Ciprofloxacino", dosis: "500mg", via_administracion: "VO", frecuencia: "c/12h", duracion: "7 días" },
-  { medicamento: "Salbutamol inhalador", dosis: "2 puff", via_administracion: "Inhalatoria", frecuencia: "c/6h", duracion: "SOS (según necesidad)" },
-  { medicamento: "Dexametasona", dosis: "4mg", via_administracion: "IM", frecuencia: "Dosis única", duracion: "" },
-  { medicamento: "Ranitidina", dosis: "150mg", via_administracion: "VO", frecuencia: "c/12h", duracion: "10 días" },
-  { medicamento: "Ácido fólico", dosis: "5mg", via_administracion: "VO", frecuencia: "c/24h", duracion: "30 días" },
-  { medicamento: "Complejo B", dosis: "1 amp", via_administracion: "IM", frecuencia: "c/24h", duracion: "5 días" },
-  { medicamento: "Cetirizina", dosis: "10mg", via_administracion: "VO", frecuencia: "c/24h", duracion: "10 días" },
-  { medicamento: "Metoclopramida", dosis: "10mg", via_administracion: "VO", frecuencia: "c/8h", duracion: "3 días" },
-];
-const MED_CHIPS = ["Diclofenaco", "Azitromicina", "Complejo B"];
+const MED_DB: Record<string, string>[] = [];
+const MED_CHIPS: string[] = [];
 
-const EXAM_DB: Record<string, string>[] = [
-  { nombre_examen: "Hemograma completo", tipo_examen: "Laboratorio", urgencia: "Rutina" },
-  { nombre_examen: "Glicemia en ayunas", tipo_examen: "Laboratorio", urgencia: "Rutina" },
-  { nombre_examen: "Perfil lipídico", tipo_examen: "Laboratorio", urgencia: "Rutina" },
-  { nombre_examen: "Examen general de orina", tipo_examen: "Laboratorio", urgencia: "Rutina" },
-  { nombre_examen: "Perfil hepático", tipo_examen: "Laboratorio", urgencia: "Rutina" },
-  { nombre_examen: "Perfil renal", tipo_examen: "Laboratorio", urgencia: "Rutina" },
-  { nombre_examen: "Radiografía de tórax", tipo_examen: "Imagenología", urgencia: "Rutina" },
-  { nombre_examen: "Electrocardiograma", tipo_examen: "Gabinete", urgencia: "Rutina" },
-  { nombre_examen: "Ecografía abdominal", tipo_examen: "Imagenología", urgencia: "Rutina" },
-  { nombre_examen: "PCR (Proteína C Reactiva)", tipo_examen: "Laboratorio", urgencia: "Rutina" },
-  { nombre_examen: "VSG", tipo_examen: "Laboratorio", urgencia: "Rutina" },
-  { nombre_examen: "Prueba de embarazo", tipo_examen: "Laboratorio", urgencia: "Rutina" },
-  { nombre_examen: "Cultivo de orina", tipo_examen: "Laboratorio", urgencia: "Rutina" },
-  { nombre_examen: "TSH", tipo_examen: "Laboratorio", urgencia: "Rutina" },
-  { nombre_examen: "Coproparasitológico", tipo_examen: "Laboratorio", urgencia: "Rutina" },
-];
-const EXAM_CHIPS = ["Hemograma completo", "Glicemia en ayunas", "Examen general de orina", "Radiografía de tórax", "Perfil lipídico", "Electrocardiograma", "Ecografía abdominal", "PCR (Proteína C Reactiva)"];
+const EXAM_DB: Record<string, string>[] = [];
+const EXAM_CHIPS: string[] = [];
 
-const FORM_DB: Record<string, string>[] = [
-  { nombre_formula: "Crema Betametasona + Ác. Salicílico", ingredientes: "Betametasona 0.1% + Ácido salicílico 3%", forma_farmaceutica: "Crema", cantidad_preparar: "30g", via_administracion: "Tópica" },
-  { nombre_formula: "Solución para nebulizar", ingredientes: "Salbutamol + Bromuro de ipratropio", forma_farmaceutica: "Solución para nebulizar", cantidad_preparar: "4ml", via_administracion: "Inhalatoria" },
-  { nombre_formula: "Jarabe pediátrico compuesto", ingredientes: "Paracetamol + Clorfenamina", forma_farmaceutica: "Jarabe", cantidad_preparar: "100ml", via_administracion: "VO" },
-  { nombre_formula: "Loción capilar compuesta", ingredientes: "Minoxidil 5% + Finasteride 0.1%", forma_farmaceutica: "Loción capilar", cantidad_preparar: "60ml", via_administracion: "Tópica" },
-];
-const FORM_CHIPS = FORM_DB.map((f) => f.nombre_formula);
+const FORM_DB: Record<string, string>[] = [];
+const FORM_CHIPS: string[] = [];
 
 const DB: Record<Tab, Record<string, string>[]> = { medicamentos: MED_DB, examenes: EXAM_DB, formulas: FORM_DB };
 const CHIPS: Record<Tab, string[]> = { medicamentos: MED_CHIPS, examenes: EXAM_CHIPS, formulas: FORM_CHIPS };
@@ -234,13 +199,14 @@ const TIPO_ID: Record<Tab, number> = { medicamentos: 1, examenes: 2, formulas: 3
 /* ============================================================
    Horario sugerido a partir de la frecuencia
    ============================================================ */
-function scheduleFromFrequency(frecuencia: string): string[] | null {
+function scheduleFromFrequency(frecuencia: string, horaInicio?: string): string[] | null {
   if (!frecuencia) return null;
   const m = frecuencia.match(/cada\s+(\d+)\s+horas?/i) || frecuencia.match(/c\s?\/\s?(\d+)\s?h/i);
   if (!m) return null;
   const interval = parseInt(m[1], 10);
   if (!interval || interval <= 0 || interval > 24) return null;
-  const startHour = 8;
+  const horaMatch = (horaInicio || "").match(/^(\d{1,2})(?::(\d{2}))?$/);
+  const startHour = horaMatch && Number(horaMatch[1]) >= 0 && Number(horaMatch[1]) <= 23 ? Number(horaMatch[1]) : 8;
   const times: string[] = [];
   for (let h = startHour; h < startHour + 24; h += interval) {
     times.push(String(h % 24).padStart(2, "0") + ":00");
@@ -494,7 +460,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
         duracion: (values.duracion || "").trim(),
         cantidad: (values.cantidad || "").trim(),
         indicaciones: (values.indicaciones || "").trim(),
-        horario: scheduleFromFrequency(values.frecuencia || ""),
+        horario: scheduleFromFrequency(values.frecuencia || "", values.hora_inicio || ""),
       };
       setMedGrupos((gs) => gs.map((g) => (g.id === grupoId ? { ...g, items: [...g.items, obj] } : g)));
     } else if (tab === "examenes") {
@@ -873,11 +839,10 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   const renderSlip = (t: Tab, grupoId: number) => {
     const grupo = gruposOfTab(t).find((g) => g.id === grupoId);
     const items = grupo ? grupo.items : [];
-    const fecha = `${fechaPartes.dia}/${fechaPartes.mes}/${fechaPartes.anio}`;
 
     const header = (
       <div className={styles["cmo-rp-header"]}>
-        <div className={styles["cmo-rp-header-name"]}><strong>Paciente:</strong> {pacienteNombre}</div>
+        <div className={styles["cmo-rp-header-name"]}> {pacienteNombre}</div>
         <div className={styles["cmo-rp-header-age"]}><strong>Edad:</strong> {pacienteEdad}</div>
       </div>
     );
@@ -912,10 +877,8 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
             return (
               <div key={m.id} className={styles["cmo-rp-med-row"]}>
                 <div className={styles["cmo-rp-med-col-left"]}>
-                  <div className={styles["cmo-rp-med-name-line"]}>
-                    <span className={styles["cmo-rp-num"]}>{i + 1}.</span>
-                    <span className={styles["cmo-rp-med-name"]}>{m.medicamento}{m.dosis ? ` ${m.dosis}` : ""}</span>
-                  </div>
+                  <span className={styles["cmo-rp-num"]}>{i + 1}.</span>
+                  <span className={styles["cmo-rp-med-name"]}>{m.medicamento}{m.dosis ? ` ${m.dosis}` : ""}</span>
                   <div className={styles["cmo-rp-med-cantidad"]}>{m.cantidad || "—"}</div>
                 </div>
                 <div className={styles["cmo-rp-med-col-right"]}>
@@ -964,7 +927,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
                   </div>
                   <div className={styles["cmo-rp-formula-detalle"]}>
                     {f.cantidad_preparar && (
-                      <div className={styles["cmo-rp-formula-cantidad"]}><strong>Cantidad a preparar:</strong> {f.cantidad_preparar}</div>
+                      <div className={styles["cmo-rp-formula-cantidad"]}><strong>Cantidad:</strong> {f.cantidad_preparar}</div>
                     )}
                     {f.forma_farmaceutica && (
                       <div className={styles["cmo-rp-formula-forma"]}><strong>Forma:</strong> {f.forma_farmaceutica}</div>
@@ -993,7 +956,9 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
           </div>
         )}
         <div className={styles["cmo-fecha"]}>
-          <span>{fecha}</span>
+          <span>{fechaPartes.dia}</span>
+          <span>{fechaPartes.mes}</span>
+          <span>{fechaPartes.anio}</span>
         </div>
       </>
     );
@@ -1139,13 +1104,6 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
                     <button type="button" className={cx(styles["icon-btn"], styles.primary, styles["add-btn"])} title="Agregar (Enter)" onClick={attemptCommit}>
                       <FontAwesomeIcon icon={faPlus} /> Agregar
                     </button>
-                  </div>
-
-                  <div className={styles["kbd-hints"]}>
-                    <span><kbd>Tab</kbd> siguiente campo</span>
-                    <span><kbd>Enter</kbd> agregar</span>
-                    <span><kbd>↑↓</kbd> navegar sugerencias</span>
-                    <span><kbd>Ctrl</kbd>+<kbd>Z</kbd> deshacer última línea</span>
                   </div>
                 </div>
 

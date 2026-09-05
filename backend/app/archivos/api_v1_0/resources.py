@@ -22,6 +22,7 @@ from app.examenes_complementarios.models import ExamenComplementario
 from app.historial_clinico.models import RegistroClinico, HistoriaClinica
 from app.pacientes.models import Paciente
 from app.tipos_archivo.models import TipoArchivo
+from app.archivos import captura_qr
 archivo_schema_list = ArchivoSchema(many=True)
 schema = ArchivoSchema()
 schema_list = ArchivoSchema(many=True)
@@ -206,8 +207,161 @@ class ArchivosPorPaciente_Resource(Resource):
 
         archivos = sorted(vistos.values(), key=lambda a: a.created_at, reverse=True)
         return archivo_schema_list.dump(archivos), 200
+
+
+# ---------------------------------------------------------------------------
+# Captura de fotos por QR desde el celular (ver app/archivos/captura_qr.py).
+# Los endpoints bajo /captura/<token> son intencionalmente SIN @jwt_required:
+# el celular que escanea el QR no tiene sesión iniciada en el sistema, así
+# que la propia validez del token (firmado, con expiración y ligado a un
+# único examen) es lo que autoriza la subida.
+# ---------------------------------------------------------------------------
+
+TIPO_ARCHIVO_ID_FOTO = 1  # mismo valor que ya usa el frontend para jpg/jpeg/png
+EXTENSIONES_FOTO_PERMITIDAS = {"jpg", "jpeg", "png"}
+
+
+def _extension(nombre_archivo):
+    return nombre_archivo.rsplit(".", 1)[1].lower() if "." in nombre_archivo else ""
+
+
+def _paciente_de_examen(examen):
+    registro = RegistroClinico.get_by_id(examen.registro_clinico_id)
+    historia = HistoriaClinica.get_by_id(registro.historia_clinica_id) if registro else None
+    return Paciente.get_by_id(historia.paciente_id) if historia else None
+
+
+class QrCapturaIniciar_Resource(Resource):
+    """POST /api/archivos/examen/<int:examen_id>/qr-captura  (la PC, con JWT)."""
+
+    @jwt_required()
+    def post(self, examen_id):
+        if not ExamenComplementario.get_by_id(examen_id):
+            return {"error": "Examen complementario no encontrado"}, 404
+
+        usuario_id = get_jwt_identity()
+        token, sid = captura_qr.crear_sesion(examen_id, usuario_id)
+        return {
+            "token": token,
+            "sid": sid,
+            "expira_en_segundos": captura_qr.QR_CAPTURA_EXPIRA_SEGUNDOS,
+        }, 201
+
+
+class QrCapturaEstado_Resource(Resource):
+    """GET /api/archivos/examen/<int:examen_id>/qr-captura/<sid>/estado  (la PC, con JWT, polling)."""
+
+    @jwt_required()
+    def get(self, examen_id, sid):
+        sesion = captura_qr.obtener_sesion_por_sid(sid)
+        if not sesion or sesion["examen_id"] != examen_id:
+            return {"error": "Sesión de captura no encontrada o vencida"}, 404
+
+        return {
+            "conectado": sesion["conectado"],
+            "fotos_count": len(sesion["fotos"]),
+            "cerrada": sesion["cerrada"],
+        }, 200
+
+
+class QrCapturaInfo_Resource(Resource):
+    """GET /api/archivos/captura/<token>/info  (el celular, sin JWT)."""
+
+    def get(self, token):
+        sesion = captura_qr.validar_token(token)
+        if not sesion:
+            return {"error": "Código QR inválido o expirado"}, 410
+
+        captura_qr.marcar_conectado(sesion)
+
+        examen = ExamenComplementario.get_by_id(sesion["examen_id"])
+        paciente = _paciente_de_examen(examen)
+
+        return {
+            "nombre_examen": examen.nombre_examen,
+            "paciente_nombre": f"{paciente.nombres} {paciente.apellidos}" if paciente else "",
+            "fotos_count": len(sesion["fotos"]),
+        }, 200
+
+
+class QrCapturaFoto_Resource(Resource):
+    """
+    POST   /api/archivos/captura/<token>/foto              (el celular, sin JWT)
+    DELETE /api/archivos/captura/<token>/foto/<archivo_id>  (el celular, sin JWT)
+    """
+
+    def post(self, token):
+        sesion = captura_qr.validar_token(token)
+        if not sesion:
+            return {"error": "Código QR inválido o expirado"}, 410
+
+        if "archivo" not in request.files:
+            return {"error": "No se envió ninguna fotografía"}, 400
+
+        file_storage = request.files["archivo"]
+        if file_storage.filename == "":
+            return {"error": "El archivo está vacío"}, 400
+        if _extension(file_storage.filename) not in EXTENSIONES_FOTO_PERMITIDAS:
+            return {"error": "Solo se permiten fotografías (jpg, jpeg, png)"}, 400
+
+        try:
+            datos_archivo = guardar_archivo_en_disco(file_storage)
+        except ValueError as err:
+            return {"error": str(err)}, 400
+
+        archivo = Archivo(
+            tipo_archivo_id=TIPO_ARCHIVO_ID_FOTO,
+            subido_por_usuario_id=sesion["usuario_id"],
+            examen_complementario_id=sesion["examen_id"],
+            **datos_archivo,
+        )
+        db.session.add(archivo)
+        db.session.commit()
+
+        captura_qr.agregar_foto(sesion, archivo.id)
+
+        return {**schema.dump(archivo), "fotos_count": len(sesion["fotos"])}, 201
+
+    def delete(self, token, archivo_id):
+        sesion = captura_qr.validar_token(token)
+        if not sesion:
+            return {"error": "Código QR inválido o expirado"}, 410
+
+        if not captura_qr.quitar_foto(sesion, archivo_id):
+            return {"error": "Esa fotografía no pertenece a esta sesión de captura"}, 404
+
+        archivo = Archivo.get_by_id(archivo_id)
+        if archivo:
+            ruta_en_disco = os.path.join(BASE_UPLOAD_DIR, archivo.ruta_almacenamiento)
+            archivo.delete()
+            try:
+                if os.path.isfile(ruta_en_disco):
+                    os.remove(ruta_en_disco)
+            except OSError:
+                pass
+
+        return "", 204
+
+
+class QrCapturaFinalizar_Resource(Resource):
+    """POST /api/archivos/captura/<token>/finalizar  (el celular, sin JWT)."""
+
+    def post(self, token):
+        sesion = captura_qr.validar_token(token)
+        if not sesion:
+            return {"error": "Código QR inválido o expirado"}, 410
+
+        captura_qr.cerrar_sesion(sesion)
+        return {"fotos_count": len(sesion["fotos"])}, 200
+
+
 api.add_resource(ArchivoDescarga_Resource, "/<int:archivo_id>/descarga")
 api.add_resource(ArchivoUpload_Resource, "/")
 api.add_resource(Archivo_Resource, "/<int:archivo_id>")
 api.add_resource(ArchivosPorExamen_Resource, "/examen/<int:examen_id>")
 api.add_resource(ArchivosPorPaciente_Resource, "/<int:paciente_id>/archivos")
+api.add_resource(QrCapturaIniciar_Resource, "/examen/<int:examen_id>/qr-captura")
+api.add_resource(QrCapturaEstado_Resource, "/examen/<int:examen_id>/qr-captura/<string:sid>/estado")
+api.add_resource(QrCapturaInfo_Resource, "/captura/<string:token>/info")
+api.add_resource(QrCapturaFoto_Resource, "/captura/<string:token>/foto", "/captura/<string:token>/foto/<int:archivo_id>")
+api.add_resource(QrCapturaFinalizar_Resource, "/captura/<string:token>/finalizar")

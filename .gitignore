@@ -12,6 +12,9 @@ backend/.env
 .env
 app/config/
 
+# Certificados locales de mkcert (HTTPS para probar la cámara en LAN)
+*.pem
+
 # Migraciones generadas
 backend/migrations/
 migrations/

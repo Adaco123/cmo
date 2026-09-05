@@ -30,6 +30,7 @@ export async function subirArchivoExamen(
   formData.append('examen_complementario_id', String(examenComplementarioId));
 
   const { data } = await api.post<ArchivoResponse>('/api/archivos', formData, {
+
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return data;
@@ -61,6 +62,7 @@ export async function descargarArchivoBlob(archivoId: number): Promise<Blob> {
   });
   return data;
 }
+
 
 /**
  * Descarga el archivo y dispara la descarga en el navegador (con su
@@ -94,6 +96,7 @@ export async function subirArchivoPaciente(
   pacienteId: number,
   archivo: File,
   tipoArchivoId: number,
+
 ): Promise<ArchivoResponse> {
   const formData = new FormData();
   formData.append('archivo', archivo);
@@ -103,5 +106,76 @@ export async function subirArchivoPaciente(
   const { data } = await api.post<ArchivoResponse>('/api/archivos', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+  return data;
+}
+
+/* ============================================================
+   Captura de fotografías por QR desde el celular
+   ============================================================ */
+
+export interface CapturaQrIniciada {
+  token: string;
+  sid: string;
+  expira_en_segundos: number;
+}
+
+/** Llamado desde la PC al pulsar "Agregar fotografías". Requiere sesión (JWT). */
+export async function iniciarCapturaQr(examenComplementarioId: number): Promise<CapturaQrIniciada> {
+  const { data } = await api.post<CapturaQrIniciada>(`/api/archivos/examen/${examenComplementarioId}/qr-captura`);
+  return data;
+}
+
+export interface CapturaQrEstado {
+  conectado: boolean;
+  fotos_count: number;
+  cerrada: boolean;
+
+}
+
+/** Polling desde la PC mientras el modal del QR está abierto. Requiere sesión (JWT). */
+export async function getEstadoCapturaQr(examenComplementarioId: number, sid: string): Promise<CapturaQrEstado> {
+  const { data } = await api.get<CapturaQrEstado>(
+    `/api/archivos/examen/${examenComplementarioId}/qr-captura/${sid}/estado`,
+  );
+  return data;
+}
+
+export interface CapturaQrInfo {
+  nombre_examen: string;
+  paciente_nombre: string;
+  fotos_count: number;
+}
+
+/**
+ * Las siguientes 4 funciones las usa la página pública del celular
+ * (/capturar-fotos/:token). SIN JWT a propósito: el celular no tiene
+ * sesión iniciada en el sistema, el propio token (firmado y con
+ * expiración) es lo que autoriza estas llamadas.
+ */
+export async function getInfoCapturaQr(token: string): Promise<CapturaQrInfo> {
+  const { data } = await api.get<CapturaQrInfo>(`/api/archivos/captura/${token}/info`);
+  return data;
+}
+
+export interface FotoCapturadaResponse extends ArchivoResponse {
+  fotos_count: number;
+}
+
+export async function subirFotoCapturaQr(token: string, foto: File): Promise<FotoCapturadaResponse> {
+
+  const formData = new FormData();
+  formData.append('archivo', foto);
+  const { data } = await api.post<FotoCapturadaResponse>(`/api/archivos/captura/${token}/foto`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
+export async function eliminarFotoCapturaQr(token: string, archivoId: number): Promise<void> {
+  await api.delete(`/api/archivos/captura/${token}/foto/${archivoId}`);
+}
+
+export async function finalizarCapturaQr(token: string): Promise<{ fotos_count: number }> {
+  const { data } = await api.post<{ fotos_count: number }>(`/api/archivos/captura/${token}/finalizar`);
   return data;
 }

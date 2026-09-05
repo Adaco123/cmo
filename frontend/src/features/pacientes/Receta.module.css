@@ -379,8 +379,9 @@
   top: 79%;
   left: 15.4%;
   display: flex;
-  gap: 58%;
-  font-family: var(--sans, Arial, sans-serif);
+  gap: 45%;
+  color: black;
+  font-family: 'Harlow Solid Italic', cursive;
   font-size: 1.4cqw;
   text-align: center;
 }
@@ -407,14 +408,13 @@
    medicamentos escalen igual de chico en la vista previa del drawer
    que en la hoja impresa a tamaño real, y no se corten en pantalla. */
 .cmo-rp-med-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.05em; gap: 3cqw; font-size: var(--cmo-fs-medicamento); }
-.cmo-rp-med-col-left { display: flex; flex-direction: column; gap: 0.02em; flex: 0 0 42%; min-width: 0; }
-.cmo-rp-med-name-line { display: flex; align-items: baseline; gap: 0.5em; }
-.cmo-rp-num { font-weight: 700; color: var(--status-inactive, #C1443F); font-size: 0.95em; flex-shrink: 0; }
-.cmo-rp-med-name { font-weight: 600; color: #16233A; }
-.cmo-rp-med-cantidad { font-size: 0.72em; color: #555; margin-left: 0; margin-top: -0.05em; font-family: var(--sans, Arial, sans-serif); }
+.cmo-rp-med-col-left { display: grid; grid-template-columns: auto 1fr; align-items: baseline; column-gap: 0.5em; row-gap: 0.02em; flex: 0 0 42%; min-width: 0; }
+.cmo-rp-num { grid-column: 1; grid-row: 1; font-weight: 700; color: var(--status-inactive, #C1443F); font-size: 0.95em; }
+.cmo-rp-med-name { grid-column: 2; grid-row: 1; font-weight: 600; color: #16233A; }
+.cmo-rp-med-cantidad { grid-column: 2; grid-row: 2; font-size: 0.72em; color: #555; margin-top: -0.05em; font-family: var(--sans, Arial, sans-serif); }
 .cmo-rp-med-col-right { flex: 0 0 50%; text-align: left; padding-left: 2cqw; }
 .cmo-rp-instrucciones { font-size: 0.9em; color: #333; font-weight: 500; line-height: 1.4; }
-.cmo-rp-med-indicaciones { font-size: 0.85em; color: #333; font-style: italic; line-height: 1.4; }
+.cmo-rp-med-indicaciones { font-size: 1em; color: #333; font-style: italic; line-height: 1.4; }
 .cmo-rp-horario { font-size: 0.82em; color: #555; margin-top: 0em; font-family: var(--sans, Arial, sans-serif); }
 
 /* ---------- exámenes: tamaño de letra independiente (--cmo-fs-examen) ---------- */

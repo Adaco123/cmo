@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getRegistroClinicoCompleto } from '../../api/historialClinico';
 import type { RegistroClinicoCompletoDetalle } from '../../api/historialClinico';
 import type { Receta } from '../../api/recetas';
@@ -10,9 +11,10 @@ import {
   faSpinner, faExclamationCircle, faFlaskVial, faPills,
   faCalendarCheck, faDownload, faXmark, faExpand, faWaveSquare,
   faNotesMedical, faTriangleExclamation, faStethoscope, faPen,
-  faCapsules,
+  faCapsules, faCamera,
 } from '@fortawesome/free-solid-svg-icons';
 import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
+import CapturaQrModal from './CapturaQrModal';
 import styles from './RegistroClinicoDetalle.module.css';
 
 interface Props {
@@ -117,6 +119,7 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
   const [galeria, setGaleria] = useState<GaleriaPorExamen>({});
   const [imagenActiva, setImagenActiva] = useState<ImagenActiva | null>(null);
   const [visorIndex, setVisorIndex] = useState<Record<number, number>>({});
+  const [qrModalExamenId, setQrModalExamenId] = useState<number | null>(null);
 
   const nombrePacienteCompleto = paciente ? `${paciente.nombres} ${paciente.apellidos}`.trim() : '';
 
@@ -332,6 +335,21 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
     setVisorIndex((prev) => ({ ...prev, [examenId]: idx }));
   };
 
+  /** Refresca solo la galería de un examen (llamado cuando llegan fotos nuevas por QR). */
+  const recargarGaleriaDeExamen = async (examenId: number) => {
+    const archivos = await getArchivosPorExamen(examenId);
+    const conUrl = await Promise.all(
+      archivos.map(async (archivo) => {
+        const blob = await descargarArchivoBlob(archivo.id);
+        return { archivo, url: URL.createObjectURL(blob) };
+      }),
+    );
+    setGaleria((prev) => {
+      (prev[examenId] || []).forEach(({ url }) => URL.revokeObjectURL(url));
+      return { ...prev, [examenId]: conUrl };
+    });
+  };
+
   return (
     <div className={styles.container}>
       <div className={styles.hud}>
@@ -454,10 +472,19 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
             return (
               <div key={examen.id} className={styles.examCard}>
                 <div className={styles.examHead}>
-                  <span className={styles.examNombre}>{examen.nombre_examen}</span>
-                  {examen.categoria?.nombre && (
-                    <span className={styles.examCategoria}>{examen.categoria.nombre}</span>
-                  )}
+                  <div className={styles.examHeadInfo}>
+                    <span className={styles.examNombre}>{examen.nombre_examen}</span>
+                    {examen.categoria?.nombre && (
+                      <span className={styles.examCategoria}>{examen.categoria.nombre}</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.btnAgregarFotos}
+                    onClick={() => setQrModalExamenId(examen.id)}
+                  >
+                    <FontAwesomeIcon icon={faCamera} /> Agregar fotografías
+                  </button>
                 </div>
                 {examen.resultado && <p className={styles.examResultado}>{examen.resultado}</p>}
                 {examen.observaciones && <p className={styles.examObs}>{examen.observaciones}</p>}
@@ -549,40 +576,65 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
         </section>
       </div>
 
-      {/* ---- Lightbox: la imagen del examen a pantalla completa ---- */}
-      {imagenActiva && (
-        <div
-          className={styles.lightboxOverlay}
-          onClick={() => setImagenActiva(null)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <button
-            type="button"
-            className={styles.lightboxClose}
+      {/* ---- Lightbox: la imagen del examen a pantalla completa ----
+         Portal a <body>: si se renderiza en su lugar normal, queda anidado
+         dentro del drawer de VerPaciente.tsx (.backdrop con backdrop-filter +
+         .backdropContentWide con overflow:auto), y esos dos combinados hacen
+         que "position: fixed" deje de tomar el viewport real como referencia
+         y el lightbox aparezca recortado/pegado arriba en vez de a pantalla
+         completa. Sacándolo a <body> con un portal, igual que ya hace
+         Receta.tsx con su área de impresión, se evita el problema de raíz. */}
+      {imagenActiva &&
+        createPortal(
+          <div
+            className={styles.lightboxOverlay}
             onClick={() => setImagenActiva(null)}
-            aria-label="Cerrar"
+            role="dialog"
+            aria-modal="true"
           >
-            <FontAwesomeIcon icon={faXmark} />
-          </button>
-          <img
-            src={imagenActiva.url}
-            alt={imagenActiva.archivo.nombre_archivo}
-            className={styles.lightboxImg}
-            onClick={(e) => e.stopPropagation()}
-          />
-          <div className={styles.lightboxCaption} onClick={(e) => e.stopPropagation()}>
-            <span>{imagenActiva.examenNombre}</span>
-            <a
-              href={imagenActiva.url}
-              download={imagenActiva.archivo.nombre_archivo}
-              className={styles.lightboxDownload}
+            <button
+              type="button"
+              className={styles.lightboxClose}
+              onClick={() => setImagenActiva(null)}
+              aria-label="Cerrar"
             >
-              <FontAwesomeIcon icon={faDownload} /> Descargar
-            </a>
-          </div>
-        </div>
-      )}
+              <FontAwesomeIcon icon={faXmark} />
+            </button>
+            <img
+              src={imagenActiva.url}
+              alt={imagenActiva.archivo.nombre_archivo}
+              className={styles.lightboxImg}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div className={styles.lightboxCaption} onClick={(e) => e.stopPropagation()}>
+              <span>{imagenActiva.examenNombre}</span>
+              <a
+                href={imagenActiva.url}
+                download={imagenActiva.archivo.nombre_archivo}
+                className={styles.lightboxDownload}
+              >
+                <FontAwesomeIcon icon={faDownload} /> Descargar
+              </a>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Mismo motivo que el lightbox de arriba: portal a <body> para que el
+         modal del QR quede realmente por encima de todo, y no atrapado
+         dentro del drawer. */}
+      {qrModalExamenId !== null &&
+        createPortal(
+          <CapturaQrModal
+            examenComplementarioId={qrModalExamenId}
+            examenNombre={
+              examenes_complementarios.find((e) => e.id === qrModalExamenId)?.nombre_examen || ''
+            }
+            onClose={() => setQrModalExamenId(null)}
+            onFotosActualizadas={() => recargarGaleriaDeExamen(qrModalExamenId)}
+          />,
+          document.body,
+        )}
     </div>
   );
 };
