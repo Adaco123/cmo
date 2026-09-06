@@ -125,9 +125,20 @@ export async function iniciarCapturaQr(examenComplementarioId: number): Promise<
   return data;
 }
 
+/** Igual que iniciarCapturaQr, pero para una sesión TRANSITORIA de captura
+ * en contexto de un paciente (ej. desde Examenes.tsx, cuando el examen
+ * todavía no existe): las fotos no quedan ligadas al paciente en BD, solo
+ * se suben para que la PC las descargue y las reubique donde corresponda. */
+export async function iniciarCapturaQrPaciente(pacienteId: number): Promise<CapturaQrIniciada> {
+  const { data } = await api.post<CapturaQrIniciada>(`/api/archivos/paciente/${pacienteId}/qr-captura`);
+  return data;
+}
+
 export interface CapturaQrEstado {
   conectado: boolean;
   fotos_count: number;
+  /** Ids de los Archivo subidos en esta sesión hasta ahora (en orden de llegada). */
+  archivo_ids: number[];
   cerrada: boolean;
 
 }
@@ -138,6 +149,25 @@ export async function getEstadoCapturaQr(examenComplementarioId: number, sid: st
     `/api/archivos/examen/${examenComplementarioId}/qr-captura/${sid}/estado`,
   );
   return data;
+}
+
+/** Igual que getEstadoCapturaQr, pero para una sesión transitoria en
+ * contexto de un paciente (ver iniciarCapturaQrPaciente). */
+export async function getEstadoCapturaQrPaciente(pacienteId: number, sid: string): Promise<CapturaQrEstado> {
+  const { data } = await api.get<CapturaQrEstado>(
+    `/api/archivos/paciente/${pacienteId}/qr-captura/${sid}/estado`,
+  );
+  return data;
+}
+
+/**
+ * Descarta una sesión de captura ya iniciada: borra (fila + archivo físico)
+ * todas las fotos que no se hayan usado todavía. Pensado para cuando se
+ * cierra el modal de QR o se cancela un registro clínico sin guardar y
+ * esas fotos se quedarían huérfanas. Requiere sesión (JWT). Idempotente.
+ */
+export async function descartarSesionCaptura(sid: string): Promise<void> {
+  await api.delete(`/api/archivos/captura-sesion/${sid}`);
 }
 
 export interface CapturaQrInfo {

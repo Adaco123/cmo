@@ -20,7 +20,9 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 QR_CAPTURA_EXPIRA_SEGUNDOS = 600  # 10 minutos para escanear y usar el QR
 
-# sid -> {examen_id, usuario_id, creado_en, conectado, fotos, cerrada}
+# sid -> {destino_campo, destino_id, usuario_id, creado_en, conectado, fotos, cerrada}
+# destino_campo es el mismo nombre de columna que usa DESTINOS_VALIDOS en
+# ArchivoUpload_Resource ("examen_complementario_id" o "paciente_id").
 _SESIONES = {}
 
 
@@ -35,19 +37,34 @@ def _limpiar_expiradas():
         _SESIONES.pop(sid, None)
 
 
-def crear_sesion(examen_id, usuario_id):
-    """Crea una sesión de captura nueva. Devuelve (token, sid)."""
+def crear_sesion(destino_campo, destino_id, usuario_id, contexto_paciente_id=None):
+    """Crea una sesión de captura nueva.
+
+    destino_campo/destino_id: a qué Archivo real se liga la foto en cuanto
+    se sube ("examen_complementario_id" o "paciente_id"). Puede ir en
+    (None, None) para una sesión TRANSITORIA: la foto sube sin ningún FK,
+    solo para que la PC la descargue y la reubique donde corresponda
+    (ej. como File[] pendiente de un examen que ni siquiera existe todavía).
+
+    contexto_paciente_id: solo informativo, para mostrar el nombre del
+    paciente en la pantalla del celular cuando destino_campo es None (no
+    se usa para ligar el Archivo).
+
+    Devuelve (token, sid).
+    """
     _limpiar_expiradas()
     sid = uuid.uuid4().hex
     _SESIONES[sid] = {
-        "examen_id": examen_id,
+        "destino_campo": destino_campo,
+        "destino_id": destino_id,
+        "contexto_paciente_id": contexto_paciente_id,
         "usuario_id": usuario_id,
         "creado_en": time.time(),
         "conectado": False,
         "fotos": [],
         "cerrada": False,
     }
-    token = _serializer().dumps({"sid": sid, "examen_id": examen_id})
+    token = _serializer().dumps({"sid": sid, "destino_campo": destino_campo, "destino_id": destino_id})
     return token, sid
 
 
@@ -66,7 +83,12 @@ def validar_token(token):
         return None
 
     sesion = _SESIONES.get(data.get("sid"))
-    if not sesion or sesion["cerrada"] or sesion["examen_id"] != data.get("examen_id"):
+    if (
+        not sesion
+        or sesion["cerrada"]
+        or sesion["destino_campo"] != data.get("destino_campo")
+        or sesion["destino_id"] != data.get("destino_id")
+    ):
         return None
     return sesion
 
@@ -88,3 +110,10 @@ def quitar_foto(sesion, archivo_id):
 
 def cerrar_sesion(sesion):
     sesion["cerrada"] = True
+
+
+def eliminar_sesion(sid):
+    """Descarta por completo una sesión (ej. al cancelar el registro
+    clínico sin guardar). Quien llame a esto es responsable de borrar
+    antes los Archivo listados en sesion["fotos"]."""
+    _SESIONES.pop(sid, None)

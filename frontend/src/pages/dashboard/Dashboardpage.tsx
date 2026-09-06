@@ -19,7 +19,7 @@ import InicioTab from './tabs/Iniciotab';
 import NuevaAtencionTab from './tabs/Nuevaatenciontab';
 import MisPacientesTab from './tabs/Mispacientestab';
 import PacientesExternosTab from './tabs/Pacientesexternostab';
-import ModelosTab from './tabs/Modelostab';
+import SeguimientoControlTab from './tabs/Seguimientocontroltab';
 import ReportesTab from './tabs/Reportestab';
 import './Dashboardpage.css';
 import '../../components/CrearCita.module.css';
@@ -137,7 +137,12 @@ const DashboardPage: React.FC = () => {
           onCambiarEstado={handleCambiarEstado}
         />
 
-        <ModelosTab active={activeTab === 'modelos'} searchValue="" />
+        <SeguimientoControlTab
+          active={activeTab === 'seguimiento_control'}
+          pacientes={pacientes}
+          searchValue=""
+          onVer={(p) => setSelectedPaciente(p)}
+        />
 
         <ReportesTab active={activeTab === 'reportes'} />
       </DashboardLayout>

@@ -2,24 +2,47 @@ import React, { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faXmark, faMobileScreenButton, faCircleCheck, faSpinner } from '@fortawesome/free-solid-svg-icons';
-import { iniciarCapturaQr, getEstadoCapturaQr } from '../../api/archivos';
+import {
+  iniciarCapturaQr,
+  getEstadoCapturaQr,
+  iniciarCapturaQrPaciente,
+  getEstadoCapturaQrPaciente,
+} from '../../api/archivos';
 import { useErrorToast } from '../../components/ErrorToastProvider';
 import styles from './CapturaQrModal.module.css';
 
+export interface CapturaQrDestino {
+  tipo: 'examen' | 'paciente';
+  id: number;
+}
+
 interface Props {
-  examenComplementarioId: number;
+  destino: CapturaQrDestino;
+  /** Título/subtítulo del modal (nombre del examen, o del paciente si aún no hay examen). */
   examenNombre: string;
   onClose: () => void;
-  /** Se llama cada vez que se detecta una foto nueva, para refrescar la galería. */
-  onFotosActualizadas: () => void;
+  /** Se llama cada vez que se detecta una foto nueva, para refrescar la galería.
+   * Opcional: no hace falta si quien usa el modal ya reacciona por foto vía onFotoNueva. */
+  onFotosActualizadas?: () => void;
+  /** Se llama en cuanto se genera el sid, para que el padre pueda acumularlo
+   * (ej. Examenes.tsx, que necesita descartar la sesión si se cancela el registro). */
+  onSesionIniciada?: (sid: string) => void;
+  /** Se llama una vez por cada archivo_id nuevo detectado en el polling, en
+   * orden de llegada. Pensado para sesiones transitorias (destino paciente
+   * desde Examenes.tsx): quien use el modal descarga esa foto y la reubica
+   * (ej. como File[] pendiente de un examen), y borra la copia del servidor. */
+  onFotoNueva?: (archivoId: number) => void;
 }
 
 const INTERVALO_POLLING_MS = 3000;
 
-const CapturaQrModal: React.FC<Props> = ({ examenComplementarioId, examenNombre, onClose, onFotosActualizadas }) => {
+const CapturaQrModal: React.FC<Props> = ({ destino, examenNombre, onClose, onFotosActualizadas, onSesionIniciada, onFotoNueva }) => {
   const { showErrorFrom } = useErrorToast();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fotosPreviasRef = useRef(0);
+  // Ids de archivo ya notificados vía onFotoNueva, para no repetirlos en
+  // pollings sucesivos (el endpoint de estado devuelve la lista completa).
+  const archivoIdsVistosRef = useRef<Set<number>>(new Set());
 
   const [sid, setSid] = useState<string | null>(null);
   const [url, setUrl] = useState<string | null>(null);
@@ -35,11 +58,14 @@ const CapturaQrModal: React.FC<Props> = ({ examenComplementarioId, examenNombre,
 
     (async () => {
       try {
-        const data = await iniciarCapturaQr(examenComplementarioId);
+        const data = destino.tipo === 'examen'
+          ? await iniciarCapturaQr(destino.id)
+          : await iniciarCapturaQrPaciente(destino.id);
         if (cancelado) return;
         setSid(data.sid);
         setSegundosRestantes(data.expira_en_segundos);
         setUrl(`${window.location.origin}/capturar-fotos/${data.token}`);
+        onSesionIniciada?.(data.sid);
       } catch (err) {
         showErrorFrom(err, 'No se pudo generar el código QR.');
         onClose();
@@ -52,7 +78,7 @@ const CapturaQrModal: React.FC<Props> = ({ examenComplementarioId, examenNombre,
       cancelado = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [examenComplementarioId]);
+  }, [destino.tipo, destino.id]);
 
   // ---- Dibujar el QR una vez que tenemos la URL ----
   useEffect(() => {
@@ -77,13 +103,21 @@ const CapturaQrModal: React.FC<Props> = ({ examenComplementarioId, examenNombre,
 
     const consultar = async () => {
       try {
-        const estado = await getEstadoCapturaQr(examenComplementarioId, sid);
+        const estado = destino.tipo === 'examen'
+          ? await getEstadoCapturaQr(destino.id, sid)
+          : await getEstadoCapturaQrPaciente(destino.id, sid);
         setConectado(estado.conectado);
         setFotosCount(estado.fotos_count);
         setCerrada(estado.cerrada);
         if (estado.fotos_count > fotosPreviasRef.current) {
           fotosPreviasRef.current = estado.fotos_count;
-          onFotosActualizadas();
+          onFotosActualizadas?.();
+        }
+        for (const archivoId of estado.archivo_ids) {
+          if (!archivoIdsVistosRef.current.has(archivoId)) {
+            archivoIdsVistosRef.current.add(archivoId);
+            onFotoNueva?.(archivoId);
+          }
         }
       } catch {
         // Un error puntual de polling no debe tumbar el modal; se reintenta solo.

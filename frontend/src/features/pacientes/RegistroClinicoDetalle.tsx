@@ -626,7 +626,7 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
       {qrModalExamenId !== null &&
         createPortal(
           <CapturaQrModal
-            examenComplementarioId={qrModalExamenId}
+            destino={{ tipo: 'examen', id: qrModalExamenId }}
             examenNombre={
               examenes_complementarios.find((e) => e.id === qrModalExamenId)?.nombre_examen || ''
             }

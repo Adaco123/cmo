@@ -162,8 +162,12 @@ const CapturarFotos: React.FC = () => {
       <div className={styles.header}>
         <span className={styles.headerLabel}>Paciente</span>
         <span className={styles.headerValor}>{pacienteNombre}</span>
-        <span className={styles.headerLabel}>Examen</span>
-        <span className={styles.headerValor}>{nombreExamen}</span>
+        {nombreExamen && (
+          <>
+            <span className={styles.headerLabel}>Examen</span>
+            <span className={styles.headerValor}>{nombreExamen}</span>
+          </>
+        )}
       </div>
 
       {errorCamara && (

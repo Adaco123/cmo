@@ -635,6 +635,20 @@ body {
   background: rgba(132, 167, 190, 0.2); color: var(--text-muted); border: 1px solid var(--border-color);
 }
 
+/* ── Badge tipo (agenda combinada: Citas + Seguimiento y Control) ── */
+.badge-tipo {
+  display: inline-block; padding: 4px 14px; border-radius: 20px;
+  font-size: 0.75rem; font-weight: 700; white-space: nowrap;
+}
+
+.badge-tipo.cita {
+  background: rgba(20, 184, 166, 0.16); color: var(--primary-dark); border: 1px solid rgba(20, 184, 166, 0.35);
+}
+
+.badge-tipo.seguimiento {
+  background: rgba(168, 85, 247, 0.16); color: #7e22ce; border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
 /* ── Reports Grid ── */
 .report-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 24px; margin-bottom: 32px;
@@ -1116,4 +1130,4 @@ body {
 .icon-action-btn-inactive:hover {
   background: rgba(193, 68, 63, 0.12);
   border-color: var(--status-inactive);
-}
+} 

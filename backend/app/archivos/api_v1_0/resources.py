@@ -231,21 +231,60 @@ def _paciente_de_examen(examen):
     return Paciente.get_by_id(historia.paciente_id) if historia else None
 
 
+def _iniciar_captura_sesion(destino_campo, destino_id):
+    """Helper compartido por las rutas de iniciar captura (examen y
+    paciente). Devuelve el dict de respuesta, o None si destino_id no existe."""
+    Modelo = DESTINOS_VALIDOS[destino_campo]
+    if not Modelo.get_by_id(destino_id):
+        return None
+
+    usuario_id = get_jwt_identity()
+    token, sid = captura_qr.crear_sesion(destino_campo, destino_id, usuario_id)
+    return {
+        "token": token,
+        "sid": sid,
+        "expira_en_segundos": captura_qr.QR_CAPTURA_EXPIRA_SEGUNDOS,
+    }
+
+
+def _iniciar_captura_temporal(paciente_id):
+    """Helper para sesiones TRANSITORIAS (sin destino real): las fotos que
+    lleguen no quedan ligadas a nada en BD, solo se guardan para que la PC
+    las descargue y las reubique donde corresponda (ej. Examenes.tsx, que
+    las mete como File[] pendiente de un examen que todavía no existe).
+    paciente_id solo se usa para validar que existe y mostrar su nombre
+    en la pantalla del celular. Devuelve el dict de respuesta, o None si
+    paciente_id no existe."""
+    if not Paciente.get_by_id(paciente_id):
+        return None
+
+    usuario_id = get_jwt_identity()
+    token, sid = captura_qr.crear_sesion(None, None, usuario_id, contexto_paciente_id=paciente_id)
+    return {
+        "token": token,
+        "sid": sid,
+        "expira_en_segundos": captura_qr.QR_CAPTURA_EXPIRA_SEGUNDOS,
+    }
+
+
+def _estado_sesion(sesion):
+    return {
+        "conectado": sesion["conectado"],
+        "fotos_count": len(sesion["fotos"]),
+        "archivo_ids": list(sesion["fotos"]),
+        "cerrada": sesion["cerrada"],
+    }
+
+
 class QrCapturaIniciar_Resource(Resource):
     """POST /api/archivos/examen/<int:examen_id>/qr-captura  (la PC, con JWT)."""
 
     @jwt_required()
     def post(self, examen_id):
-        if not ExamenComplementario.get_by_id(examen_id):
+        resultado = _iniciar_captura_sesion("examen_complementario_id", examen_id)
+        if resultado is None:
             return {"error": "Examen complementario no encontrado"}, 404
-
-        usuario_id = get_jwt_identity()
-        token, sid = captura_qr.crear_sesion(examen_id, usuario_id)
-        return {
-            "token": token,
-            "sid": sid,
-            "expira_en_segundos": captura_qr.QR_CAPTURA_EXPIRA_SEGUNDOS,
-        }, 201
+        return resultado, 201
 
 
 class QrCapturaEstado_Resource(Resource):
@@ -254,14 +293,37 @@ class QrCapturaEstado_Resource(Resource):
     @jwt_required()
     def get(self, examen_id, sid):
         sesion = captura_qr.obtener_sesion_por_sid(sid)
-        if not sesion or sesion["examen_id"] != examen_id:
+        if not sesion or sesion["destino_campo"] != "examen_complementario_id" or sesion["destino_id"] != examen_id:
             return {"error": "Sesión de captura no encontrada o vencida"}, 404
 
-        return {
-            "conectado": sesion["conectado"],
-            "fotos_count": len(sesion["fotos"]),
-            "cerrada": sesion["cerrada"],
-        }, 200
+        return _estado_sesion(sesion), 200
+
+
+class QrCapturaPacienteIniciar_Resource(Resource):
+    """POST /api/archivos/paciente/<int:paciente_id>/qr-captura  (la PC, con JWT).
+
+    Sesión TRANSITORIA (ver _iniciar_captura_temporal): las fotos no quedan
+    ligadas al paciente en BD.
+    """
+
+    @jwt_required()
+    def post(self, paciente_id):
+        resultado = _iniciar_captura_temporal(paciente_id)
+        if resultado is None:
+            return {"error": "Paciente no encontrado"}, 404
+        return resultado, 201
+
+
+class QrCapturaPacienteEstado_Resource(Resource):
+    """GET /api/archivos/paciente/<int:paciente_id>/qr-captura/<sid>/estado  (la PC, con JWT, polling)."""
+
+    @jwt_required()
+    def get(self, paciente_id, sid):
+        sesion = captura_qr.obtener_sesion_por_sid(sid)
+        if not sesion or sesion.get("contexto_paciente_id") != paciente_id:
+            return {"error": "Sesión de captura no encontrada o vencida"}, 404
+
+        return _estado_sesion(sesion), 200
 
 
 class QrCapturaInfo_Resource(Resource):
@@ -274,11 +336,20 @@ class QrCapturaInfo_Resource(Resource):
 
         captura_qr.marcar_conectado(sesion)
 
-        examen = ExamenComplementario.get_by_id(sesion["examen_id"])
-        paciente = _paciente_de_examen(examen)
+        nombre_examen = ""
+        paciente = None
+        if sesion["destino_campo"] == "examen_complementario_id":
+            examen = ExamenComplementario.get_by_id(sesion["destino_id"])
+            if examen:
+                nombre_examen = examen.nombre_examen
+                paciente = _paciente_de_examen(examen)
+        elif sesion.get("contexto_paciente_id"):
+            # Sesión transitoria: no hay examen todavía, solo mostramos a
+            # qué paciente pertenece esta captura.
+            paciente = Paciente.get_by_id(sesion["contexto_paciente_id"])
 
         return {
-            "nombre_examen": examen.nombre_examen,
+            "nombre_examen": nombre_examen,
             "paciente_nombre": f"{paciente.nombres} {paciente.apellidos}" if paciente else "",
             "fotos_count": len(sesion["fotos"]),
         }, 200
@@ -309,11 +380,15 @@ class QrCapturaFoto_Resource(Resource):
         except ValueError as err:
             return {"error": str(err)}, 400
 
+        kwargs_destino = {}
+        if sesion["destino_campo"] is not None:
+            kwargs_destino[sesion["destino_campo"]] = sesion["destino_id"]
+
         archivo = Archivo(
             tipo_archivo_id=TIPO_ARCHIVO_ID_FOTO,
             subido_por_usuario_id=sesion["usuario_id"],
-            examen_complementario_id=sesion["examen_id"],
             **datos_archivo,
+            **kwargs_destino,
         )
         db.session.add(archivo)
         db.session.commit()
@@ -355,6 +430,41 @@ class QrCapturaFinalizar_Resource(Resource):
         return {"fotos_count": len(sesion["fotos"])}, 200
 
 
+class QrCapturaSesionDescartar_Resource(Resource):
+    """
+    DELETE /api/archivos/captura-sesion/<sid>  (la PC, con JWT)
+
+    Se usa para descartar fotos de una sesión de captura que no llegaron
+    a usarse: sesiones transitorias (Examenes.tsx, sin ningún destino en
+    BD) cuya foto nunca se llegó a reubicar como File[] pendiente, o
+    sesiones ligadas a un examen/paciente cuando se cancela TODO el
+    registro clínico sin guardar. Borra fila + archivo físico de cada
+    foto tomada en esa sesión, para que no queden huérfanas.
+    Idempotente: si la sesión ya no existe (expiró o ya se descartó),
+    no hace nada y responde 204 igual.
+    """
+
+    @jwt_required()
+    def delete(self, sid):
+        sesion = captura_qr.obtener_sesion_por_sid(sid)
+        if not sesion:
+            return "", 204
+
+        for archivo_id in list(sesion["fotos"]):
+            archivo = Archivo.get_by_id(archivo_id)
+            if archivo:
+                ruta_en_disco = os.path.join(BASE_UPLOAD_DIR, archivo.ruta_almacenamiento)
+                archivo.delete()
+                try:
+                    if os.path.isfile(ruta_en_disco):
+                        os.remove(ruta_en_disco)
+                except OSError:
+                    pass
+
+        captura_qr.eliminar_sesion(sid)
+        return "", 204
+
+
 api.add_resource(ArchivoDescarga_Resource, "/<int:archivo_id>/descarga")
 api.add_resource(ArchivoUpload_Resource, "/")
 api.add_resource(Archivo_Resource, "/<int:archivo_id>")
@@ -362,6 +472,9 @@ api.add_resource(ArchivosPorExamen_Resource, "/examen/<int:examen_id>")
 api.add_resource(ArchivosPorPaciente_Resource, "/<int:paciente_id>/archivos")
 api.add_resource(QrCapturaIniciar_Resource, "/examen/<int:examen_id>/qr-captura")
 api.add_resource(QrCapturaEstado_Resource, "/examen/<int:examen_id>/qr-captura/<string:sid>/estado")
+api.add_resource(QrCapturaPacienteIniciar_Resource, "/paciente/<int:paciente_id>/qr-captura")
+api.add_resource(QrCapturaPacienteEstado_Resource, "/paciente/<int:paciente_id>/qr-captura/<string:sid>/estado")
 api.add_resource(QrCapturaInfo_Resource, "/captura/<string:token>/info")
 api.add_resource(QrCapturaFoto_Resource, "/captura/<string:token>/foto", "/captura/<string:token>/foto/<int:archivo_id>")
 api.add_resource(QrCapturaFinalizar_Resource, "/captura/<string:token>/finalizar")
+api.add_resource(QrCapturaSesionDescartar_Resource, "/captura-sesion/<string:sid>")

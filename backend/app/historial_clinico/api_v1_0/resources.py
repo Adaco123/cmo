@@ -802,6 +802,82 @@ class SeguimientoControl_Resource(Resource):
             "recetas": receta_schema.dump(recetas_creadas, many=True),
         }, 201
 
+
+class SeguimientoControlEditar_Resource(Resource):
+    """
+    PUT /api/historial_clinico/seguimientos/<int:seguimiento_id>
+
+    Edita un seguimiento de control ya creado: evolución, próxima fecha
+    de control y horario. No permite reasignar registro_clinico_id ni
+    medico_id (si el médico se equivocó de registro, se cancela y se crea
+    uno nuevo — no está en el alcance de este endpoint).
+    Acepta actualización parcial: un campo ausente en el body conserva su
+    valor actual.
+    """
+
+    @jwt_required()
+    def put(self, seguimiento_id):
+        seguimiento = SeguimientoControl.get_by_id(seguimiento_id)
+        if not seguimiento:
+            return {"error": "Seguimiento de control no encontrado"}, 404
+
+        body = request.get_json(force=True) or {}
+
+        if "evolucion" in body:
+            evolucion = (body.get("evolucion") or "").strip()
+            if not evolucion:
+                return {"evolucion": ["Requerido"]}, 400
+        else:
+            evolucion = seguimiento.evolucion
+
+        try:
+            if "proxima_fecha_control" in body:
+                proxima_fecha_control = _parse_fecha(body.get("proxima_fecha_control"))
+            else:
+                proxima_fecha_control = seguimiento.proxima_fecha_control
+        except ValueError as err:
+            return {"proxima_fecha_control": [str(err)]}, 400
+
+        try:
+            hora_inicio = (
+                _parse_hora(body.get("hora_inicio"), "hora_inicio")
+                if "hora_inicio" in body else seguimiento.hora_inicio
+            )
+            hora_fin = (
+                _parse_hora(body.get("hora_fin"), "hora_fin")
+                if "hora_fin" in body else seguimiento.hora_fin
+            )
+        except ValueError as err:
+            return {"hora": [str(err)]}, 400
+
+        try:
+            _validar_orden_horario(hora_inicio, hora_fin)
+        except ValueError as err:
+            return {"hora_fin": [str(err)]}, 400
+
+        if proxima_fecha_control and hora_inicio and hora_fin:
+            if existe_choque_con_cita(seguimiento.medico_id, proxima_fecha_control, hora_inicio, hora_fin):
+                return {"error": "Ya existe una cita registrada con ese médico a esa misma hora"}, 409
+
+            if existe_choque_con_seguimiento(
+                seguimiento.medico_id, proxima_fecha_control, hora_inicio, hora_fin, excluir_id=seguimiento.id
+            ):
+                return {"error": "Ya existe otro control de seguimiento agendado con ese médico a esa misma hora"}, 409
+
+        seguimiento.evolucion = evolucion
+        seguimiento.proxima_fecha_control = proxima_fecha_control
+        seguimiento.hora_inicio = hora_inicio
+        seguimiento.hora_fin = hora_fin
+
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Error editando seguimiento de control")
+            return {"error": "No se pudo editar el seguimiento de control"}, 500
+
+        return seguimiento_schema.dump(seguimiento), 200
+
 class RegistroClinicoDetalleCompleto_Resource(Resource):
     """
     GET /api/historial_clinico/registros/<int:registro_id>/completo
@@ -854,6 +930,7 @@ class SeguimientoControlList_Resource(Resource):
         )
         return seguimiento_schema_list.dump(seguimientos), 200
 api.add_resource(SeguimientoControlList_Resource, "/seguimientos")
+api.add_resource(SeguimientoControlEditar_Resource, "/seguimientos/<int:seguimiento_id>")
 api.add_resource(RegistroClinicoDetalleCompleto_Resource, "/registros/<int:registro_id>/completo")
 api.add_resource(RegistroClinicoCompleto_Resource, "/registro-completo")
 api.add_resource(RegistroClinicoCompletoUpdate_Resource, "/registro-completo/<int:registro_id>")

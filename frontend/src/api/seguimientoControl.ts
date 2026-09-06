@@ -68,3 +68,23 @@ export async function getSeguimientos():Promise<SeguimientoControl[]>{
   );
   return data;
 }
+
+/** Payload para PUT /api/historial_clinico/seguimientos/:id — todos los
+ * campos son opcionales, un campo ausente conserva su valor actual. */
+export interface SeguimientoControlUpdatePayload {
+  evolucion?: string;
+  proxima_fecha_control?: string | null;
+  hora_inicio?: string | null;
+  hora_fin?: string | null;
+}
+
+export async function updateSeguimientoControl(
+  seguimientoId: number,
+  payload: SeguimientoControlUpdatePayload,
+): Promise<SeguimientoControl> {
+  const { data } = await api.put<SeguimientoControl>(
+    `/api/historial_clinico/seguimientos/${seguimientoId}`,
+    payload,
+  );
+  return data;
+}

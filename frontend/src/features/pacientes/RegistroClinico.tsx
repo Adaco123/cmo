@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import gsap from 'gsap';
-import { subirArchivoExamen } from '../../api/archivos';
+import { subirArchivoExamen, descartarSesionCaptura } from '../../api/archivos';
 import type { Paciente as ApiPaciente } from '../../api/pacientes';
 import Receta from './Receta';
 import type { RecetaHandle } from './Receta';
@@ -432,11 +432,24 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
 
   const [drawerRxOpen, setDrawerRxOpen] = useState(false);
 
+  // Cerrar/cancelar TODO el registro clínico (no solo un drawer interno)
+  // descarta las sesiones de captura QR abiertas ligadas al paciente:
+  // esas fotos no deben quedar huérfanas si el médico no llegó a guardar.
+  const handleCerrarTodo = useCallback(() => {
+    const sids = examenesRef.current?.getSidsCapturaPendientes() ?? [];
+    sids.forEach((sid) => {
+      descartarSesionCaptura(sid).catch(() => {
+        // Best-effort: si el descarte falla no bloqueamos el cierre del formulario.
+      });
+    });
+    onClose?.();
+  }, [onClose]);
+
   return (
-    <div className={styles.backdrop} onClick={() => onClose?.()}>
+    <div className={styles.backdrop} onClick={() => handleCerrarTodo()}>
       <div className={styles.modalWide} onClick={(e) => e.stopPropagation()}>
         {onClose && (
-          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Cerrar">
+          <button type="button" className={styles.closeBtn} onClick={handleCerrarTodo} aria-label="Cerrar">
             <FontAwesomeIcon icon={faXmark} />
           </button>
         )}
@@ -736,6 +749,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
             onClose={() => setDrawerExamOpen(false)}
             contexto={{
               medico_id: MEDICO_ID,
+              paciente_id: pacienteIdFinal,
               paciente_nombre: nombrePaciente,
               registro_numero: consultaId ? `#RC-${consultaId}` : '#RC-00128',
               medico_nombre: medicoNombre,

@@ -6,6 +6,7 @@ import React, {
   useImperativeHandle,
   forwardRef,
 } from 'react';
+import { createPortal } from 'react-dom';
 import styles from './Examenes.module.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -18,7 +19,10 @@ import {
   faTrash,
   faPlus,
   faXmark,
+  faCamera,
 } from '@fortawesome/free-solid-svg-icons';
+import CapturaQrModal from './CapturaQrModal';
+import { descargarArchivoBlob, eliminarArchivo as eliminarArchivoDelServidor, descartarSesionCaptura } from '../../api/archivos';
 
 /* ============================================================
    Helper para combinar clases del CSS Module
@@ -70,8 +74,16 @@ export interface ExamenesPayloadSalida {
 export interface ExamenesHandle {
   /** Devuelve solo las categorías que tienen al menos un ítem. `null` si no hay nada. */
   getPayload: () => ExamenesPayloadSalida | null;
-  /** Limpia todo — llamar después de un guardado exitoso. */
+  /** Limpia todo — llamar después de un guardado exitoso. No descarta
+   * sesiones de captura QR en el backend: al guardar con éxito las fotos
+   * ya quedaron correctamente ligadas al paciente, solo se limpia la
+   * lista local de sids pendientes. */
   reset: () => void;
+  /** Sids de las sesiones de captura QR (ligadas a paciente_id) abiertas
+   * durante la vida del drawer y aún no descartadas. El padre las usa
+   * para descartarlas (DELETE /captura-sesion/<sid>) si se cancela TODO
+   * el registro clínico sin guardar. */
+  getSidsCapturaPendientes: () => string[];
 }
 
 interface Props {
@@ -80,6 +92,10 @@ interface Props {
   contexto: {
     /** Opcional: no existe aún al crear un registro clínico nuevo. No se usa dentro de este componente. */
     registro_clinico_id?: number;
+    /** Id del paciente al que se está creando este registro clínico nuevo.
+     * Habilita el botón de "Agregar fotografías" por QR (las fotos quedan
+     * ligadas al paciente porque el examen todavía no existe). */
+    paciente_id?: number;
     medico_id: number;
     paciente_nombre: string;
     registro_numero: string;
@@ -152,6 +168,15 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [shakeNombre, setShakeNombre] = useState(false);
 
+  // Captura de fotos por QR: sesión TRANSITORIA en contexto del paciente
+  // (el examen aún no existe). Cada foto se descarga en cuanto llega y se
+  // mete en pendingFiles como un File más — no queda ligada a nada en el
+  // backend, se sube recién al guardar el registro, igual que un archivo
+  // arrastrado a mano.
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrSids, setQrSids] = useState<string[]>([]);
+  const qrSidActualRef = useRef<string | null>(null);
+
   // Referencias
   const nombreInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -171,6 +196,28 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
       prev.forEach((p) => { if (p.url) URL.revokeObjectURL(p.url); });
       return [];
     });
+  }, []);
+
+  // Se llama por cada foto nueva detectada en la sesión de captura QR:
+  // la descarga del servidor, la mete en pendingFiles como un File más
+  // (misma bolsa que el drag-and-drop) y borra la copia transitoria del
+  // servidor — no debe quedar nada ligado a ella una vez está en el navegador.
+  const handleFotoQrNueva = useCallback((archivoId: number) => {
+    (async () => {
+      try {
+        const blob = await descargarArchivoBlob(archivoId);
+        const file = new File([blob], `foto-qr-${archivoId}.jpg`, { type: blob.type || 'image/jpeg' });
+        setPendingFiles((prev) => [...prev, { file, url: URL.createObjectURL(file) }]);
+      } catch {
+        showToast('No se pudo importar una fotografía tomada por el celular.');
+      } finally {
+        eliminarArchivoDelServidor(archivoId).catch(() => {
+          // Best-effort: si no se pudo borrar la copia transitoria, no
+          // bloqueamos el flujo — queda como huérfana hasta la limpieza
+          // manual, mismo riesgo aceptado que otros casos límite del QR.
+        });
+      }
+    })();
   }, []);
 
   /* ---------- handle expuesto al padre (getPayload / reset) ---------- */
@@ -201,7 +248,12 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
       setObservaciones('');
       limpiarPendingFiles();
       if (fileInputRef.current) fileInputRef.current.value = '';
+      // El registro se guardó con éxito: las fotos ya se reubicaron como
+      // File[] normales (o se descartaron al cerrar el modal del QR), no
+      // queda nada pendiente en el backend — solo limpiar la lista local.
+      setQrSids([]);
     },
+    getSidsCapturaPendientes: () => qrSids,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }));
 
@@ -466,6 +518,11 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
               <span>Médico: <b>{contexto.medico_nombre}</b></span>
             </div>
           </div>
+          {contexto.paciente_id != null && (
+            <button type="button" className={styles.btnAgregarFotosPaciente} onClick={() => setQrModalOpen(true)}>
+              <FontAwesomeIcon icon={faCamera} /> Agregar fotografías
+            </button>
+          )}
           <button type="button" className={styles.drawerClose} onClick={onClose}>
             <FontAwesomeIcon icon={faXmark} />
           </button>
@@ -612,6 +669,32 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
         </div>
       </div>
 
+      {/* Portal a <body>: si no, el modal queda atrapado dentro del
+         backdrop/overflow del drawer de VerPaciente.tsx en vez de cubrir
+         toda la pantalla (mismo patrón que Receta.tsx y RegistroClinicoDetalle.tsx). */}
+      {qrModalOpen && contexto.paciente_id != null &&
+        createPortal(
+          <CapturaQrModal
+            destino={{ tipo: 'paciente', id: contexto.paciente_id }}
+            examenNombre={contexto.paciente_nombre}
+            onClose={() => {
+              // Al cerrar el modal, cualquier foto que llegó pero no se
+              // alcanzó a reubicar como pendingFile (carrera con el
+              // polling) se descarta — no debe quedar huérfana.
+              const sid = qrSidActualRef.current;
+              qrSidActualRef.current = null;
+              setQrModalOpen(false);
+              if (sid) descartarSesionCaptura(sid).catch(() => {});
+            }}
+            onFotoNueva={handleFotoQrNueva}
+            onSesionIniciada={(sid) => {
+              qrSidActualRef.current = sid;
+              setQrSids((prev) => [...prev, sid]);
+            }}
+          />,
+          document.body,
+        )}
+
       {/* Toast */}
       {toast && (
         <div className={styles.toast}>
@@ -633,4 +716,4 @@ const Examenes = forwardRef<ExamenesHandle, Props>(function Examenes(
   );
 });
 
-export default Examenes;
+export default Examenes; 
