@@ -1,11 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { createSeguimientoControl } from '../../api/seguimientoControl';
 import type { SeguimientoControlResponse } from '../../api/seguimientoControl';
 import type { RegistroClinico } from '../../api/historialClinico';
+import Calendario from '../citas/Calendario';
+import { useCalendarioData } from '../citas/hooks/Usecalendariodata';
 import Receta from './Receta';
 import type { RecetaHandle } from './Receta';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCalendarCheck, faSpinner, faSave, faCapsules, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faCalendarCheck, faSpinner, faSave, faCapsules, faXmark, faCalendarDays } from '@fortawesome/free-solid-svg-icons';
 import styles from './Control.module.css';
 import { useErrorToast } from '../../components/ErrorToastProvider';
 import { extractErrorMessage } from '../../utils/errors';
@@ -20,6 +23,15 @@ function toLocalDateString(d: Date): string {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+/** "HH:MM" + minutos -> "HH:MM". Usado para calcular hora_fin sola, sin
+ * dejar que se ingrese por teclado. */
+function sumarMinutos(hora: string, minutos: number): string {
+  const [h, m] = hora.split(':').map(Number);
+  const fecha = new Date();
+  fecha.setHours(h, m + minutos, 0, 0);
+  return fecha.toTimeString().slice(0, 5);
 }
 
 interface Props {
@@ -37,8 +49,6 @@ interface Props {
 
 const CONTROL_CHIPS: { label: string; val: string }[] = [
   { label: '7 días', val: '7' },
-  { label: '15 días', val: '15' },
-  { label: '1 mes', val: '30' },
   { label: 'Alta / sin control', val: '' },
 ];
 
@@ -63,13 +73,21 @@ const Control: React.FC<Props> = ({
   onClose,
 }) => {
   const [evolucion, setEvolucion] = useState('');
-  const [controlDias, setControlDias] = useState('');
+  const [controlFecha, setControlFecha] = useState<string | null>(null);
   const [horaInicio, setHoraInicio] = useState('');
-  const [horaFin, setHoraFin] = useState('');
+  const horaFin = (() => {
+    if (!horaInicio) return '';
+    const calculada = sumarMinutos(horaInicio, 45);
+    // Si cruza medianoche, no hay hora_fin automática válida — se manda null.
+    return calculada > horaInicio ? calculada : '';
+  })();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { showError, showSuccess } = useErrorToast();
   const evolucionRef = useRef<HTMLTextAreaElement>(null);
+
+  // ---------- calendario para elegir la fecha del próximo control ----------
+  const calendarioControl = useCalendarioData();
 
   // ---------- receta del seguimiento ----------
   const [drawerRxOpen, setDrawerRxOpen] = useState(false);
@@ -80,18 +98,29 @@ const Control: React.FC<Props> = ({
     evolucionRef.current?.focus();
   }, []);
 
-  const proximaFechaControl = (() => {
-    if (!controlDias.trim()) return null;
-    const d = new Date();
-    d.setDate(d.getDate() + parseInt(controlDias, 10));
-    return toLocalDateString(d);
-  })();
+  const proximaFechaControl = controlFecha;
 
   const proximaFechaLegible = proximaFechaControl
     ? new Date(proximaFechaControl + 'T00:00:00').toLocaleDateString('es-BO', {
         day: '2-digit', month: '2-digit', year: 'numeric',
       })
     : null;
+
+  const fecha7DiasStr = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return toLocalDateString(d);
+  })();
+
+  const elegirChip = (val: string) => {
+    if (val === '7') {
+      const d = new Date();
+      d.setDate(d.getDate() + 7);
+      setControlFecha(toLocalDateString(d));
+    } else {
+      setControlFecha(null);
+    }
+  };
 
   // Se llama cuando el doctor cierra el drawer de receta (con o sin guardar líneas)
   const handleCerrarReceta = () => {
@@ -118,7 +147,7 @@ const Control: React.FC<Props> = ({
         evolucion: texto,
         proxima_fecha_control: proximaFechaControl,
         hora_inicio: horaInicio.trim() || null,
-        hora_fin: horaFin.trim() || null,
+        hora_fin: horaFin || null,
         recetas: recetaPayload || {},
       });
 
@@ -173,21 +202,26 @@ const Control: React.FC<Props> = ({
               <button
                 key={c.label}
                 type="button"
-                className={`${styles.chip} ${controlDias === c.val ? styles.active : ''}`}
-                onClick={() => setControlDias(c.val)}
+                className={`${styles.chip} ${
+                  (c.val === '7' && controlFecha === fecha7DiasStr) || (c.val === '' && controlFecha === null)
+                    ? styles.active : ''
+                }`}
+                onClick={() => elegirChip(c.val)}
               >
                 {c.label}
               </button>
             ))}
+            <button type="button" className={styles.chip} onClick={calendarioControl.abrir}>
+              <FontAwesomeIcon icon={faCalendarDays} /> {proximaFechaLegible ? proximaFechaLegible : 'Elegir fecha'}
+            </button>
           </div>
-          {proximaFechaLegible && <div className={styles.subhint}>Próximo control: {proximaFechaLegible}</div>}
-          {controlDias.trim() && (
+          {controlFecha && (
             <div className={styles.horaRow}>
               <span>Hora</span>
               <input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
               <span>a</span>
-              <input type="time" value={horaFin} onChange={(e) => setHoraFin(e.target.value)} />
-              <span className={styles.subhint}>(opcional)</span>
+              <input type="time" value={horaFin} disabled title="Se calcula sola: hora de inicio + 45 min" style={{ opacity: 0.75, cursor: 'not-allowed' }} />
+              <span className={styles.subhint}>(+45 min automático)</span>
             </div>
           )}
         </div>
@@ -231,6 +265,35 @@ const Control: React.FC<Props> = ({
           medicoNombre={medicoNombre}
         />
       </div>
+
+      {calendarioControl.abierto &&
+        createPortal(
+          <Calendario
+            citas={calendarioControl.citas}
+            seguimientos={calendarioControl.seguimientos}
+            pacientes={calendarioControl.pacientes}
+            onClose={calendarioControl.cerrar}
+            onConfirmarFecha={(fecha) => {
+              setControlFecha(fecha);
+              calendarioControl.cerrar();
+            }}
+          />,
+          document.body,
+        )}
+      {calendarioControl.abierto && calendarioControl.loading &&
+        createPortal(
+          <div className="today-appointments-empty" style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 200 }}>
+            Cargando datos del calendario...
+          </div>,
+          document.body,
+        )}
+      {calendarioControl.abierto && calendarioControl.error &&
+        createPortal(
+          <div className="today-appointments-empty" style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 200 }}>
+            {calendarioControl.error}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 };

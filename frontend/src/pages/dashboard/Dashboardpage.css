@@ -649,6 +649,28 @@ body {
   background: rgba(168, 85, 247, 0.16); color: #7e22ce; border: 1px solid rgba(168, 85, 247, 0.35);
 }
 
+/* ── Badge estado de cita (Programada/Cancelada/No asistió), por nombre ── */
+.badge-estado {
+  display: inline-block; padding: 4px 14px; border-radius: 20px;
+  font-size: 0.75rem; font-weight: 700; white-space: nowrap;
+}
+
+.badge-estado.programada {
+  background: rgba(20, 184, 166, 0.16); color: var(--primary-dark); border: 1px solid rgba(20, 184, 166, 0.35);
+}
+
+.badge-estado.cancelada {
+  background: rgba(193, 68, 63, 0.14); color: var(--status-inactive); border: 1px solid rgba(193, 68, 63, 0.35);
+}
+
+.badge-estado.no-asistio {
+  background: rgba(217, 119, 6, 0.14); color: #b45309; border: 1px solid rgba(217, 119, 6, 0.35);
+}
+
+.badge-estado.otro {
+  background: rgba(132, 167, 190, 0.2); color: var(--text-muted); border: 1px solid var(--border-color);
+}
+
 /* ── Reports Grid ── */
 .report-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 24px; margin-bottom: 32px;
@@ -1130,4 +1152,4 @@ body {
 .icon-action-btn-inactive:hover {
   background: rgba(193, 68, 63, 0.12);
   border-color: var(--status-inactive);
-} 
+}

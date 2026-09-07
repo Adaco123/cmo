@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { DayPicker } from 'react-day-picker';
 import { es } from 'date-fns/locale';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -15,6 +15,11 @@ interface CalendarioProps {
   pacientes: Paciente[];
   onClose: () => void;
   onSelectCita?: (cita: Cita) => void;
+  /** Cuando viene seteado, el calendario entra en "modo selección": aparece
+   * un botón "Usar esta fecha" que devuelve el día elegido (YYYY-MM-DD) y
+   * cierra el modal. Las citas/seguimientos ya agendados se siguen viendo
+   * en sus colores — es solo informativo, no bloquea elegir ese día. */
+  onConfirmarFecha?: (fecha: string) => void;
 }
 
 function toDateKey(value: string | Date): string {
@@ -38,18 +43,35 @@ function buildWhatsAppUrl(telefono: string, mensaje: string): string {
   return `https://wa.me/${toWhatsAppNumber(telefono)}?text=${encodeURIComponent(mensaje)}`;
 }
 
-function mensajeRecordatorio(nombrePaciente: string, fechaLabel: string, hora: string, motivo?: string | null): string {
-  const motivoTexto = motivo ? ` Motivo: ${motivo}.` : '';
-  return `Hola ${nombrePaciente}, te recordamos tu cita en CMO el ${fechaLabel} a las ${hora}.${motivoTexto}`;
+function mensajeRecordatorio(nombrePaciente: string, fechaLabel: string, hora: string): string {
+  
+  return `Hola ${nombrePaciente}, te recordamos tu cita en CMO el ${fechaLabel} a las ${hora}.`;
 }
 
-function mensajeSeguimiento(nombrePaciente: string, fechaLabel: string, evolucion?: string | null): string {
-  const evolucionTexto = evolucion ? ` Evolución: ${evolucion}.` : '';
-  return `Hola ${nombrePaciente}, te recordamos tu seguimiento de control en CMO el ${fechaLabel}.${evolucionTexto}`;
+function mensajeSeguimiento(nombrePaciente: string, fechaLabel: string): string {
+  
+  return `Hola ${nombrePaciente}, te recordamos tu seguimiento de control en CMO el ${fechaLabel}`;
 }
 
-const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes, onClose, onSelectCita }) => {
+const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes, onClose, onSelectCita, onConfirmarFecha }) => {
   const [selectedDay, setSelectedDay] = useState<Date | undefined>(new Date());
+  const ultimoClickRef = useRef<{ dia: string; hora: number } | null>(null);
+
+  // Doble click sobre un día = confirmar directo, sin pasar por el botón
+  // "Usar esta fecha". Solo aplica en modo selección (onConfirmarFecha
+  // presente) — en modo lectura (Iniciotab.tsx) no hace nada especial.
+  const handleDayClick = (dia: Date) => {
+    if (!onConfirmarFecha) return;
+    const clave = toDateKey(dia);
+    const ahora = Date.now();
+    const anterior = ultimoClickRef.current;
+    if (anterior && anterior.dia === clave && ahora - anterior.hora < 400) {
+      ultimoClickRef.current = null;
+      onConfirmarFecha(clave);
+    } else {
+      ultimoClickRef.current = { dia: clave, hora: ahora };
+    }
+  };
 
   const citasPorFecha = useMemo(() => {
     const map = new Map<string, Cita[]>();
@@ -108,6 +130,7 @@ const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes,
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <h3>Calendario</h3>
+          
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Cerrar">
             <FontAwesomeIcon icon={faXmark} />
           </button>
@@ -119,6 +142,7 @@ const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes,
             locale={es}
             selected={selectedDay}
             onSelect={setSelectedDay}
+            onDayClick={handleDayClick}
             modifiers={{ conCitas: diasConCitas, conSeguimientos: diasConSeguimientos }}
             modifiersClassNames={{
               conCitas: styles.diaConCitas,

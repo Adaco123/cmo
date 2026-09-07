@@ -14,6 +14,7 @@ interface SeguimientoControlTabProps {
   active: boolean;
   pacientes: Paciente[];
   searchValue: string;
+  onSearchChange: (value: string) => void;
   onVer: (paciente: Paciente) => void;
 }
 
@@ -35,6 +36,25 @@ function formatHora(inicio?: string | null, fin?: string | null): string {
   return fin ? `${corta(inicio)} - ${corta(fin)}` : corta(inicio);
 }
 
+/** "YYYY-MM-DD" en fecha LOCAL, para comparar contra fechaAgenda sin líos de UTC. */
+function toLocalDateString(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/** Nombre del estado -> clase de color del badge (ver .badge-estado en
+ * Dashboardpage.css). Por nombre, nunca por id — los ids del catálogo
+ * pueden variar entre instalaciones. */
+function claseEstado(nombre: string): string {
+  const norm = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (norm.includes('program')) return 'programada';
+  if (norm.includes('cancel')) return 'cancelada';
+  if (norm.includes('asisti')) return 'no-asistio';
+  return 'otro';
+}
+
 /**
  * Reemplaza la pestaña "Modelos" (data estática de prueba) por una agenda
  * combinada de Citas + Seguimientos de control, cada quien con su color
@@ -52,24 +72,27 @@ function formatHora(inicio?: string | null, fin?: string | null): string {
  * lo próximo". Si un seguimiento no tiene próximo control (alta), se usa
  * su propia fecha como respaldo solo para no desaparecer de la lista.
  */
-const SeguimientoControlTab: React.FC<SeguimientoControlTabProps> = ({ active, pacientes, searchValue, onVer }) => {
+const SeguimientoControlTab: React.FC<SeguimientoControlTabProps> = ({ active, pacientes, searchValue, onSearchChange, onVer }) => {
   const { showErrorFrom, showSuccess } = useErrorToast();
 
   const [citas, setCitas] = useState<Cita[]>([]);
   const [seguimientos, setSeguimientos] = useState<SeguimientoControl[]>([]);
+  const [estadosCita, setEstadosCita] = useState<EstadoCita[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cargado, setCargado] = useState(false);
+  const [verHistorialCompleto, setVerHistorialCompleto] = useState(false);
 
   const [editando, setEditando] = useState<FilaAgenda | null>(null);
 
   const cargar = () => {
     setLoading(true);
     setError(null);
-    Promise.all([getCitas(), getSeguimientos()])
-      .then(([citasData, seguimientosData]) => {
+    Promise.all([getCitas(), getSeguimientos(), getEstadosCita()])
+      .then(([citasData, seguimientosData, estadosData]) => {
         setCitas(citasData);
         setSeguimientos(seguimientosData);
+        setEstadosCita(estadosData);
         setCargado(true);
       })
       .catch(() => setError('No se pudo cargar la agenda de citas y controles.'))
@@ -83,6 +106,9 @@ const SeguimientoControlTab: React.FC<SeguimientoControlTabProps> = ({ active, p
   }, [active, cargado, loading]);
 
   const buscarPaciente = (pacienteId: number) => pacientes.find((p) => p.id === pacienteId) || null;
+  const nombreEstado = (estadoId: number) => estadosCita.find((e) => e.id === estadoId)?.nombre ?? null;
+
+  const hoyStr = toLocalDateString(new Date());
 
   const filas: FilaAgenda[] = [
     ...citas.map((cita): FilaAgenda => ({
@@ -103,16 +129,49 @@ const SeguimientoControlTab: React.FC<SeguimientoControlTabProps> = ({ active, p
       const nombre = fila.paciente ? `${fila.paciente.nombres} ${fila.paciente.apellidos}` : '';
       return nombre.toLowerCase().includes(searchValue.toLowerCase());
     })
-    .sort((a, b) => (b.fechaAgenda || '').localeCompare(a.fechaAgenda || ''));
+    .filter((fila) => verHistorialCompleto || (fila.fechaAgenda || '') >= hoyStr)
+    .sort((a, b) => (a.fechaAgenda || '').localeCompare(b.fechaAgenda || ''));
 
   return (
     <div className={`tab-content ${active ? 'active' : ''}`}>
       <div className="table-card scroll-animated">
         <div className="card-header">
           <h3>Citas con seguimiento control</h3>
-          <button type="button" className="glow-btn" onClick={cargar} disabled={loading}>
-            <FontAwesomeIcon icon={faRefresh} className={loading ? 'spin' : ''} /> Actualizar
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                className="glow-btn"
+                style={!verHistorialCompleto ? undefined : { opacity: 0.55 }}
+                onClick={() => setVerHistorialCompleto(false)}
+              >
+                Próximas
+              </button>
+              <button
+                type="button"
+                className="glow-btn"
+                style={verHistorialCompleto ? undefined : { opacity: 0.55 }}
+                onClick={() => setVerHistorialCompleto(true)}
+              >
+                Ver historial completo
+              </button>
+            </div>
+            <div className="search-table">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Buscar por paciente..."
+                value={searchValue}
+                onChange={(e) => onSearchChange(e.target.value)}
+              />
+            </div>
+            <button type="button" className="glow-btn" onClick={cargar} disabled={loading}>
+              <FontAwesomeIcon icon={faRefresh} className={loading ? 'spin' : ''} /> Actualizar
+            </button>
+          </div>
         </div>
 
         {loading && !cargado ? (
@@ -120,7 +179,9 @@ const SeguimientoControlTab: React.FC<SeguimientoControlTabProps> = ({ active, p
         ) : error ? (
           <div className="today-appointments-empty">{error}</div>
         ) : filas.length === 0 ? (
-          <div className="today-appointments-empty">No hay citas ni controles de seguimiento registrados.</div>
+          <div className="today-appointments-empty">
+            {verHistorialCompleto ? 'No hay citas ni controles de seguimiento registrados.' : 'No hay citas ni controles próximos.'}
+          </div>
         ) : (
           <table>
             <thead>
@@ -129,6 +190,7 @@ const SeguimientoControlTab: React.FC<SeguimientoControlTabProps> = ({ active, p
                 <th>Paciente</th>
                 <th>Fecha</th>
                 <th>Hora</th>
+                <th>Estado</th>
                 <th>Detalle</th>
                 <th>Ver</th>
                 <th>Editar</th>
@@ -141,6 +203,7 @@ const SeguimientoControlTab: React.FC<SeguimientoControlTabProps> = ({ active, p
                 const hora = fila.tipo === 'cita'
                   ? formatHora(fila.cita.hora_inicio, fila.cita.hora_fin)
                   : formatHora(fila.seguimiento.hora_inicio, fila.seguimiento.hora_fin);
+                const estadoNombre = fila.tipo === 'cita' ? nombreEstado(fila.cita.estado_id) : null;
 
                 return (
                   <tr key={key}>
@@ -156,6 +219,13 @@ const SeguimientoControlTab: React.FC<SeguimientoControlTabProps> = ({ active, p
                     </td>
                     <td>{formatFecha(fila.fechaAgenda)}</td>
                     <td>{hora}</td>
+                    <td>
+                      {estadoNombre ? (
+                        <span className={`badge-estado ${claseEstado(estadoNombre)}`}>{estadoNombre}</span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                     <td className="diagnostico-cell">{detalle}</td>
                     <td>
                       {fila.paciente ? (

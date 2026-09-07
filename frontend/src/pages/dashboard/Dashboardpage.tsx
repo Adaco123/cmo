@@ -41,6 +41,7 @@ const DashboardPage: React.FC = () => {
   const [pacienteAEditar, setPacienteAEditar] = useState<Paciente | null>(null);
   const [pacienteExternoSeleccionado, setPacienteExternoSeleccionado] = useState<Paciente | null>(null);
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
+  const [searchSeguimiento, setSearchSeguimiento] = useState('');
 
   const handleLogout = () => {
     authStore.logout();
@@ -140,7 +141,8 @@ const DashboardPage: React.FC = () => {
         <SeguimientoControlTab
           active={activeTab === 'seguimiento_control'}
           pacientes={pacientes}
-          searchValue=""
+          searchValue={searchSeguimiento}
+          onSearchChange={setSearchSeguimiento}
           onVer={(p) => setSelectedPaciente(p)}
         />
 

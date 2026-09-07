@@ -169,7 +169,7 @@ const CapturaQrModal: React.FC<Props> = ({ destino, examenNombre, onClose, onFot
                 </span>
               )}
               {fotosCount > 0 && (
-                <span className={styles.estadoFotos}>📸 {fotosCount} fotografía{fotosCount === 1 ? '' : 's'} recibida{fotosCount === 1 ? '' : 's'}</span>
+                <span className={styles.estadoFotos}> {fotosCount} fotografía{fotosCount === 1 ? '' : 's'} recibida{fotosCount === 1 ? '' : 's'}</span>
               )}
             </div>
           </>

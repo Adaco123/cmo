@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRefresh, faCalendarDays } from '@fortawesome/free-solid-svg-icons';
 import { type Paciente } from '../../../api/pacientes';
-import { type Cita, getCitas } from '../../../api/citas';
-import { type SeguimientoControl, getSeguimientos } from '../../../api/seguimientoControl'; // 👈 ajusta el nombre del archivo si es distinto
+import { type Cita } from '../../../api/citas';
 import Calendario from '../../../features/citas/Calendario';
+import { useCalendarioData } from '../../../features/citas/hooks/Usecalendariodata';
 import {
   pagosHoy,
   getPacientesAtendidosHoy,
@@ -43,7 +43,6 @@ const InicioTab: React.FC<InicioTabProps> = ({
 }) => {
   const [loading, setLoading] = useState(true);
   const [pagosHoyData, setPagosHoyData] = useState<PagosResumenHoy | null>(null);
-  const [calendarioAbierto, setCalendarioAbierto] = useState(false);
   const [pacientesAtendidosHoy, setPacientesAtendidosHoy] = useState<PacientesAtendidosHoy | null>(null);
   useEffect(() => {
     let isMounted = true;
@@ -78,23 +77,7 @@ const InicioTab: React.FC<InicioTabProps> = ({
   // Se cargan solo cuando el usuario realmente abre el calendario, así no
   // pesamos el dashboard con fetches que la mayoría de las veces no hacen
   // falta.
-  const [citasCalendario, setCitasCalendario] = useState<Cita[]>([]);
-  const [seguimientosCalendario, setSeguimientosCalendario] = useState<SeguimientoControl[]>([]);
-  const [loadingCalendario, setLoadingCalendario] = useState(false);
-  const [errorCalendario, setErrorCalendario] = useState<string | null>(null);
-
-  const abrirCalendario = () => {
-    setCalendarioAbierto(true);
-    setLoadingCalendario(true);
-    setErrorCalendario(null);
-    Promise.all([getCitas(), getSeguimientos()])
-      .then(([citas, seguimientos]) => {
-        setCitasCalendario(citas);
-        setSeguimientosCalendario(seguimientos);
-      })
-      .catch(() => setErrorCalendario('No se pudieron cargar los datos del calendario.'))
-      .finally(() => setLoadingCalendario(false));
-  };
+  const calendarioControl = useCalendarioData();
 
   return (
     <div className={`tab-content ${active ? 'active' : ''}`}>
@@ -121,7 +104,7 @@ const InicioTab: React.FC<InicioTabProps> = ({
         <button
           type="button"
           className="mini-calendar-card scroll-animated"
-          onClick={abrirCalendario}
+          onClick={calendarioControl.abrir}
         >
           <div className="mini-calendar-icon">
             <FontAwesomeIcon icon={faCalendarDays} />
@@ -204,22 +187,22 @@ const InicioTab: React.FC<InicioTabProps> = ({
         )}
       </div>
 
-      {calendarioAbierto && (
+      {calendarioControl.abierto && (
         <Calendario
-          citas={citasCalendario}
-          seguimientos={seguimientosCalendario}
+          citas={calendarioControl.citas}
+          seguimientos={calendarioControl.seguimientos}
           pacientes={pacientes}
-          onClose={() => setCalendarioAbierto(false)}
+          onClose={calendarioControl.cerrar}
         />
       )}
-      {calendarioAbierto && loadingCalendario && (
+      {calendarioControl.abierto && calendarioControl.loading && (
         <div className="today-appointments-empty" style={{ position: 'fixed', bottom: 16, right: 16 }}>
           Cargando datos del calendario...
         </div>
       )}
-      {calendarioAbierto && errorCalendario && (
+      {calendarioControl.abierto && calendarioControl.error && (
         <div className="today-appointments-empty" style={{ position: 'fixed', bottom: 16, right: 16 }}>
-          {errorCalendario}
+          {calendarioControl.error}
         </div>
       )}
     </div>

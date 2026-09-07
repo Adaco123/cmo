@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import gsap from 'gsap';
+import { createPortal } from 'react-dom';
 import { subirArchivoExamen, descartarSesionCaptura } from '../../api/archivos';
 import type { Paciente as ApiPaciente } from '../../api/pacientes';
+import Calendario from '../citas/Calendario';
+import { useCalendarioData } from '../citas/hooks/Usecalendariodata';
 import Receta from './Receta';
 import type { RecetaHandle } from './Receta';
 import styles from './RegistroClinico.module.css';
@@ -11,7 +14,7 @@ import Examenes from './Examenes';
 import type { ExamenesHandle } from './Examenes';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faUser, faCapsules, faFlaskVial, faXmark
+  faUser, faCapsules, faFlaskVial, faXmark, faCalendarDays
 } from '@fortawesome/free-solid-svg-icons';
 import { useErrorToast } from '../../components/ErrorToastProvider';
 import { extractErrorMessage } from '../../utils/errors';
@@ -29,6 +32,15 @@ function toLocalDateString(d: Date): string {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+/** "HH:MM" + minutos -> "HH:MM". Usado para calcular hora_fin sola, sin
+ * dejar que se ingrese por teclado (ver hora_fin en "Consulta control"). */
+function sumarMinutos(hora: string, minutos: number): string {
+  const [h, m] = hora.split(':').map(Number);
+  const fecha = new Date();
+  fecha.setHours(h, m + minutos, 0, 0);
+  return fecha.toTimeString().slice(0, 5);
 }
 
 // Forma "aplanada" de un examen ya lista para mandar a la API y para
@@ -86,8 +98,6 @@ const ALERGIA_CHIPS = ['Penicilina', 'AINES', 'Sulfas'];
 
 const CONTROL_CHIPS: { label: string; val: string }[] = [
   { label: '7 días', val: '7' },
-  { label: '15 días', val: '15' },
-  { label: '1 mes', val: '30' },
   { label: 'Sin control', val: '' },
 ];
 
@@ -146,16 +156,23 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
   });
 
   const [controlNota, setControlNota] = useState('');
-  const [controlDias, setControlDias] = useState('');
+  const [controlFecha, setControlFecha] = useState<Date | null>(null);
   const [controlHoraInicio, setControlHoraInicio] = useState('');
-  const [controlHoraFin, setControlHoraFin] = useState('');
+  const controlHoraFin = (() => {
+    if (!controlHoraInicio) return '';
+    const calculada = sumarMinutos(controlHoraInicio, 45);
+    // Si cruza medianoche, calculada queda "menor" que controlHoraInicio
+    // en comparación de texto ("00:15" < "23:30") — en ese caso no hay
+    // hora_fin automática válida, se manda null (el backend ya lo acepta).
+    return calculada > controlHoraInicio ? calculada : '';
+  })();
+  const calendarioControl = useCalendarioData();
 
   const vitalRefs = useRef<Record<VitalKey, HTMLInputElement | null>>({
     pa_sys: null, pa_dia: null, fc: null, fr: null, sat: null, temp: null, peso: null, talla: null, glu: null,
   });
   const alergiasRef = useRef<HTMLInputElement | null>(null);
   const controlNotaRef = useRef<HTMLTextAreaElement | null>(null);
-  const controlRef = useRef<HTMLInputElement | null>(null);
   const recetaRef = useRef<RecetaHandle>(null);
   const examenesRef = useRef<ExamenesHandle>(null);
 
@@ -196,7 +213,6 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
     document.getElementById('sec_motivo')?.focus();
   };
 
-  const handleControlChip = (val: string) => setControlDias(val);
 
   // Recibe el texto ya armado desde Receta.tsx (medicamentos, exámenes y
   // fórmulas) y lo vuelca en secciones.tratamiento. Este es el ÚNICO lugar
@@ -228,17 +244,26 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
   // recién al guardar, vía examenesRef.current.getPayload().
   const [examCount, setExamCount] = useState(0);
 
-  const controlFecha = useMemo(() => {
-    if (!controlDias.trim()) return null;
-    const d = new Date();
-    d.setDate(d.getDate() + parseInt(controlDias, 10));
-    return d;
-  }, [controlDias]);
-
   const controlFechaLegible = useMemo(() => {
     if (!controlFecha) return null;
     return controlFecha.toLocaleDateString('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }, [controlFecha]);
+
+  // "7 días" es el único atajo que queda (el resto se elige visualmente
+  // con el calendario); "Sin control" limpia la fecha por completo.
+  const fecha7DiasStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return toLocalDateString(d);
+  }, []);
+
+  const elegirControlSieteDias = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    setControlFecha(d);
+  };
+
+  const elegirSinControl = () => setControlFecha(null);
 
   // Aplana el payload agrupado por categoría que devuelve Examenes,
   // conservando los File[] de cada examen para subirlos después de crear
@@ -317,7 +342,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
         evolucion: controlNota.trim(),
         proxima_fecha_control: proximaFechaControl,
         hora_inicio: controlHoraInicio.trim() || null,
-        hora_fin: controlHoraFin.trim() || null,
+        hora_fin: controlHoraFin || null,
       };
     }
 
@@ -418,7 +443,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [vitales, secciones, alergiasRegistro, controlNota, controlDias, controlHoraInicio, controlHoraFin, examCount, saving]);
+  }, [vitales, secciones, alergiasRegistro, controlNota, controlFecha, controlHoraInicio, controlHoraFin, examCount, saving]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -646,33 +671,36 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                   onChange={e => setControlNota(e.target.value)}
                   placeholder="Ej: Antibiótico por 7 días, control por persistencia de fiebre..."
                 />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Volver en</span>
-                  <input ref={controlRef} type="text" inputMode="numeric" maxLength={3} placeholder="7"
-                    value={controlDias} onChange={e => setControlDias(e.target.value.replace(/[^0-9]/g, ''))}
-                    style={{ width: 60, background: 'var(--bg-input)', border: '1.5px solid var(--border-color)', borderRadius: 10, textAlign: 'center', fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, padding: '8px 4px', color: 'var(--text-main)' }} />
-                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>días</span>
-                </div>
                 <div className={styles.chips}>
                   {CONTROL_CHIPS.map(c => (
-                    <div key={c.label} className={`${styles.chip} ${controlDias === c.val ? styles.active : ''}`} onClick={() => handleControlChip(c.val)}>
+                    <div
+                      key={c.label}
+                      className={`${styles.chip} ${
+                        (c.val === '7' && controlFecha && toLocalDateString(controlFecha) === fecha7DiasStr) ||
+                        (c.val === '' && controlFecha === null)
+                          ? styles.active : ''
+                      }`}
+                      onClick={() => (c.val === '7' ? elegirControlSieteDias() : elegirSinControl())}
+                    >
                       {c.label}
                     </div>
                   ))}
+                  <div className={styles.chip} onClick={calendarioControl.abrir}>
+                    <FontAwesomeIcon icon={faCalendarDays} /> {controlFechaLegible ? controlFechaLegible : 'Elegir fecha'}
+                  </div>
                 </div>
-                {controlDias.trim() && (
+                {controlFecha && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
                     <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Hora</span>
                     <input type="time" value={controlHoraInicio} onChange={e => setControlHoraInicio(e.target.value)}
                       style={{ background: 'var(--bg-input)', border: '1.5px solid var(--border-color)', borderRadius: 10, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, padding: '8px 6px', color: 'var(--text-main)' }} />
                     <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>a</span>
-                    <input type="time" value={controlHoraFin} onChange={e => setControlHoraFin(e.target.value)}
-                      style={{ background: 'var(--bg-input)', border: '1.5px solid var(--border-color)', borderRadius: 10, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, padding: '8px 6px', color: 'var(--text-main)' }} />
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>(opcional)</span>
+                    <input type="time" value={controlHoraFin} disabled title="Se calcula sola: hora de inicio + 45 min"
+                      style={{ background: 'var(--bg-input)', border: '1.5px solid var(--border-color)', borderRadius: 10, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, padding: '8px 6px', color: 'var(--text-muted)', opacity: 0.75, cursor: 'not-allowed' }} />
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>(+45 min automático)</span>
                   </div>
                 )}
-                {controlFechaLegible && <div className={styles.subhint}>Próximo control: {controlFechaLegible}</div>}
-                {!controlNota.trim() && controlDias.trim() && (
+                {!controlNota.trim() && controlFecha && (
                   <div className={styles.subhint} style={{ color: 'var(--warn, #C08A2E)' }}>
                     Elegiste una fecha pero falta la nota — sin nota no se registra el seguimiento
                   </div>
@@ -771,6 +799,35 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
           />
         </div>
       </div>
+
+      {calendarioControl.abierto &&
+        createPortal(
+          <Calendario
+            citas={calendarioControl.citas}
+            seguimientos={calendarioControl.seguimientos}
+            pacientes={calendarioControl.pacientes}
+            onClose={calendarioControl.cerrar}
+            onConfirmarFecha={(fecha) => {
+              setControlFecha(new Date(`${fecha}T00:00:00`));
+              calendarioControl.cerrar();
+            }}
+          />,
+          document.body,
+        )}
+      {calendarioControl.abierto && calendarioControl.loading &&
+        createPortal(
+          <div className="today-appointments-empty" style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 200 }}>
+            Cargando datos del calendario...
+          </div>,
+          document.body,
+        )}
+      {calendarioControl.abierto && calendarioControl.error &&
+        createPortal(
+          <div className="today-appointments-empty" style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 200 }}>
+            {calendarioControl.error}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 };

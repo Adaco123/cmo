@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { createCita, type CitaPayload } from '../api/citas';
 import { type EstadoCita, getEstadosCita } from '../api/estadosCita';
+import Calendario from '../features/citas/Calendario';
+import { useCalendarioData } from '../features/citas/hooks/Usecalendariodata';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUser, faSpinner, faFloppyDisk, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faUser, faSpinner, faFloppyDisk, faXmark, faCalendarDays } from '@fortawesome/free-solid-svg-icons';
 import styles from './CrearCita.module.css';
 import { useErrorToast } from './ErrorToastProvider';
 import { extractErrorMessage } from '../utils/errors';
@@ -28,10 +31,11 @@ function toLocalDateString(d: Date): string {
 }
 
 /** Suma 1 hora a un "HH:MM" y maneja el desborde de medianoche (23:30 -> 00:30). */
-function sumarUnaHora(hora: string): string {
+/** "HH:MM" + minutos -> "HH:MM". */
+function sumarMinutos(hora: string, minutos: number): string {
   const [h, m] = hora.split(':').map(Number);
   const fecha = new Date();
-  fecha.setHours(h + 1, m, 0, 0);
+  fecha.setHours(h, m + minutos, 0, 0);
   return fecha.toTimeString().slice(0, 5);
 }
 /** Nombre del estado que se usa por defecto al agendar una cita nueva. */
@@ -63,6 +67,9 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
     motivo: '',
     estado_id: 0,
   });
+
+  // ---------- calendario para elegir la fecha (atajo visual, opcional) ----------
+  const calendarioControl = useCalendarioData();
 
   useEffect(() => {
     getEstadosCita()
@@ -111,7 +118,11 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
       motivo: motivo,
       medico_id: DEFAULT_MEDICO_ID,
       consultorio_id: DEFAULT_CONSULTORIO_ID,
-      hora_fin: sumarUnaHora(formData.hora_inicio),
+      hora_fin: (() => {
+        const calculada = sumarMinutos(formData.hora_inicio, 45);
+        // Si cruza medianoche, no hay hora_fin automática válida.
+        return calculada > formData.hora_inicio ? calculada : null;
+      })(),
     };
 
     const data = await createCita(payload);
@@ -182,14 +193,26 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
             <div className={`${styles.row} ${styles.rowTwo}`}>
               <div className={styles.fieldGroup}>
                 <label htmlFor="fecha">Fecha *</label>
-                <input
-                  type="date"
-                  id="fecha"
-                  name="fecha"
-                  value={formData.fecha}
-                  onChange={handleChange}
-                  required
-                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="date"
+                    id="fecha"
+                    name="fecha"
+                    value={formData.fecha}
+                    onChange={handleChange}
+                    required
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    className={styles.closeBtn}
+                    title="Elegir fecha en calendario"
+                    onClick={calendarioControl.abrir}
+                    style={{ position: 'static', flexShrink: 0 }}
+                  >
+                    <FontAwesomeIcon icon={faCalendarDays} />
+                  </button>
+                </div>
               </div>
               <div className={styles.fieldGroup}>
                 <label htmlFor="hora_inicio">Hora inicio *</label>
@@ -231,6 +254,35 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
           </button>
         </form>
       </div>
+
+      {calendarioControl.abierto &&
+        createPortal(
+          <Calendario
+            citas={calendarioControl.citas}
+            seguimientos={calendarioControl.seguimientos}
+            pacientes={calendarioControl.pacientes}
+            onClose={calendarioControl.cerrar}
+            onConfirmarFecha={(fecha) => {
+              setFormData((prev) => ({ ...prev, fecha }));
+              calendarioControl.cerrar();
+            }}
+          />,
+          document.body,
+        )}
+      {calendarioControl.abierto && calendarioControl.loading &&
+        createPortal(
+          <div className="today-appointments-empty" style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 200 }}>
+            Cargando datos del calendario...
+          </div>,
+          document.body,
+        )}
+      {calendarioControl.abierto && calendarioControl.error &&
+        createPortal(
+          <div className="today-appointments-empty" style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 200 }}>
+            {calendarioControl.error}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 };
