@@ -72,6 +72,7 @@ def create_app(settings_module):
             "Falta configurar SECRET_KEY (en backend/config/) o la variable de entorno "
             "JWT_SECRET_KEY. La app no debe arrancar sin una clave real para firmar los JWT."
         )
+    
     app.config["JWT_SECRET_KEY"] = jwt_secret_key
     app.config["JWT_TOKEN_LOCATION"] = ["headers"]
 
@@ -81,7 +82,6 @@ def create_app(settings_module):
         allowed_origins = [
             "http://localhost:5173",
             "http://localhost:3000",
-            "https://balanced-contentment-production-b0f7.up.railway.app",
         ]
 
     CORS(

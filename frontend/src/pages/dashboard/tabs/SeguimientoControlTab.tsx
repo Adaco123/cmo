@@ -4,6 +4,7 @@ import { faRefresh, faPen, faSave, faSpinner, faXmark, faCalendarCheck } from '@
 import { type Paciente } from '../../../api/pacientes';
 import { type SeguimientoControl, getSeguimientos, updateSeguimientoControl } from '../../../api/seguimientoControl';
 import { type Cita, getCitas, updateCita } from '../../../api/citas';
+import { type EstadoCita, getEstadosCita } from '../../../api/estadosCita';
 import ViewButton from '../../../components/ui/ViewButton';
 import { useErrorToast } from '../../../components/ErrorToastProvider';
 import { extractErrorMessage } from '../../../utils/errors';
@@ -216,9 +217,22 @@ const EditarFilaModal: React.FC<EditarFilaModalProps> = ({ fila, onClose, onGuar
   const [horaInicio, setHoraInicio] = useState((esCita ? fila.cita.hora_inicio : fila.seguimiento.hora_inicio) || '');
   const [horaFin, setHoraFin] = useState((esCita ? fila.cita.hora_fin : fila.seguimiento.hora_fin) || '');
   const [motivo, setMotivo] = useState(esCita ? (fila.cita.motivo || '') : '');
+  const [estadoId, setEstadoId] = useState<number>(esCita ? fila.cita.estado_id : 0);
+  const [estados, setEstados] = useState<EstadoCita[]>([]);
   const [evolucion, setEvolucion] = useState(esCita ? '' : fila.seguimiento.evolucion);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!esCita) return;
+    getEstadosCita()
+      .then(setEstados)
+      .catch(() => {
+        // Si falla, el select queda solo con el estado actual (ver abajo) —
+        // no bloquea poder editar motivo/fecha aunque no cargue el catálogo.
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const guardar = async () => {
     setGuardando(true);
@@ -230,6 +244,7 @@ const EditarFilaModal: React.FC<EditarFilaModalProps> = ({ fila, onClose, onGuar
           hora_inicio: horaInicio || fila.cita.hora_inicio,
           hora_fin: horaFin || null,
           motivo,
+          estado_id: estadoId,
         });
         onGuardada({ tipo: 'cita', fechaAgenda: citaActualizada.fecha, cita: citaActualizada, paciente: fila.paciente });
       } else {
@@ -278,6 +293,24 @@ const EditarFilaModal: React.FC<EditarFilaModalProps> = ({ fila, onClose, onGuar
           <div className={styles.field}>
             <label>Evolución</label>
             <textarea value={evolucion} onChange={(e) => setEvolucion(e.target.value)} placeholder="Evolución del paciente" />
+          </div>
+        )}
+
+        {esCita && (
+          <div className={styles.field}>
+            <label>Estado</label>
+            <select
+              className={styles.select}
+              value={estadoId}
+              onChange={(e) => setEstadoId(Number(e.target.value))}
+            >
+              {estados.length === 0 && <option value={estadoId}>Estado actual (#{estadoId})</option>}
+              {estados.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nombre}
+                </option>
+              ))}
+            </select>
           </div>
         )}
 

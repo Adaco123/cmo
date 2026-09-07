@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createCita, type CitaPayload } from '../api/citas';
+import { type EstadoCita, getEstadosCita } from '../api/estadosCita';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUser, faSpinner, faFloppyDisk, faXmark } from '@fortawesome/free-solid-svg-icons';
 import styles from './CrearCita.module.css';
@@ -33,6 +34,13 @@ function sumarUnaHora(hora: string): string {
   fecha.setHours(h + 1, m, 0, 0);
   return fecha.toTimeString().slice(0, 5);
 }
+/** Nombre del estado que se usa por defecto al agendar una cita nueva. */
+const NOMBRE_ESTADO_POR_DEFECTO = 'Programada';
+
+function idEstadoPorDefecto(lista: EstadoCita[]): number {
+  return lista.find((e) => e.nombre === NOMBRE_ESTADO_POR_DEFECTO)?.id ?? lista[0]?.id ?? 0;
+}
+
 /**
  * Modal para agendar una cita. Es autocontenido: renderiza su propio
  * backdrop + botón de cerrar, así que el componente que lo usa
@@ -44,6 +52,7 @@ function sumarUnaHora(hora: string): string {
  *   )}
  */
 const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) => {
+  const [estados, setEstados] = useState<EstadoCita[]>([]);
   const [formData, setFormData] = useState<CitaPayload>({
     paciente_id: paciente?.id ?? 0,
     medico_id: DEFAULT_MEDICO_ID,
@@ -52,8 +61,21 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
     hora_inicio: new Date().toTimeString().slice(0, 5),
     hora_fin: '',
     motivo: '',
-    estado_id: 1,
+    estado_id: 0,
   });
+
+  useEffect(() => {
+    getEstadosCita()
+      .then((data) => {
+        setEstados(data);
+        setFormData((prev) => ({ ...prev, estado_id: prev.estado_id || idEstadoPorDefecto(data) }));
+      })
+      .catch(() => {
+        // Si falla, el select queda vacío — el resto del formulario sigue
+        // usable, pero no se podrá enviar sin elegir estado manualmente
+        // (y no habrá opciones entre las que elegir hasta reintentar).
+      });
+  }, []);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +128,7 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
       hora_inicio: now.toTimeString().slice(0, 5),
       hora_fin: '',
       motivo: '',
-      estado_id: 1,
+      estado_id: idEstadoPorDefecto(estados),
     });
   } catch (err) {
     const mensaje = extractErrorMessage(err, 'No se pudo guardar la cita.');
@@ -147,9 +169,12 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
                   onChange={handleChange}
                   required
                 >
-                  <option value={1}>Pendiente</option>
-                  <option value={2}>Cancelada</option>
-                  
+                  <option value={0} disabled>Selecciona un estado</option>
+                  {estados.map((estado) => (
+                    <option key={estado.id} value={estado.id}>
+                      {estado.nombre}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
