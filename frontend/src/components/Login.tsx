@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authStore } from '../auth';
+import { useAuth } from './AuthProvider';
 import './Login.css';
 
 const Login: React.FC = () => {
@@ -251,6 +251,7 @@ const Login: React.FC = () => {
 
 
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -262,7 +263,7 @@ const Login: React.FC = () => {
     setError(null);
     setLoading(true);
 
-    const result = await authStore.login(email, password);
+    const result = await login(email, password);
     setLoading(false);
 
     if (result.success) {

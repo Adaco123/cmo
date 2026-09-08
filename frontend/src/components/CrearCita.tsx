@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { createCita, type CitaPayload } from '../api/citas';
 import { type EstadoCita, getEstadosCita } from '../api/estadosCita';
 import Calendario from '../features/citas/Calendario';
-import { useCalendarioData } from '../features/citas/hooks/Usecalendariodata';
+import { useCalendario } from './CalendarioProvider';
+import { useAuth } from './AuthProvider';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUser, faSpinner, faFloppyDisk, faXmark, faCalendarDays } from '@fortawesome/free-solid-svg-icons';
 import styles from './CrearCita.module.css';
@@ -18,6 +19,9 @@ interface CrearCitaProps {
   onSuccess?: (data: any) => void;
 }
 
+// Fallback solo por si el Provider todavía no resolvió el usuario
+// (o no hay sesión) — en circunstancias normales se usa medicoId, que
+// sale del médico realmente logueado (ver useAuth() abajo).
 const DEFAULT_MEDICO_ID = 1;
 const DEFAULT_CONSULTORIO_ID = 1;
 
@@ -56,10 +60,16 @@ function idEstadoPorDefecto(lista: EstadoCita[]): number {
  *   )}
  */
 const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) => {
+  const { user } = useAuth();
+  // Usuario.id es string (viene del backend así); medico_id en los
+  // payloads es number. Si por algo no hay usuario o el id no es
+  // numérico, cae al fallback en vez de mandar NaN al backend.
+  const medicoId = Number(user?.id) || DEFAULT_MEDICO_ID;
+
   const [estados, setEstados] = useState<EstadoCita[]>([]);
   const [formData, setFormData] = useState<CitaPayload>({
     paciente_id: paciente?.id ?? 0,
-    medico_id: DEFAULT_MEDICO_ID,
+    medico_id: medicoId,
     consultorio_id: DEFAULT_CONSULTORIO_ID,
     fecha: toLocalDateString(new Date()),
     hora_inicio: new Date().toTimeString().slice(0, 5),
@@ -69,7 +79,7 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
   });
 
   // ---------- calendario para elegir la fecha (atajo visual, opcional) ----------
-  const calendarioControl = useCalendarioData();
+  const calendarioControl = useCalendario();
 
   useEffect(() => {
     getEstadosCita()
@@ -116,7 +126,7 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
     const payload: CitaPayload = {
       ...formData,
       motivo: motivo,
-      medico_id: DEFAULT_MEDICO_ID,
+      medico_id: medicoId,
       consultorio_id: DEFAULT_CONSULTORIO_ID,
       hora_fin: (() => {
         const calculada = sumarMinutos(formData.hora_inicio, 45);
@@ -133,7 +143,7 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
     const now = new Date();
     setFormData({
       paciente_id: paciente?.id ?? 0,
-      medico_id: DEFAULT_MEDICO_ID,
+      medico_id: medicoId,
       consultorio_id: DEFAULT_CONSULTORIO_ID,
       fecha: toLocalDateString(now),
       hora_inicio: now.toTimeString().slice(0, 5),

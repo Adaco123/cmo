@@ -355,21 +355,38 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   };
 
   const buildTratamientoTexto = useCallback(
-    (meds: Grupo<MedItem>[], exams: Grupo<ExamItem>[], forms: Grupo<FormItem>[]): string => {
+    (
+      meds: Grupo<MedItem>[],
+      exams: Grupo<ExamItem>[],
+      forms: Grupo<FormItem>[],
+      indicacionesTexto: string
+    ): string => {
       const bloques = [
         bloqueCategoria("MEDICAMENTOS", meds, (m) => m.medicamento, formatMed),
         bloqueCategoria("EXÁMENES", exams, (e) => e.nombre_examen, formatExam),
         bloqueCategoria("FÓRMULAS", forms, (f) => f.nombre_formula, formatFormula),
       ].filter(Boolean);
+
+      // Las "Indicaciones generales" del drawer también deben reflejarse
+      // en el campo Tratamiento del registro clínico — antes se guardaban
+      // solo dentro del payload de recetas y se perdían de vista para
+      // cualquiera que leyera la nota médica sin abrir la receta impresa.
+      // Solo se agregan si ya hay algo recetado (igual que las demás
+      // categorías, que no aparecen si están vacías).
+      const texto = indicacionesTexto.trim();
+      if (bloques.length && texto) {
+        bloques.push(`INDICACIONES GENERALES\n${texto}`);
+      }
+
       return bloques.join("\n\n");
     },
     []
   );
 
   useEffect(() => {
-    onTratamientoChange?.(buildTratamientoTexto(medGrupos, examGrupos, formGrupos));
+    onTratamientoChange?.(buildTratamientoTexto(medGrupos, examGrupos, formGrupos, indicaciones));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [medGrupos, examGrupos, formGrupos]);
+  }, [medGrupos, examGrupos, formGrupos, indicaciones]);
 
   /* ---------- handle expuesto al padre ---------- */
   useImperativeHandle(ref, () => ({

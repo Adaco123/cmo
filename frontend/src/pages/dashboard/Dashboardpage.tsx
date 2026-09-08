@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { type DashboardTab } from '../../components/layout/Sidebar';
 import Modal from '../../components/ui/Modal';
-import { authStore } from '../../auth';
+import { useAuth } from '../../components/AuthProvider';
+import { useCalendario } from '../../components/CalendarioProvider';
 import { type Paciente } from '../../api/pacientes';
 import { usePacientes } from '../../features/pacientes/hooks/UsePacientes';
-import { useCitasHoy } from '../../features/citas/hooks/Usecitashoy';
 import PacienteForm from '../../features/pacientes/PacienteForm';
 import EditarPacienteForm from '../../features/pacientes/EditarPacienteForm';
 import PacienteExterno from '../../features/pacientes/PacienteExterno';
@@ -31,7 +31,8 @@ const ORIGEN_EXTERNO = 2;
  * Reemplaza CMODashboard.tsx. Solo coordina: qué tab está activo,
  * qué modal está abierto, y pasa los datos de los hooks hacia los
  * componentes de cada tab. Toda la lógica de fetch/estado vive en
- * usePacientes / useCitasHoy / useBuscarPaciente (dentro de NuevaAtencionTab).
+ * usePacientes / useBuscarPaciente (dentro de NuevaAtencionTab) y en
+ * CalendarioProvider (citas, vía useCalendario()).
  */
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -43,8 +44,10 @@ const DashboardPage: React.FC = () => {
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
   const [searchSeguimiento, setSearchSeguimiento] = useState('');
 
+  const { logout } = useAuth();
+
   const handleLogout = () => {
-    authStore.logout();
+    logout();
     navigate('/login');
   };
 
@@ -60,16 +63,52 @@ const DashboardPage: React.FC = () => {
     cambiarEstado,
   } = usePacientes();
 
-  const {
-    citasHoy,
-    loading: loadingCitas,
-    error: citasError,
-    finalizandoId,
-    reload: loadCitas,
-    finalizar: finalizarCita,
-  } = useCitasHoy();
-
   const { showError, showSuccess } = useErrorToast();
+
+  const calendarioControl = useCalendario();
+  const { citas, estadosCita, loading: loadingCitas, error: citasError, agendaCargada, refrescarAgenda, finalizarCita } = calendarioControl;
+
+  // La agenda del CalendarioProvider antes solo se cargaba cuando alguien
+  // abría el picker del calendario. Dashboardpage la necesita apenas se
+  // monta (para "citas de hoy"), así que la dispara acá si todavía no se
+  // cargó desde ningún otro lado.
+  useEffect(() => {
+    if (!agendaCargada && !loadingCitas) {
+      refrescarAgenda();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [finalizandoId, setFinalizandoId] = useState<number | null>(null);
+
+  const formatDateKey = (date: Date) => {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // "Citas de hoy" pendientes de atender: de la fecha de hoy, y sin contar
+  // las que ya están Canceladas o Atendidas (buscadas por NOMBRE sobre
+  // estadosCita, nunca por id — ver comentario en CalendarioProvider).
+  const estadosOcultos = new Set(['cancelada', 'atendida']);
+  const nombreEstadoPorId = new Map(estadosCita.map((e) => [e.id, e.nombre.trim().toLowerCase()]));
+  const hoyKey = formatDateKey(new Date());
+  const citasHoy = citas
+    .filter((cita) => String(cita.fecha || '').slice(0, 10) === hoyKey)
+    .filter((cita) => !estadosOcultos.has(nombreEstadoPorId.get(cita.estado_id) || ''))
+    .sort((a, b) => (a.hora_inicio || '').localeCompare(b.hora_inicio || ''));
+
+  const handleFinalizarCita = async (citaId: number) => {
+    setFinalizandoId(citaId);
+    try {
+      await finalizarCita(citaId);
+    } catch (err) {
+      showError(extractErrorMessage(err, 'No se pudo finalizar la cita.'));
+    } finally {
+      setFinalizandoId(null);
+    }
+  };
 
   const handleCambiarEstado = async (p: Paciente) => {
     const nombreCompleto = `${p.nombres} ${p.apellidos}`.trim();
@@ -97,9 +136,9 @@ const DashboardPage: React.FC = () => {
           loadingCitas={loadingCitas}
           citasError={citasError}
           finalizandoId={finalizandoId}
-          onRefreshCitas={() => void loadCitas()}
+          onRefreshCitas={() => refrescarAgenda()}
           onAtender={(p) => setSelectedPaciente(p)}
-          onFinalizar={(cita) => void finalizarCita(cita)}
+          onFinalizar={(cita) => void handleFinalizarCita(cita.id)}
         />
 
         <NuevaAtencionTab

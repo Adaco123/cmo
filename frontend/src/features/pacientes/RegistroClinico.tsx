@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom';
 import { subirArchivoExamen, descartarSesionCaptura } from '../../api/archivos';
 import type { Paciente as ApiPaciente } from '../../api/pacientes';
 import Calendario from '../citas/Calendario';
-import { useCalendarioData } from '../citas/hooks/Usecalendariodata';
+import { useCalendario } from '../../components/CalendarioProvider';
+import { useAuth } from '../../components/AuthProvider';
 import Receta from './Receta';
 import type { RecetaHandle } from './Receta';
 import styles from './RegistroClinico.module.css';
@@ -19,6 +20,9 @@ import {
 import { useErrorToast } from '../../components/ErrorToastProvider';
 import { extractErrorMessage } from '../../utils/errors';
 
+// Fallback solo por si no hay sesión resuelta todavía — en circunstancias
+// normales se usa medicoId, que sale del médico realmente logueado
+// (ver useAuth() dentro del componente).
 const MEDICO_ID = 1;
 const TIPO_ARCHIVO_POR_EXT: Record<string, number> = {
   jpg: 1, jpeg: 1, png: 1,
@@ -128,6 +132,10 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
   const pacienteIdFinal = paciente?.id ?? pacienteId;
   const diagnostico_ant = paciente?.diagnostico ?? diagnosticoPrevio;
 
+  const { user } = useAuth();
+  // Usuario.id es string; medico_id en los payloads es number.
+  const medicoId = Number(user?.id) || MEDICO_ID;
+
   const pageRef = useRef<HTMLDivElement | null>(null);
 
   const [vitales, setVitales] = useState<Record<VitalKey, string>>({
@@ -166,7 +174,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
     // hora_fin automática válida, se manda null (el backend ya lo acepta).
     return calculada > controlHoraInicio ? calculada : '';
   })();
-  const calendarioControl = useCalendarioData();
+  const calendarioControl = useCalendario();
 
   const vitalRefs = useRef<Record<VitalKey, HTMLInputElement | null>>({
     pa_sys: null, pa_dia: null, fc: null, fr: null, sat: null, temp: null, peso: null, talla: null, glu: null,
@@ -299,7 +307,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
     const payload: RegistroCompletoPayload = {
       consulta: {
         paciente_id: pacienteIdFinal!,
-        medico_id: MEDICO_ID,
+        medico_id: medicoId,
         fecha,
         hora,
         motivo: secciones.motivo.trim() || null,
@@ -776,7 +784,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
             isOpen={drawerExamOpen}
             onClose={() => setDrawerExamOpen(false)}
             contexto={{
-              medico_id: MEDICO_ID,
+              medico_id: medicoId,
               paciente_id: pacienteIdFinal,
               paciente_nombre: nombrePaciente,
               registro_numero: consultaId ? `#RC-${consultaId}` : '#RC-00128',

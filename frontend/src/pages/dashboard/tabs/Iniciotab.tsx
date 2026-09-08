@@ -1,16 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRefresh, faCalendarDays } from '@fortawesome/free-solid-svg-icons';
 import { type Paciente } from '../../../api/pacientes';
 import { type Cita } from '../../../api/citas';
 import Calendario from '../../../features/citas/Calendario';
-import { useCalendarioData } from '../../../features/citas/hooks/Usecalendariodata';
-import {
-  pagosHoy,
-  getPacientesAtendidosHoy,
-  type PagosResumenHoy,
-  type PacientesAtendidosHoy,
-} from '../../../api/reportes';
+import { useCalendario } from '../../../components/CalendarioProvider';
+import { useReportesHoy } from '../../../components/ReportesHoyProvider';
 
 interface InicioTabProps {
   active: boolean;
@@ -41,43 +36,13 @@ const InicioTab: React.FC<InicioTabProps> = ({
   onAtender,
   onFinalizar,
 }) => {
-  const [loading, setLoading] = useState(true);
-  const [pagosHoyData, setPagosHoyData] = useState<PagosResumenHoy | null>(null);
-  const [pacientesAtendidosHoy, setPacientesAtendidosHoy] = useState<PacientesAtendidosHoy | null>(null);
-  useEffect(() => {
-    let isMounted = true;
-
-    setLoading(true);
-    Promise.all([pagosHoy(), getPacientesAtendidosHoy()])
-      .then(([pagos, pacientes]) => {
-        if (isMounted) {
-          setPagosHoyData(pagos);
-          setPacientesAtendidosHoy(pacientes);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setPagosHoyData(null);
-          setPacientesAtendidosHoy(null);
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setLoading(false);
-    
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const { pagosHoyData, pacientesAtendidosHoy, loading } = useReportesHoy();
 
   // Citas y seguimientos para el calendario (todos, no solo los de hoy).
   // Se cargan solo cuando el usuario realmente abre el calendario, así no
   // pesamos el dashboard con fetches que la mayoría de las veces no hacen
   // falta.
-  const calendarioControl = useCalendarioData();
+  const calendarioControl = useCalendario();
 
   return (
     <div className={`tab-content ${active ? 'active' : ''}`}>

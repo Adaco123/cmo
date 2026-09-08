@@ -12,12 +12,19 @@ schema = EstadoCitaSchema()
 schema_list = EstadoCitaSchema(many=True)
 
 # Mismo patrón de auto-creación perezosa que _get_or_create_categoria_examen
-# en historial_clinico: garantiza que existan estos 3 nombres, en este
+# en historial_clinico: garantiza que existan estos 4 nombres, en este
 # orden, la primera vez que alguien consulta el catálogo — para que el
 # selector de estado en el frontend siempre tenga opciones aunque sea una
 # base de datos nueva. Si un nombre ya existe (por id que sea), no se
 # vuelve a crear ni se reasigna: esto nunca toca ids ya existentes.
-ESTADOS_CITA_POR_DEFECTO = ["Programada", "Cancelada", "No asistió"]
+#
+# "Atendida" se agregó porque el botón "Finalizar" del dashboard (marcar
+# que el médico ya atendió al paciente) estaba usando por error
+# estado_id=2 hardcodeado en el frontend, que en la práctica apuntaba a
+# "Cancelada" — o sea, "Finalizar" cancelaba la cita en vez de marcarla
+# como atendida. Con este estado nuevo, el frontend busca "Atendida" por
+# nombre (nunca por id) sobre este mismo catálogo.
+ESTADOS_CITA_POR_DEFECTO = ["Programada", "Cancelada", "No asistió", "Atendida"]
 
 
 def _asegurar_estados_cita_por_defecto():

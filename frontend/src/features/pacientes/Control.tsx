@@ -4,7 +4,8 @@ import { createSeguimientoControl } from '../../api/seguimientoControl';
 import type { SeguimientoControlResponse } from '../../api/seguimientoControl';
 import type { RegistroClinico } from '../../api/historialClinico';
 import Calendario from '../citas/Calendario';
-import { useCalendarioData } from '../citas/hooks/Usecalendariodata';
+import { useCalendario } from '../../components/CalendarioProvider';
+import { useAuth } from '../../components/AuthProvider';
 import Receta from './Receta';
 import type { RecetaHandle } from './Receta';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -13,7 +14,8 @@ import styles from './Control.module.css';
 import { useErrorToast } from '../../components/ErrorToastProvider';
 import { extractErrorMessage } from '../../utils/errors';
 
-// TODO: reemplazar por el id del médico autenticado cuando exista login real
+// Fallback solo por si no hay sesión resuelta todavía — ahora sí existe
+// login real (ver useAuth() dentro del componente, más abajo).
 const MEDICO_ID = 1;
 
 /** "YYYY-MM-DD" en fecha LOCAL, a diferencia de toISOString() que usa UTC
@@ -86,8 +88,12 @@ const Control: React.FC<Props> = ({
   const { showError, showSuccess } = useErrorToast();
   const evolucionRef = useRef<HTMLTextAreaElement>(null);
 
+  const { user } = useAuth();
+  // Usuario.id es string; medico_id en los payloads es number.
+  const medicoId = Number(user?.id) || MEDICO_ID;
+
   // ---------- calendario para elegir la fecha del próximo control ----------
-  const calendarioControl = useCalendarioData();
+  const calendarioControl = useCalendario();
 
   // ---------- receta del seguimiento ----------
   const [drawerRxOpen, setDrawerRxOpen] = useState(false);
@@ -143,7 +149,7 @@ const Control: React.FC<Props> = ({
       const recetaPayload = recetaRef.current?.getPayload();
 
       const resultado = await createSeguimientoControl(registroClinico.id, {
-        medico_id: MEDICO_ID,
+        medico_id: medicoId,
         evolucion: texto,
         proxima_fecha_control: proximaFechaControl,
         hora_inicio: horaInicio.trim() || null,

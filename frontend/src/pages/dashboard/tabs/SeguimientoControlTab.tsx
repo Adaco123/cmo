@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRefresh, faPen, faSave, faSpinner, faXmark, faCalendarCheck } from '@fortawesome/free-solid-svg-icons';
 import { type Paciente } from '../../../api/pacientes';
-import { type SeguimientoControl, getSeguimientos, updateSeguimientoControl } from '../../../api/seguimientoControl';
-import { type Cita, getCitas, updateCita } from '../../../api/citas';
-import { type EstadoCita, getEstadosCita } from '../../../api/estadosCita';
+import { type SeguimientoControl } from '../../../api/seguimientoControl';
+import { type Cita } from '../../../api/citas';
+import { useCalendario } from '../../../components/CalendarioProvider';
 import ViewButton from '../../../components/ui/ViewButton';
 import { useErrorToast } from '../../../components/ErrorToastProvider';
 import { extractErrorMessage } from '../../../utils/errors';
@@ -75,35 +75,24 @@ function claseEstado(nombre: string): string {
 const SeguimientoControlTab: React.FC<SeguimientoControlTabProps> = ({ active, pacientes, searchValue, onSearchChange, onVer }) => {
   const { showErrorFrom, showSuccess } = useErrorToast();
 
-  const [citas, setCitas] = useState<Cita[]>([]);
-  const [seguimientos, setSeguimientos] = useState<SeguimientoControl[]>([]);
-  const [estadosCita, setEstadosCita] = useState<EstadoCita[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [cargado, setCargado] = useState(false);
+  const {
+    citas,
+    seguimientos,
+    estadosCita,
+    agendaCargada,
+    loading,
+    error,
+    refrescarAgenda,
+  } = useCalendario();
   const [verHistorialCompleto, setVerHistorialCompleto] = useState(false);
 
   const [editando, setEditando] = useState<FilaAgenda | null>(null);
 
-  const cargar = () => {
-    setLoading(true);
-    setError(null);
-    Promise.all([getCitas(), getSeguimientos(), getEstadosCita()])
-      .then(([citasData, seguimientosData, estadosData]) => {
-        setCitas(citasData);
-        setSeguimientos(seguimientosData);
-        setEstadosCita(estadosData);
-        setCargado(true);
-      })
-      .catch(() => setError('No se pudo cargar la agenda de citas y controles.'))
-      .finally(() => setLoading(false));
-  };
-
   useEffect(() => {
-    if (active && !cargado && !loading) {
-      cargar();
+    if (active && !agendaCargada && !loading) {
+      refrescarAgenda();
     }
-  }, [active, cargado, loading]);
+  }, [active, agendaCargada, loading, refrescarAgenda]);
 
   const buscarPaciente = (pacienteId: number) => pacientes.find((p) => p.id === pacienteId) || null;
   const nombreEstado = (estadoId: number) => estadosCita.find((e) => e.id === estadoId)?.nombre ?? null;
@@ -168,13 +157,13 @@ const SeguimientoControlTab: React.FC<SeguimientoControlTabProps> = ({ active, p
                 onChange={(e) => onSearchChange(e.target.value)}
               />
             </div>
-            <button type="button" className="glow-btn" onClick={cargar} disabled={loading}>
+            <button type="button" className="glow-btn" onClick={refrescarAgenda} disabled={loading}>
               <FontAwesomeIcon icon={faRefresh} className={loading ? 'spin' : ''} /> Actualizar
             </button>
           </div>
         </div>
 
-        {loading && !cargado ? (
+        {loading && !agendaCargada ? (
           <div className="today-appointments-empty">Cargando agenda...</div>
         ) : error ? (
           <div className="today-appointments-empty">{error}</div>
@@ -252,13 +241,10 @@ const SeguimientoControlTab: React.FC<SeguimientoControlTabProps> = ({ active, p
           fila={editando}
           onClose={() => setEditando(null)}
           onGuardada={(filaActualizada) => {
-            if (filaActualizada.tipo === 'cita') {
-              setCitas((prev) => prev.map((c) => (c.id === filaActualizada.cita.id ? filaActualizada.cita : c)));
-            } else {
-              setSeguimientos((prev) =>
-                prev.map((s) => (s.id === filaActualizada.seguimiento.id ? filaActualizada.seguimiento : s)),
-              );
-            }
+            // Ya no hace falta mergear el resultado a mano acá: actualizarCita
+            // / actualizarSeguimiento (llamados dentro de EditarFilaModal) ya
+            // actualizaron el array compartido en CalendarioProvider, y este
+            // componente lee `citas`/`seguimientos` de ahí — se re-renderiza solo.
             setEditando(null);
             showSuccess(filaActualizada.tipo === 'cita' ? 'Cita actualizada.' : 'Seguimiento de control actualizado.');
           }}
@@ -282,34 +268,23 @@ interface EditarFilaModalProps {
  */
 const EditarFilaModal: React.FC<EditarFilaModalProps> = ({ fila, onClose, onGuardada, showErrorFrom }) => {
   const esCita = fila.tipo === 'cita';
+  const { estadosCita: estados, actualizarCita, actualizarSeguimiento } = useCalendario();
 
   const [fecha, setFecha] = useState(esCita ? fila.cita.fecha : (fila.seguimiento.proxima_fecha_control || ''));
   const [horaInicio, setHoraInicio] = useState((esCita ? fila.cita.hora_inicio : fila.seguimiento.hora_inicio) || '');
   const [horaFin, setHoraFin] = useState((esCita ? fila.cita.hora_fin : fila.seguimiento.hora_fin) || '');
   const [motivo, setMotivo] = useState(esCita ? (fila.cita.motivo || '') : '');
   const [estadoId, setEstadoId] = useState<number>(esCita ? fila.cita.estado_id : 0);
-  const [estados, setEstados] = useState<EstadoCita[]>([]);
   const [evolucion, setEvolucion] = useState(esCita ? '' : fila.seguimiento.evolucion);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!esCita) return;
-    getEstadosCita()
-      .then(setEstados)
-      .catch(() => {
-        // Si falla, el select queda solo con el estado actual (ver abajo) —
-        // no bloquea poder editar motivo/fecha aunque no cargue el catálogo.
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const guardar = async () => {
     setGuardando(true);
     setError(null);
     try {
       if (esCita) {
-        const citaActualizada = await updateCita(fila.cita.id, {
+        const citaActualizada = await actualizarCita(fila.cita.id, {
           fecha,
           hora_inicio: horaInicio || fila.cita.hora_inicio,
           hora_fin: horaFin || null,
@@ -318,7 +293,7 @@ const EditarFilaModal: React.FC<EditarFilaModalProps> = ({ fila, onClose, onGuar
         });
         onGuardada({ tipo: 'cita', fechaAgenda: citaActualizada.fecha, cita: citaActualizada, paciente: fila.paciente });
       } else {
-        const seguimientoActualizado = await updateSeguimientoControl(fila.seguimiento.id, {
+        const seguimientoActualizado = await actualizarSeguimiento(fila.seguimiento.id, {
           evolucion,
           proxima_fecha_control: fecha || null,
           hora_inicio: horaInicio || null,

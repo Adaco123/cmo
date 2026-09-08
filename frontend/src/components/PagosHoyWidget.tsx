@@ -1,40 +1,17 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { pagosHoy } from '../api/reportes';
+import React, { useEffect, useRef, useState } from 'react';
+import { useReportesHoy } from './ReportesHoyProvider';
 import './PagosHoyWidget.css';
-const REFRESH_MS = 60000; // definido acá arriba, fuera del componente está OK porque es una constante fija, no un hook
 
 const formatMonto = (valor: number) =>
   new Intl.NumberFormat('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valor);
 
 const PagosHoyWidget: React.FC = () => {
-  // ── Todos los hooks van AQUÍ DENTRO ──
-  const [monto, setMonto] = useState(0);
-  const [cantidadPagos, setCantidadPagos] = useState<number | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { pagosHoyData, loading, error } = useReportesHoy();
+  const monto = parseFloat(pagosHoyData?.total_pagado_hoy || '0');
+  const cantidadPagos = pagosHoyData?.cantidad_pagos;
 
   const [displayMonto, setDisplayMonto] = useState(0);
   const prevMonto = useRef(0);
-
-  const cargar = useCallback(async () => {
-    try {
-      setError(null);
-      const data = await pagosHoy();
-      setMonto(parseFloat(data.total_pagado_hoy || '0'));
-      setCantidadPagos(data.cantidad_pagos);
-    } catch (err: unknown) {
-      setError('No se pudo cargar');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Fetch inicial + refresco automático
-  useEffect(() => {
-    void cargar();
-    const interval = setInterval(() => void cargar(), REFRESH_MS);
-    return () => clearInterval(interval);
-  }, [cargar]);
 
   // Animación de conteo cuando cambia el monto
   useEffect(() => {
