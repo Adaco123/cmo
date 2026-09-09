@@ -406,6 +406,14 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
       setExamCount(0);
       recetaRef.current?.reset();
       showSuccess('Registro clínico guardado correctamente');
+
+      // Igual que en CrearCita.tsx y Control.tsx: si se cargó "Consulta
+      // control" (fecha/hora de próximo control), createRegistroCompleto
+      // ya creó ese seguimiento en el backend, pero CalendarioProvider no
+      // se entera solo — sin esto, la agenda del día / "Seguimiento y
+      // Control" seguían mostrando la lista vieja hasta recargar la página.
+      calendarioControl.refrescarAgenda();
+
       // El registro y los exámenes ya se crearon aunque algún archivo no
       // se haya podido subir — se avisa aparte (sin bloquear el flujo de
       // guardado) para que no quede como un fallo silencioso en consola.

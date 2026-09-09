@@ -5,6 +5,7 @@ import {
   type PagosResumenHoy,
   type PacientesAtendidosHoy,
 } from '../api/reportes';
+import { useAuth } from './AuthProvider';
 
 const REFRESH_MS = 60000;
 
@@ -41,6 +42,7 @@ const ReportesHoyContext = createContext<ReportesHoyContextValue | null>(null);
  * y no hace falta compartir.
  */
 export const ReportesHoyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [pagosHoyData, setPagosHoyData] = useState<PagosResumenHoy | null>(null);
   const [pacientesAtendidosHoy, setPacientesAtendidosHoy] = useState<PacientesAtendidosHoy | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,10 +62,20 @@ export const ReportesHoyProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   useEffect(() => {
+    // Igual que en PacientesProvider: no pedir nada hasta que la sesión
+    // esté resuelta, para no salir con un fetch sin token apenas arranca
+    // la app (chocaba con el login en curso y disparaba un 401 falso).
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      setPagosHoyData(null);
+      setPacientesAtendidosHoy(null);
+      setLoading(false);
+      return;
+    }
     void cargar();
     const interval = setInterval(() => void cargar(), REFRESH_MS);
     return () => clearInterval(interval);
-  }, [cargar]);
+  }, [authLoading, isAuthenticated, cargar]);
 
   return (
     <ReportesHoyContext.Provider

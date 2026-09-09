@@ -10,8 +10,8 @@ export default defineConfig({
     https: {
       // Generados con: mkcert 192.168.101.7 localhost
       // (correr ese comando dentro de frontend/ — ver README o pedirle a Claude el detalle)
-      key: fs.readFileSync('./192.168.1.12+1-key.pem'),
-      cert: fs.readFileSync('./192.168.1.12+1.pem'),
+      key: fs.readFileSync('./192.168.101.7+1-key.pem'),
+      cert: fs.readFileSync('./192.168.101.7+1.pem'),
     },
   },
 })

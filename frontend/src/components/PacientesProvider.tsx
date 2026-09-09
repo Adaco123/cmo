@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { type Paciente, getPacientes, updatePaciente } from '../api/pacientes';
+import { useAuth } from './AuthProvider';
 
 interface PacientesContextValue {
   /** Lista completa de pacientes (propios + externos), sin filtrar. */
@@ -40,6 +41,7 @@ const PacientesContext = createContext<PacientesContextValue | null>(null);
  * sobre `pacientes`.
  */
 export const PacientesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,8 +61,18 @@ export const PacientesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, []);
 
   useEffect(() => {
+    // Esperamos a que AuthProvider resuelva la sesión (init() ya
+    // terminó) antes de pedir la lista — así no salimos con un fetch
+    // sin token apenas arranca la app, que antes chocaba con el login
+    // en curso y terminaba en un 401 "fantasma".
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      setPacientes([]);
+      setLoading(false);
+      return;
+    }
     void reload();
-  }, [reload]);
+  }, [authLoading, isAuthenticated, reload]);
 
   const cambiarEstado = useCallback(async (paciente: Paciente) => {
     const estadoAnterior = paciente.estado;

@@ -152,6 +152,12 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
     const data = await createCita(payload);
     showSuccess('Cita agendada exitosamente');
 
+    // La cita se creó en el backend pero el estado compartido de
+    // CalendarioProvider (citas/seguimientos) no se entera solo —
+    // sin esto, la agenda del día / calendario seguían mostrando la
+    // lista vieja hasta recargar la página.
+    calendarioControl.refrescarAgenda();
+
     if (onSuccess) onSuccess(data);
 
     const now = new Date();

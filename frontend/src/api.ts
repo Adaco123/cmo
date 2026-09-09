@@ -34,10 +34,19 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      delete api.defaults.headers.common['Authorization'];
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      // Si la petición que falló NO llevaba token (ej. un fetch de un
+      // Provider global disparado antes de terminar el login), este 401
+      // no dice nada sobre la sesión actual — solo que ese pedido en
+      // particular no estaba autenticado. Forzar logout acá borraría un
+      // token válido recién guardado si esa respuesta llega tarde,
+      // después de que el usuario ya inició sesión.
+      const teniaToken = !!(error.config?.headers as any)?.['Authorization'];
+      if (teniaToken) {
+        localStorage.removeItem('token');
+        delete api.defaults.headers.common['Authorization'];
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);
@@ -86,4 +95,3 @@ export async function postWithRetry(url: string, data: any = {}, config: any = {
     }
   }
 }
-

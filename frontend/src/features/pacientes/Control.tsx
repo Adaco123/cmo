@@ -159,6 +159,12 @@ const Control: React.FC<Props> = ({
 
       recetaRef.current?.reset();
       showSuccess('Control guardado correctamente');
+
+      // Igual que en CrearCita.tsx: el nuevo seguimiento no aparece
+      // solo en las pantallas que leen de CalendarioProvider (ej.
+      // "Seguimiento y Control") hasta refrescar la agenda compartida.
+      calendarioControl.refrescarAgenda();
+
       onSaved?.(resultado);
     } catch (err) {
       const mensaje = extractErrorMessage(err, 'No se pudo guardar el control. Intenta de nuevo.');
