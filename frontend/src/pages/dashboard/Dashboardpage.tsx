@@ -6,7 +6,7 @@ import Modal from '../../components/ui/Modal';
 import { useAuth } from '../../components/AuthProvider';
 import { useCalendario } from '../../components/CalendarioProvider';
 import { type Paciente } from '../../api/pacientes';
-import { usePacientes } from '../../features/pacientes/hooks/UsePacientes';
+import { usePacientes } from '../../components/PacientesProvider';
 import PacienteForm from '../../features/pacientes/PacienteForm';
 import EditarPacienteForm from '../../features/pacientes/EditarPacienteForm';
 import PacienteExterno from '../../features/pacientes/PacienteExterno';
@@ -55,13 +55,31 @@ const DashboardPage: React.FC = () => {
     pacientes,
     loading: loadingPacientes,
     error: pacientesError,
-    filters,
-    handleFilterChange,
     reload: loadPacientes,
-    filteredMisPacientes,
-    filteredExternos,
     cambiarEstado,
   } = usePacientes();
+
+  // Los filtros de "Mis Pacientes" / "Externos" son estado de esta
+  // pantalla, no dato compartido — por eso viven acá y no en
+  // PacientesProvider (ver comentario en ese archivo).
+  const [filters, setFilters] = useState({ misPacientes: '', externos: '' });
+  const handleFilterChange = (key: keyof typeof filters, value: string) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+  const matchesSearch = (p: Paciente, search: string) => {
+    const q = search.toLowerCase();
+    const fullName = `${p.nombres} ${p.apellidos}`.toLowerCase();
+    return (
+      !q ||
+      fullName.includes(q) ||
+      p.documento.toLowerCase().includes(q) ||
+      (p.telefono || '').toLowerCase().includes(q) ||
+      (p.correo || '').toLowerCase().includes(q)
+    );
+  };
+  // Mismo criterio que ORIGEN_EXTERNO: origen_id === 1 es "propio".
+  const filteredMisPacientes = pacientes.filter((p) => p.origen_id === 1 && matchesSearch(p, filters.misPacientes));
+  const filteredExternos = pacientes.filter((p) => p.origen_id === ORIGEN_EXTERNO && matchesSearch(p, filters.externos));
 
   const { showError, showSuccess } = useErrorToast();
 

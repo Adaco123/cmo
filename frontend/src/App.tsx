@@ -8,24 +8,27 @@ import { ErrorToastProvider } from './components/ErrorToastProvider';
 import { CalendarioProvider } from './components/CalendarioProvider';
 import { AuthProvider } from './components/AuthProvider';
 import { ReportesHoyProvider } from './components/ReportesHoyProvider';
+import { PacientesProvider } from './components/PacientesProvider';
 
 function App() {
   return (
     <AuthProvider>
       <ErrorToastProvider>
-        <CalendarioProvider>
-          <ReportesHoyProvider>
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<EcoVisionHome />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/dashboard" element={<DashboardPage/>} />
-                <Route path="/historia-clinica" element={<HistoriaClinica />} />
-                <Route path="/capturar-fotos/:token" element={<CapturarFotos />} />
-              </Routes>
-            </BrowserRouter>
-          </ReportesHoyProvider>
-        </CalendarioProvider>
+        <PacientesProvider>
+          <CalendarioProvider>
+            <ReportesHoyProvider>
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<EcoVisionHome />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/dashboard" element={<DashboardPage/>} />
+                  <Route path="/historia-clinica" element={<HistoriaClinica />} />
+                  <Route path="/capturar-fotos/:token" element={<CapturarFotos />} />
+                </Routes>
+              </BrowserRouter>
+            </ReportesHoyProvider>
+          </CalendarioProvider>
+        </PacientesProvider>
       </ErrorToastProvider>
     </AuthProvider>
   );

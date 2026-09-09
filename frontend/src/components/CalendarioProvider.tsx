@@ -6,8 +6,9 @@ import {
   getSeguimientos,
   updateSeguimientoControl,
 } from '../api/seguimientoControl';
-import { type Paciente, getPacientes } from '../api/pacientes';
+import { type Paciente } from '../api/pacientes';
 import { type EstadoCita, getEstadosCita } from '../api/estadosCita';
+import { usePacientes } from './PacientesProvider';
 
 interface CalendarioContextValue {
   abierto: boolean;
@@ -76,12 +77,17 @@ const CalendarioContext = createContext<CalendarioContextValue | null>(null);
  * no "Completada"/"Atendida". O sea, el botón "Finalizar" del dashboard
  * en realidad cancelaba la cita. Se agregó el estado "Atendida" al
  * catálogo del backend, y acá se busca siempre por nombre.
+ *
+ * `pacientes` YA NO se pide acá — se lee de PacientesProvider (que debe
+ * montarse arriba de este Provider en App.tsx), para no tener dos copias
+ * de la misma lista completa de pacientes en la app.
  */
 export const CalendarioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { pacientes } = usePacientes();
+
   const [abierto, setAbierto] = useState(false);
   const [citas, setCitas] = useState<Cita[]>([]);
   const [seguimientos, setSeguimientos] = useState<SeguimientoControl[]>([]);
-  const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [estadosCita, setEstadosCita] = useState<EstadoCita[]>([]);
   const [agendaCargada, setAgendaCargada] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -90,11 +96,10 @@ export const CalendarioProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const cargarDatos = useCallback(() => {
     setLoading(true);
     setError(null);
-    Promise.all([getCitas(), getSeguimientos(), getPacientes(), getEstadosCita()])
-      .then(([citasData, seguimientosData, pacientesData, estadosData]) => {
+    Promise.all([getCitas(), getSeguimientos(), getEstadosCita()])
+      .then(([citasData, seguimientosData, estadosData]) => {
         setCitas(citasData);
         setSeguimientos(seguimientosData);
-        setPacientes(pacientesData);
         setEstadosCita(estadosData);
         setAgendaCargada(true);
       })

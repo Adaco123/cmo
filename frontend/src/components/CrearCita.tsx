@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createCita, type CitaPayload } from '../api/citas';
-import { type EstadoCita, getEstadosCita } from '../api/estadosCita';
+import { type EstadoCita } from '../api/estadosCita';
 import Calendario from '../features/citas/Calendario';
 import { useCalendario } from './CalendarioProvider';
 import { useAuth } from './AuthProvider';
@@ -32,6 +32,15 @@ function toLocalDateString(d: Date): string {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+/** "YYYY-MM-DD" -> "DD/MM/AAAA" (mismo formato que usa Control.tsx). */
+function formatFechaLegible(fechaYmd: string): string {
+  return new Date(fechaYmd + 'T00:00:00').toLocaleDateString('es-BO', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 }
 
 /** Suma 1 hora a un "HH:MM" y maneja el desborde de medianoche (23:30 -> 00:30). */
@@ -66,7 +75,6 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
   // numérico, cae al fallback en vez de mandar NaN al backend.
   const medicoId = Number(user?.id) || DEFAULT_MEDICO_ID;
 
-  const [estados, setEstados] = useState<EstadoCita[]>([]);
   const [formData, setFormData] = useState<CitaPayload>({
     paciente_id: paciente?.id ?? 0,
     medico_id: medicoId,
@@ -80,19 +88,25 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
 
   // ---------- calendario para elegir la fecha (atajo visual, opcional) ----------
   const calendarioControl = useCalendario();
+  const estados = calendarioControl.estadosCita;
 
   useEffect(() => {
-    getEstadosCita()
-      .then((data) => {
-        setEstados(data);
-        setFormData((prev) => ({ ...prev, estado_id: prev.estado_id || idEstadoPorDefecto(data) }));
-      })
-      .catch(() => {
-        // Si falla, el select queda vacío — el resto del formulario sigue
-        // usable, pero no se podrá enviar sin elegir estado manualmente
-        // (y no habrá opciones entre las que elegir hasta reintentar).
-      });
+    // Si ninguna otra pantalla ya cargó la agenda (citas/estados/etc.),
+    // la disparamos acá — CrearCita puede montarse fuera del dashboard
+    // (ej. desde VerPaciente en /historia-clinica), donde nadie más la
+    // pidió todavía. Si ya está cargada, agendaCargada evita repetir el
+    // fetch.
+    if (!calendarioControl.agendaCargada && !calendarioControl.loading) {
+      calendarioControl.refrescarAgenda();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (estados.length > 0) {
+      setFormData((prev) => ({ ...prev, estado_id: prev.estado_id || idEstadoPorDefecto(estados) }));
+    }
+  }, [estados]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -203,26 +217,15 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
             <div className={`${styles.row} ${styles.rowTwo}`}>
               <div className={styles.fieldGroup}>
                 <label htmlFor="fecha">Fecha *</label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    type="date"
-                    id="fecha"
-                    name="fecha"
-                    value={formData.fecha}
-                    onChange={handleChange}
-                    required
-                    style={{ flex: 1 }}
-                  />
-                  <button
-                    type="button"
-                    className={styles.closeBtn}
-                    title="Elegir fecha en calendario"
-                    onClick={calendarioControl.abrir}
-                    style={{ position: 'static', flexShrink: 0 }}
-                  >
-                    <FontAwesomeIcon icon={faCalendarDays} />
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  id="fecha"
+                  className={styles.fechaBtn}
+                  onClick={calendarioControl.abrir}
+                >
+                  <FontAwesomeIcon icon={faCalendarDays} />
+                  {formData.fecha ? formatFechaLegible(formData.fecha) : 'Elegir fecha'}
+                </button>
               </div>
               <div className={styles.fieldGroup}>
                 <label htmlFor="hora_inicio">Hora inicio *</label>

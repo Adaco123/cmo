@@ -171,6 +171,38 @@
   min-height: 34px;
 }
 
+/* Botón que reemplaza al input de fecha nativo (ver CrearCita.tsx) — mismo
+ * aspecto que un .fieldGroup input normal, pero es un <button> que abre
+ * el calendario en vez de un campo editable a mano. */
+.fechaBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 7px 10px;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-main);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.fechaBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.fechaBtn:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
 /* ----- BOTÓN GUARDAR ----- */
 .btnGuardar {
   padding: 10px 20px;
