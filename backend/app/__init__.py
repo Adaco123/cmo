@@ -58,7 +58,7 @@ BLUEPRINTS = (
     (tipos_archivo_bp, "/api/tipos_archivo"),
     (usuarios_bp, "/api/usuarios"),
     (recetas_bp,"/api/recetas"),
-    (examenes_complementarios_bp,"api/examenes"),
+    (examenes_complementarios_bp, "/api/examenes"),
 )
 
 

@@ -291,22 +291,6 @@
   color: color-mix(in srgb, var(--status-inactive) 45%, transparent);
 }
 
-.chip.chipAlert {
-  border-color: color-mix(in srgb, var(--status-inactive) 40%, transparent);
-  background: var(--bg-card);
-}
-
-.chip.chipAlert:hover {
-  background: color-mix(in srgb, var(--status-inactive) 14%, transparent);
-}
-
-.chip.chipAlert.active {
-  border-color: var(--status-inactive);
-  background: var(--status-inactive);
-  color: #fff;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-inactive) 22%, transparent);
-}
-
 /* inputs de texto/número dentro de un .field */
 .field :is(textarea, input[type="text"], input[type="number"]) {
   width: 100%;
@@ -434,6 +418,14 @@
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+/* Asterisco rojo para marcar campos obligatorios (signos vitales
+   requeridos para poder guardar el registro clínico). */
+.reqAsterisk {
+  color: var(--status-inactive);
+  font-weight: 700;
+  margin-left: 2px;
 }
 
 .vslot .vinputs {

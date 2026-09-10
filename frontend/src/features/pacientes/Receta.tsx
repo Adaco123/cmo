@@ -10,6 +10,7 @@ import React, {
 import { createPortal } from "react-dom";
 import styles from "./Receta.module.css";
 import RecetaImprimir from "../../assets/mosol.png"
+import { getCategoriasExamen, type CategoriaExamen } from "../../api/examenesComplementarios";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faFileMedical,
@@ -48,7 +49,7 @@ export interface RecetaPayloadSalida {
     frecuencia: string; duracion: string | null; cantidad: string | null; indicaciones: string | null;
   }>[];
   examenes?: RecetaBloque<{
-    nombre_examen: string; tipo_examen: string; urgencia: string; indicaciones_previas: string | null;
+    nombre_examen: string; categoria_id: number; urgencia: string; indicaciones_previas: string | null;
   }>[];
   formulas?: RecetaBloque<{
     nombre_formula: string; ingredientes: string; forma_farmaceutica: string | null;
@@ -78,7 +79,10 @@ interface MedItem {
 interface ExamItem {
   id: number;
   nombre_examen: string;
-  tipo_examen: string;
+  // Guarda el NOMBRE de la categoría (igual que urgencia guarda "Rutina"/
+  // "Urgente"); se resuelve a categoria_id recién al armar el payload,
+  // contra la lista cargada de getCategoriasExamen().
+  categoria: string;
   urgencia: "Rutina" | "Urgente";
   indicaciones_previas: string;
 }
@@ -141,6 +145,9 @@ const MED_FIELDS: FieldDef[] = [
 
 const EXAM_FIELDS: FieldDef[] = [
   { key: "nombre_examen", label: "Examen", placeholder: "Hemograma completo", width: "lg", required: true, autocomplete: true },
+  // select se completa en tiempo real con las categorías del backend
+  // (ver fieldsByTab más abajo); acá queda vacío como placeholder.
+  { key: "categoria", label: "Categoría", width: "sm", required: true, select: [] },
   { key: "urgencia", label: "Urgencia", width: "sm", select: ["Rutina", "Urgente"] },
   { key: "indicaciones_previas", label: "Indicaciones previas", placeholder: "En ayunas 8h", width: "md" },
 ];
@@ -166,10 +173,10 @@ const NAME_KEY_BY_TAB: Record<Tab, string> = {
   formulas: "nombre_formula",
 };
 
-function emptyDraftFor(t: Tab): Record<string, string> {
+function emptyDraftFor(t: Tab, categoriasExamen: CategoriaExamen[] = []): Record<string, string> {
   const base: Record<string, string> = {};
   FIELDS_BY_TAB[t].forEach((f) => { base[f.key] = ""; });
-  if (t === "examenes") { base.tipo_examen = "General"; base.urgencia = "Rutina"; }
+  if (t === "examenes") { base.categoria = categoriasExamen[0]?.nombre || ""; base.urgencia = "Rutina"; }
   return base;
 }
 
@@ -285,6 +292,32 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
 
   const fieldRefs = useRef<Record<string, HTMLInputElement | HTMLSelectElement | null>>({});
 
+  // Catálogo de categorías de examen (laboratorio, imagenología, etc.),
+  // el mismo que usa Examenes.tsx. Se carga una vez al montar.
+  const [categoriasExamen, setCategoriasExamen] = useState<CategoriaExamen[]>([]);
+  useEffect(() => {
+    getCategoriasExamen().then(setCategoriasExamen).catch(() => {});
+  }, []);
+
+  // Igual que FIELDS_BY_TAB, pero con el select de "categoria" ya
+  // completado con las categorías reales cargadas del backend.
+  const fieldsByTab = useMemo<Record<Tab, FieldDef[]>>(() => ({
+    ...FIELDS_BY_TAB,
+    examenes: FIELDS_BY_TAB.examenes.map((f) =>
+      f.key === "categoria" ? { ...f, select: categoriasExamen.map((c) => c.nombre) } : f
+    ),
+  }), [categoriasExamen]);
+
+  // Si la pestaña activa es exámenes y el borrador todavía no tiene
+  // categoría (llegó vacío antes de que termine de cargar el catálogo),
+  // la completa con la primera disponible.
+  useEffect(() => {
+    if (tab === "examenes" && !draft.categoria && categoriasExamen[0]) {
+      setDraft((d) => ({ ...d, categoria: categoriasExamen[0].nombre }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoriasExamen, tab]);
+
   const fechaPartes = useMemo(() => {
     const d = new Date();
     return {
@@ -324,7 +357,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   };
 
   const formatExam = (e: ExamItem) => {
-    const partes = [e.tipo_examen, e.urgencia].filter(Boolean).join(" · ");
+    const partes = [e.categoria, e.urgencia].filter(Boolean).join(" · ");
     return `${e.nombre_examen}${partes ? " — " + partes : ""}`;
   };
 
@@ -414,12 +447,15 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
       }
 
       if (flatten(examGrupos).length) {
-        payload.examenes = bloques(examGrupos, (e) => ({
-          nombre_examen: e.nombre_examen,
-          tipo_examen: e.tipo_examen || "General",
-          urgencia: e.urgencia,
-          indicaciones_previas: e.indicaciones_previas || null,
-        }));
+        payload.examenes = bloques(examGrupos, (e) => {
+          const categoria = categoriasExamen.find((c) => c.nombre === e.categoria);
+          return {
+            nombre_examen: e.nombre_examen,
+            categoria_id: categoria?.id ?? categoriasExamen[0]?.id ?? 0,
+            urgencia: e.urgencia,
+            indicaciones_previas: e.indicaciones_previas || null,
+          };
+        });
       }
 
       if (flatten(formGrupos).length) {
@@ -442,7 +478,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
       setIndicaciones("Tomar agua y descansar");
       setGrupoActivoId({ medicamentos: 1, examenes: 1, formulas: 1 });
       setGrupoPreview(1);
-      setDraft(emptyDraftFor(tab));
+      setDraft(emptyDraftFor(tab, categoriasExamen));
       grupoSeqRef.current = { medicamentos: 2, examenes: 2, formulas: 2 };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -484,7 +520,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
       const obj: ExamItem = {
         id,
         nombre_examen: values.nombre_examen.trim(),
-        tipo_examen: (values.tipo_examen || "General").trim(),
+        categoria: (values.categoria || categoriasExamen[0]?.nombre || "").trim(),
         urgencia: values.urgencia === "Urgente" ? "Urgente" : "Rutina",
         indicaciones_previas: (values.indicaciones_previas || "").trim(),
       };
@@ -522,7 +558,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
       return;
     }
     commitValues(draft);
-    setDraft(emptyDraftFor(tab));
+    setDraft(emptyDraftFor(tab, categoriasExamen));
     setShowSuggestions(false);
     fieldRefs.current[NAME_KEY_BY_TAB[tab]]?.focus();
   };
@@ -626,7 +662,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   const applySuggestion = (i: number) => {
     const entry = filtered[i];
     if (!entry) return;
-    setDraft({ ...emptyDraftFor(tab), ...entry });
+    setDraft({ ...emptyDraftFor(tab, categoriasExamen), ...entry });
     setShowSuggestions(false);
   };
 
@@ -663,7 +699,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   /* ---------- cambio de pestaña ---------- */
   const switchTab = (t: Tab) => {
     setTab(t);
-    setDraft(emptyDraftFor(t));
+    setDraft(emptyDraftFor(t, categoriasExamen));
     setShowSuggestions(false);
     setTimeout(() => fieldRefs.current[NAME_KEY_BY_TAB[t]]?.focus(), 0);
   };
@@ -798,7 +834,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   const handleChipClick = (label: string) => {
     const nameKey = NAME_KEY_BY_TAB[tab];
     const dbItem = DB[tab].find((d) => d[nameKey] === label);
-    if (dbItem) commitValues({ ...emptyDraftFor(tab), ...dbItem });
+    if (dbItem) commitValues({ ...emptyDraftFor(tab, categoriasExamen), ...dbItem });
   };
 
   /* ---------- render de línea del ticket ---------- */
@@ -1018,7 +1054,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
                   >
                     <span className={styles.name}>{item[f.key]}</span>
                     <span className={styles.preview}>
-                      {[item.dosis, item.via_administracion, item.frecuencia, item.duracion, item.tipo_examen, item.ingredientes]
+                      {[item.dosis, item.via_administracion, item.frecuencia, item.duracion, item.categoria, item.ingredientes]
                         .filter(Boolean).slice(0, 2).join(" · ")}
                       <span className={styles["sugg-tabhint"]}>Tab</span>
                     </span>
@@ -1117,7 +1153,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
 
                 <div className={styles["row-entry"]}>
                   <div className={styles["campo-grid"]}>
-                    {FIELDS_BY_TAB[tab].map(renderCampo)}
+                    {fieldsByTab[tab].map(renderCampo)}
                     <button type="button" className={cx(styles["icon-btn"], styles.primary, styles["add-btn"])} title="Agregar (Enter)" onClick={attemptCommit}>
                       <FontAwesomeIcon icon={faPlus} /> Agregar
                     </button>

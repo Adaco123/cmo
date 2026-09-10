@@ -1,5 +1,6 @@
 from marshmallow import fields, validate
 from app.extensions import ma
+from app.examenes_complementarios.schemas import CategoriaExamenSchema
 
 class TipoRecetaSchema(ma.Schema):
     id = fields.Integer(dump_only=True)
@@ -39,9 +40,11 @@ class RecetaExamenSchema(ma.Schema):
     receta_id = fields.Integer(dump_only=True)
 
     nombre_examen = fields.String(required=True, validate=validate.Length(max=200))
-    tipo_examen = fields.String(required=True, validate=validate.Length(max=30))
+    categoria_id = fields.Integer(required=True)
     urgencia = fields.String(load_default="Rutina", validate=validate.Length(max=20))
     indicaciones_previas = fields.String(allow_none=True, validate=validate.Length(max=300))
+
+    categoria = fields.Nested(CategoriaExamenSchema, dump_only=True)
 
 
 class RecetaSchema(ma.Schema):

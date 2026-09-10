@@ -29,7 +29,11 @@ export interface RecetaFormulaMagistralItemPayload {
 
 export interface RecetaExamenItemPayload {
   nombre_examen: string;
-  tipo_examen: string;
+  // Antes era tipo_examen (texto libre). Ahora usa el mismo catálogo que
+  // examenes_complementarios (ver getCategoriasExamen en
+  // examenesComplementarios.ts), para que la categoría de la solicitud y
+  // la del resultado nunca queden desincronizadas.
+  categoria_id: number;
   urgencia?: string; // load_default="Rutina" en el backend
   indicaciones_previas?: string | null;
 }
@@ -70,6 +74,7 @@ export interface RecetaExamen extends Omit<RecetaExamenItemPayload, 'urgencia'> 
   id: number;
   receta_id: number;
   urgencia: string; // el backend siempre la devuelve rellena (default "Rutina")
+  categoria?: { id: number; nombre: string };
 }
 
 export interface Receta {

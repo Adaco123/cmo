@@ -138,6 +138,17 @@ body {
   box-shadow: 6px 0 45px rgba(46, 68, 87, 0.08);
   z-index: 10;
   transition: width var(--transition-smooth), padding var(--transition-smooth);
+  /* Permite scroll vertical cuando el contenido no cabe (pantallas
+     pequeñas / poca altura), pero oculta la barra de scroll visualmente
+     para no romper el diseño ("scroll invisible"). */
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE / viejo Edge */
+}
+
+.sidebar::-webkit-scrollbar {
+  display: none;               /* Chrome, Safari, Edge Chromium */
 }
 
 .sidebar-brand {

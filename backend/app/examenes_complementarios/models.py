@@ -29,6 +29,10 @@ class ExamenComplementario(db.Model, BaseModelMixin):
 
     registro_clinico_id = db.Column(db.BigInteger, db.ForeignKey('registros_clinicos.id'), nullable=False)
     categoria_id = db.Column(db.SmallInteger, db.ForeignKey('categorias_examen.id'), nullable=False)
+    # Nullable: NULL cuando el paciente trae el examen directo (sin solicitud
+    # previa). Si el médico lo solicitó en una receta, apunta a esa fila y
+    # esta se crea vacía (resultado=NULL) en el momento de la solicitud.
+    receta_examen_id = db.Column(db.BigInteger, db.ForeignKey('receta_examenes.id'), nullable=True)
 
     nombre_examen = db.Column(db.String(200), nullable=False)
     resultado = db.Column(db.Text)
@@ -48,6 +52,7 @@ class ExamenComplementario(db.Model, BaseModelMixin):
     registro_clinico = db.relationship("RegistroClinico", back_populates="examenes_complementarios")
     categoria = db.relationship("CategoriaExamen", back_populates="examenes")
     archivos = db.relationship("Archivo", back_populates="examen_complementario", cascade="all, delete-orphan")
+    receta_examen = db.relationship("RecetaExamen", back_populates="resultado_examen")
 
     def __repr__(self):
         return f"<ExamenComplementario id={self.id} nombre_examen={self.nombre_examen}>"

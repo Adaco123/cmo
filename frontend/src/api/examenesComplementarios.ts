@@ -1,13 +1,37 @@
 /**
- * CRUD independiente de exámenes complementarios: por ahora solo existe
- * lectura/borrado (ver ExamenComplementario_Resource en el backend). La
- * creación sigue siendo únicamente como parte del payload combinado en
- * POST /historial_clinico/registro-completo; el PUT de edición de ese
- * mismo endpoint ya NO crea ni edita exámenes, solo los deja tal cual.
+ * CRUD independiente de exámenes complementarios. La creación sigue siendo
+ * únicamente como parte del payload combinado en
+ * POST /historial_clinico/registro-completo (o del seguimiento); acá solo
+ * viven las operaciones sueltas sobre un examen ya existente: leer el
+ * catálogo de categorías y completar la observación de un resultado
+ * pendiente (la solicitud de un examen crea, del lado del backend, un
+ * ExamenComplementario espejo en estado "Pendiente" vinculado a
+ * receta_examen_id).
  */
 import api from '../api';
 
 export type CategoriaExamenNombre = 'Laboratorio' | 'Imagenología' | 'Otro';
+
+export interface CategoriaExamen {
+  id: number;
+  nombre: string;
+}
+
+export async function getCategoriasExamen(): Promise<CategoriaExamen[]> {
+  const { data } = await api.get<CategoriaExamen[]>('/api/examenes/categorias');
+  return data;
+}
+
+export async function updateObservacionesExamen(
+  examenId: number,
+  observaciones: string,
+): Promise<ExamenComplementario> {
+  const { data } = await api.put<ExamenComplementario>(
+    `/api/examenes/${examenId}/observaciones`,
+    { observaciones },
+  );
+  return data;
+}
 
 /** Lo que el frontend arma para cada línea del dock de exámenes. */
 export interface ExamenComplementarioItemPayload {
@@ -23,6 +47,9 @@ export interface ExamenComplementario {
   registro_clinico_id: number;
   categoria_id: number;
   categoria?: { id: number; nombre: string };
+  // Presente cuando este examen es el resultado de un examen solicitado
+  // en una receta (nace en null, sin foto/observaciones, como "Pendiente").
+  receta_examen_id?: number | null;
   nombre_examen: string;
   resultado?: string | null;
   observaciones?: string | null;

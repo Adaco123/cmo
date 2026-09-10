@@ -82,23 +82,21 @@ type VitalKey = 'pa_sys' | 'pa_dia' | 'fc' | 'fr' | 'sat' | 'temp' | 'peso' | 't
 const VITAL_ORDER: VitalKey[] = ['pa_sys', 'pa_dia', 'fc', 'fr', 'sat', 'temp', 'peso', 'talla', 'glu'];
 
 // NOTA: 'tratamiento' se mantiene en esta lista solo como definición de
-// metadatos (label/icon/placeholder) para reutilizarlos en el bloque
-// especial de solo lectura más abajo. Se filtra explícitamente del
-// .map() genérico porque su edición manual está deshabilitada: el
-// contenido llega automáticamente desde Receta.tsx (pestaña Medicamentos).
+// metadatos (label/icon) para reutilizarlos en el bloque especial de
+// solo lectura más abajo. Se filtra explícitamente del .map() genérico
+// porque su edición manual está deshabilitada: el contenido llega
+// automáticamente desde Receta.tsx (pestaña Medicamentos).
 const SECTIONS = [
-  { key: 'motivo', label: 'Motivo de consulta', icon: 'fa-question-circle', placeholder: 'Motivo por el que acude el paciente a consulta...' },
-  { key: 'enfermedad_actual', label: 'Enfermedad actual', icon: 'fa-history', placeholder: 'Tiempo de evolución, síntomas, características...' },
-  { key: 'examen_fisico', label: 'Examen físico', icon: 'fa-stethoscope', placeholder: 'Hallazgos al examen físico por sistemas...' },
-  { key: 'hallazgos_ecograficos', label: 'Hallazgos ecográficos', icon: 'fa-wave-square', placeholder: 'Hallazgos observados en la ecografía...' },
-  { key: 'diagnostico', label: 'Diagnóstico', icon: 'fa-diagnoses', placeholder: 'Diagnóstico presuntivo o definitivo, CIE-10 si aplica...' },
-  { key: 'tratamiento', label: 'Tratamiento', icon: 'fa-prescription-bottle-alt', placeholder: 'Se completa automáticamente al recetar medicamentos, exámenes o fórmulas...' },
-  { key: 'observaciones', label: 'Observaciones', icon: 'fa-comment-medical', placeholder: 'Notas adicionales (opcional)...' },
+  { key: 'motivo', label: 'Motivo de consulta', icon: 'fa-question-circle' },
+  { key: 'enfermedad_actual', label: 'Enfermedad actual', icon: 'fa-history' },
+  { key: 'examen_fisico', label: 'Examen físico', icon: 'fa-stethoscope' },
+  { key: 'hallazgos_ecograficos', label: 'Hallazgos ecográficos', icon: 'fa-wave-square' },
+  { key: 'diagnostico', label: 'Diagnóstico', icon: 'fa-diagnoses' },
+  { key: 'tratamiento', label: 'Tratamiento', icon: 'fa-prescription-bottle-alt' },
+  { key: 'observaciones', label: 'Observaciones', icon: 'fa-comment-medical' },
 ] as const;
 
 type SectionKey = typeof SECTIONS[number]['key'];
-
-const ALERGIA_CHIPS = ['Penicilina', 'AINES', 'Sulfas'];
 
 const CONTROL_CHIPS: { label: string; val: string }[] = [
   { label: '7 días', val: '7' },
@@ -215,12 +213,6 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
       vitalRefs.current.glu?.focus();
     }
   };
-
-  const handleAlergiaChip = (val: string) => {
-    setAlergiasRegistro(val);
-    document.getElementById('sec_motivo')?.focus();
-  };
-
 
   // Recibe el texto ya armado desde Receta.tsx (medicamentos, exámenes y
   // fórmulas) y lo vuelca en secciones.tratamiento. Este es el ÚNICO lugar
@@ -548,21 +540,21 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                 </div>
                 <div className={styles.vitalsRow}>
                   <div className={styles.vslot}>
-                    <label>Presión arterial</label>
+                    <label>Presión arterial <span className={styles.reqAsterisk}>*</span></label>
                     <div className={styles.vinputs}>
                       <input ref={setVitalRef('pa_sys')} className={vitales.pa_sys ? styles.ok : ''} value={vitales.pa_sys}
-                        onChange={e => setVital('pa_sys', e.target.value, 3)} placeholder="120" inputMode="numeric" maxLength={3} />
+                        onChange={e => setVital('pa_sys', e.target.value, 3)} inputMode="numeric" maxLength={3} />
                       <span className={styles.sep}>/</span>
                       <input ref={setVitalRef('pa_dia')} className={vitales.pa_dia ? styles.ok : ''} value={vitales.pa_dia}
-                        onChange={e => setVital('pa_dia', e.target.value, 3)} placeholder="80" inputMode="numeric" maxLength={3} />
+                        onChange={e => setVital('pa_dia', e.target.value, 3)} inputMode="numeric" maxLength={3} />
                       <span className={styles.unit}>mmHg</span>
                     </div>
                   </div>
                   <div className={styles.vslot}>
-                    <label>Frec. cardíaca</label>
+                    <label>Frec. cardíaca <span className={styles.reqAsterisk}>*</span></label>
                     <div className={styles.vinputs}>
                       <input ref={setVitalRef('fc')} className={vitales.fc ? styles.ok : ''} value={vitales.fc}
-                        onChange={e => setVital('fc', e.target.value, 3)} placeholder="78" inputMode="numeric" maxLength={3} />
+                        onChange={e => setVital('fc', e.target.value, 3)} inputMode="numeric" maxLength={3} />
                       <span className={styles.unit}>lpm</span>
                     </div>
                   </div>
@@ -570,31 +562,31 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                     <label>Frec. respiratoria</label>
                     <div className={styles.vinputs}>
                       <input ref={setVitalRef('fr')} className={vitales.fr ? styles.ok : ''} value={vitales.fr}
-                        onChange={e => setVital('fr', e.target.value, 2)} placeholder="16" inputMode="numeric" maxLength={2} />
+                        onChange={e => setVital('fr', e.target.value, 2)} inputMode="numeric" maxLength={2} />
                       <span className={styles.unit}>rpm</span>
                     </div>
                   </div>
                   <div className={styles.vslot}>
-                    <label>Saturación O2</label>
+                    <label>Saturación O2 <span className={styles.reqAsterisk}>*</span></label>
                     <div className={styles.vinputs}>
                       <input ref={setVitalRef('sat')} className={vitales.sat ? styles.ok : ''} value={vitales.sat}
-                        onChange={e => setVital('sat', e.target.value, 3)} placeholder="97" inputMode="numeric" maxLength={3} />
+                        onChange={e => setVital('sat', e.target.value, 3)} inputMode="numeric" maxLength={3} />
                       <span className={styles.unit}>%</span>
                     </div>
                   </div>
                   <div className={styles.vslot}>
-                    <label>Temperatura</label>
+                    <label>Temperatura <span className={styles.reqAsterisk}>*</span></label>
                     <div className={styles.vinputs}>
                       <input ref={setVitalRef('temp')} className={`${styles.wide} ${vitales.temp ? styles.ok : ''}`} value={vitales.temp}
-                        onChange={e => setVital('temp', e.target.value, 99, false)} placeholder="36.5" inputMode="decimal" />
+                        onChange={e => setVital('temp', e.target.value, 99, false)} inputMode="decimal" />
                       <span className={styles.unit}>°C</span>
                     </div>
                   </div>
                   <div className={styles.vslot}>
-                    <label>Peso</label>
+                    <label>Peso <span className={styles.reqAsterisk}>*</span></label>
                     <div className={styles.vinputs}>
                       <input ref={setVitalRef('peso')} className={`${styles.wide} ${vitales.peso ? styles.ok : ''}`} value={vitales.peso}
-                        onChange={e => setVital('peso', e.target.value, 99, false)} placeholder="70" inputMode="decimal" />
+                        onChange={e => setVital('peso', e.target.value, 99, false)} inputMode="decimal" />
                       <span className={styles.unit}>kg</span>
                     </div>
                   </div>
@@ -602,7 +594,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                     <label>Talla</label>
                     <div className={styles.vinputs}>
                       <input ref={setVitalRef('talla')} className={`${styles.wide} ${vitales.talla ? styles.ok : ''}`} value={vitales.talla}
-                        onChange={e => setTalla(e.target.value)} placeholder="1.70" inputMode="numeric" maxLength={4} />
+                        onChange={e => setTalla(e.target.value)} inputMode="numeric" maxLength={4} />
                       <span className={styles.unit}>m</span>
                     </div>
                   </div>
@@ -610,7 +602,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                     <label>Glicemia</label>
                     <div className={styles.vinputs}>
                       <input ref={setVitalRef('glu')} className={`${styles.wide} ${vitales.glu ? styles.ok : ''}`} value={vitales.glu}
-                        onChange={e => setVital('glu', e.target.value, 99, false)} placeholder="95" inputMode="decimal" />
+                        onChange={e => setVital('glu', e.target.value, 99, false)} inputMode="decimal" />
                       <span className={styles.unit}>mg/dL</span>
                     </div>
                   </div>
@@ -623,15 +615,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                   <i className={`fas fa-allergies ${styles.ficon}`}></i> Alergias
                   {alergiasRegistro.trim() && <span className={styles.badgeOk}>✓</span>}
                 </div>
-                <input ref={alergiasRef} type="text" value={alergiasRegistro} onChange={e => setAlergiasRegistro(e.target.value)}
-                  placeholder="Alergia nueva detectada en esta consulta..." />
-                <div className={styles.chips}>
-                  {ALERGIA_CHIPS.map(val => (
-                    <div key={val} className={`${styles.chip} ${styles.chipAlert} ${alergiasRegistro === val ? styles.active : ''}`} onClick={() => handleAlergiaChip(val)}>
-                      {val}
-                    </div>
-                  ))}
-                </div>
+                <input ref={alergiasRef} type="text" value={alergiasRegistro} onChange={e => setAlergiasRegistro(e.target.value)} />
                 {alergiasPrevias.trim() && (
                   <div className={styles.subhint}>Ya registradas: {alergiasPrevias}</div>
                 )}
@@ -648,7 +632,6 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                     rows={2}
                     value={secciones[s.key]}
                     onChange={e => setSecciones(prev => ({ ...prev, [s.key]: e.target.value }))}
-                    placeholder={s.placeholder}
                   />
                 </div>
               ))}
@@ -670,7 +653,6 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                   value={secciones.tratamiento}
                   readOnly
                   disabled
-                  placeholder="Se completa automáticamente al recetar medicamentos (Alt+R → Medicamentos)..."
                 />
                 <div className={styles.subhint}>Este campo se llena solo desde “Recetar” → Medicamentos</div>
               </div>
@@ -685,7 +667,6 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                   rows={2}
                   value={controlNota}
                   onChange={e => setControlNota(e.target.value)}
-                  placeholder="Ej: Antibiótico por 7 días, control por persistencia de fiebre..."
                 />
                 <div className={styles.chips}>
                   {CONTROL_CHIPS.map(c => (

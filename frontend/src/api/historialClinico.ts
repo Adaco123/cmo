@@ -226,14 +226,14 @@ export async function getExpedientePaciente(pacienteId: number): Promise<any> {
   return data;
 }
 
-export async function downloadRegistroClinicoPdf(registroId: number): Promise<void> {
+export async function downloadRegistroClinicoPdf(registroId: number, nombreArchivo?: string,): Promise<void> {
   const response = await api.get(`/api/historial_clinico/reportes/registro/${registroId}`, {
     responseType: 'blob',
   });
 
   const contentDisposition = response.headers['content-disposition'] || '';
   const match = contentDisposition.match(/filename\*?=(?:UTF-8''|"?)([^";]+)(?:"|$)/i) || [];
-  const filename = match[1] || `registro_${registroId}.pdf`;
+  const filename = nombreArchivo || match[1] || `registro_${registroId}.pdf`;
   const blob = new Blob([response.data], { type: 'application/pdf' });
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -245,7 +245,7 @@ export async function downloadRegistroClinicoPdf(registroId: number): Promise<vo
   window.URL.revokeObjectURL(url);
 }
 
-export async function downloadConsentimientoPdf(registroId: number): Promise<void> {
+export async function downloadConsentimientoPdf(registroId: number, nombreArchivo?: string): Promise<void> {
   const response = await api.get(
     `/api/historial_clinico/reportes/registro/${registroId}/consentimiento`,
     { responseType: 'blob' },
@@ -253,7 +253,7 @@ export async function downloadConsentimientoPdf(registroId: number): Promise<voi
 
   const contentDisposition = response.headers['content-disposition'] || '';
   const match = contentDisposition.match(/filename\*?=(?:UTF-8''|"?)([^";]+)(?:"|$)/i) || [];
-  const filename = match[1] || `consentimiento_${registroId}.pdf`;
+  const filename =nombreArchivo || match[1] || `consentimiento_${registroId}.pdf`;
   const blob = new Blob([response.data], { type: 'application/pdf' });
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');

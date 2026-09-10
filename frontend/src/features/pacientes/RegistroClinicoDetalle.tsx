@@ -6,6 +6,7 @@ import type { Receta } from '../../api/recetas';
 import type { Paciente } from '../../api/pacientes';
 import { getArchivosPorExamen, descargarArchivoBlob } from '../../api/archivos';
 import type { ArchivoResponse } from '../../api/archivos';
+import { updateObservacionesExamen } from '../../api/examenesComplementarios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faSpinner, faExclamationCircle, faFlaskVial, faPills,
@@ -121,6 +122,11 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
   const [visorIndex, setVisorIndex] = useState<Record<number, number>>({});
   const [qrModalExamenId, setQrModalExamenId] = useState<number | null>(null);
 
+  // Edición de observaciones de un examen ya existente (ej. completar el
+  // resultado del examen "Pendiente" que se creó junto con la solicitud).
+  const [obsDrafts, setObsDrafts] = useState<Record<number, string>>({});
+  const [guardandoObsId, setGuardandoObsId] = useState<number | null>(null);
+
   const nombrePacienteCompleto = paciente ? `${paciente.nombres} ${paciente.apellidos}`.trim() : '';
 
   useEffect(() => {
@@ -173,6 +179,36 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [imagenActiva]);
+
+  const obsValor = (examen: { id: number; observaciones?: string | null }): string =>
+    obsDrafts[examen.id] ?? examen.observaciones ?? '';
+
+  const handleGuardarObs = async (examenId: number) => {
+    const texto = obsDrafts[examenId] ?? '';
+    setGuardandoObsId(examenId);
+    try {
+      const actualizado = await updateObservacionesExamen(examenId, texto);
+      setDetalle((prev) =>
+        prev
+          ? {
+              ...prev,
+              examenes_complementarios: prev.examenes_complementarios.map((e) =>
+                e.id === examenId ? { ...e, observaciones: actualizado.observaciones } : e,
+              ),
+            }
+          : prev,
+      );
+      setObsDrafts((d) => {
+        const { [examenId]: _quitado, ...resto } = d;
+        return resto;
+      });
+    } catch {
+      // El input se queda con lo que el médico tipeó para que no lo pierda;
+      // puede reintentar tocando "Guardar" de nuevo.
+    } finally {
+      setGuardandoObsId(null);
+    }
+  };
 
   const registro = detalle?.registro ?? null;
 
@@ -468,6 +504,12 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
             const imagenes = galeria[examen.id] || [];
             const idxActivo = visorIndex[examen.id] ?? 0;
             const activa = imagenes[idxActivo];
+            const esPendiente =
+              examen.receta_examen_id != null &&
+              !examen.resultado &&
+              !examen.observaciones &&
+              imagenes.length === 0;
+            const obsSucia = obsValor(examen) !== (examen.observaciones || '');
 
             return (
               <div key={examen.id} className={styles.examCard}>
@@ -477,6 +519,7 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
                     {examen.categoria?.nombre && (
                       <span className={styles.examCategoria}>{examen.categoria.nombre}</span>
                     )}
+                    {esPendiente && <span className={styles.examPendiente}>Pendiente</span>}
                   </div>
                   <button
                     type="button"
@@ -487,7 +530,28 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
                   </button>
                 </div>
                 {examen.resultado && <p className={styles.examResultado}>{examen.resultado}</p>}
-                {examen.observaciones && <p className={styles.examObs}>{examen.observaciones}</p>}
+
+                <div className={styles.examObsEdit}>
+                  <textarea
+                    className={styles.examObsInput}
+                    rows={2}
+                    placeholder="Observaciones del médico..."
+                    value={obsValor(examen)}
+                    onChange={(e) =>
+                      setObsDrafts((d) => ({ ...d, [examen.id]: e.target.value }))
+                    }
+                  />
+                  {obsSucia && (
+                    <button
+                      type="button"
+                      className={styles.btnGuardarObs}
+                      disabled={guardandoObsId === examen.id}
+                      onClick={() => handleGuardarObs(examen.id)}
+                    >
+                      {guardandoObsId === examen.id ? 'Guardando...' : 'Guardar'}
+                    </button>
+                  )}
+                </div>
 
                 {imagenes.length > 0 && activa && (
                   <div className={styles.visor}>

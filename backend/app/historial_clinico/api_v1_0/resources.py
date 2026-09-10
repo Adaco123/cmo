@@ -187,7 +187,24 @@ def _crear_recetas_desde_bloques(recetas_validated: dict, registro_clinico_id: i
             db.session.flush()
 
             for item_data in bloque["items"]:
-                db.session.add(ItemModel(receta_id=receta.id, **item_data))
+                item = ItemModel(receta_id=receta.id, **item_data)
+                db.session.add(item)
+
+                if clave == "examenes":
+                    # Espejo en examenes_complementarios: nace vacío
+                    # (resultado=None) y queda vinculado a esta solicitud,
+                    # heredando su categoría. Así ya aparece como "pendiente"
+                    # en el registro clínico apenas se solicita, sin esperar
+                    # a que el paciente vuelva con el resultado.
+                    db.session.flush()  # necesita item.id
+                    db.session.add(ExamenComplementario(
+                        registro_clinico_id=registro_clinico_id,
+                        categoria_id=item.categoria_id,
+                        receta_examen_id=item.id,
+                        nombre_examen=item.nombre_examen,
+                        resultado=None,
+                        observaciones=None,
+                    ))
 
             recetas_creadas.append(receta)
     return recetas_creadas

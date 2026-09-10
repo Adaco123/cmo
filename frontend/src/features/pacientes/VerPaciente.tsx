@@ -343,11 +343,18 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
   }, []);
 
   const handleDescargarPdf = useCallback((registroId: number) => {
-    void downloadRegistroClinicoPdf(registroId);
+    
+    const nombreArchivo= `${paciente?.nombres ?? ''}${paciente?.apellidos ?? ''}${paciente?.documento ?? ''}`
+      .replace(/\s+/g, '')
+      .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]/g, '');
+    void downloadRegistroClinicoPdf(registroId, `${nombreArchivo}Reg.pdf`);
   }, []);
 
   const handleDescargarConsentimiento = useCallback((registroId: number) => {
-    void downloadConsentimientoPdf(registroId);
+    const nombreArchivo= `${paciente?.nombres ?? ''}${paciente?.apellidos ?? ''}${paciente?.documento ?? ''}`
+      .replace(/\s+/g, '')
+      .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]/g, '')
+    void downloadConsentimientoPdf(registroId, `${nombreArchivo}Consentimiento.pdf`);
   }, []);
 
   const handleRegistroGuardado = useCallback((resultado: RegistroCompletoResponse) => {

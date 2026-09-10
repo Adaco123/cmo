@@ -98,13 +98,22 @@ class RecetaExamen(db.Model, BaseModelMixin):
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     receta_id = db.Column(db.BigInteger, db.ForeignKey('recetas.id'), nullable=False)
+    # Antes era tipo_examen (string libre, sin relación con categorias_examen).
+    # Ahora usa el mismo catálogo que examenes_complementarios, para que la
+    # solicitud y su resultado nunca queden con categorías distintas.
+    categoria_id = db.Column(db.SmallInteger, db.ForeignKey('categorias_examen.id'), nullable=False)
 
     nombre_examen = db.Column(db.String(200), nullable=False)
-    tipo_examen = db.Column(db.String(30), nullable=False)  # laboratorio / imagenologia / otro
     urgencia = db.Column(db.String(20), nullable=False, default="Rutina")
     indicaciones_previas = db.Column(db.String(300))
 
     receta = db.relationship("Receta", back_populates="examenes")
+    categoria = db.relationship("CategoriaExamen")
+    # Resultado (si ya llegó): el ExamenComplementario espejo que se crea
+    # junto con esta solicitud. uselist=False porque es 1 a 1.
+    resultado_examen = db.relationship(
+        "ExamenComplementario", back_populates="receta_examen", uselist=False
+    )
 
     def __repr__(self):
         return f"<RecetaExamen id={self.id} nombre_examen={self.nombre_examen}>"

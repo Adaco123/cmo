@@ -16,6 +16,9 @@ class ExamenComplementarioSchema(ma.Schema):
 
     registro_clinico_id = fields.Integer(required=True)
     categoria_id = fields.Integer(required=True)
+    # Se asigna solo desde el backend (al crear la solicitud en una receta,
+    # o al confirmar el vínculo); nunca se recibe del cliente.
+    receta_examen_id = fields.Integer(dump_only=True, allow_none=True)
 
     nombre_examen = fields.String(required=True, validate=validate.Length(max=200))
     resultado = fields.String(allow_none=True)
