@@ -59,7 +59,7 @@ class RegistroClinico(db.Model, BaseModelMixin):
     temperatura = db.Column(db.Numeric(4, 1), nullable=False)
     peso = db.Column(db.Numeric(5, 2), nullable=False)
     talla = db.Column(db.Numeric(4, 2), nullable=False)
-    hallazgos_ecograficos=db.Column(db.String(200),nullable=False)
+    hallazgos_ecograficos=db.Column(db.Text,nullable=False)
     # --- Lo exclusivo del registro clínico (no de la consulta) -----------
     enfermedad_actual = db.Column(db.Text)
     examen_fisico = db.Column(db.Text)

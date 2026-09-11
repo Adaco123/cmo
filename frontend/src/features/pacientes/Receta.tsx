@@ -133,32 +133,32 @@ interface FieldDef {
 }
 
 const MED_FIELDS: FieldDef[] = [
-  { key: "medicamento", label: "Medicamento", placeholder: "Paracetamol", width: "lg", required: true, autocomplete: true },
-  { key: "dosis", label: "Dosis", placeholder: "500mg", width: "sm", required: true },
-  { key: "via_administracion", label: "Vía", placeholder: "VO", width: "sm", datalist: ["VO", "IV", "IM", "SC", "SL", "Inhalatoria", "Tópica"] },
-  { key: "frecuencia", label: "Frecuencia", placeholder: "c/8h", width: "sm", required: true },
-  { key: "duracion", label: "Duración", placeholder: "5 días", width: "sm" },
-  { key: "hora_inicio", label: "Inicia a las", placeholder: "08:00", width: "sm" },
-  { key: "cantidad", label: "Cantidad", placeholder: "20 tabletas", width: "sm" },
-  { key: "indicaciones", label: "Indicaciones", placeholder: "Con alimentos", width: "md" },
+  { key: "medicamento", label: "Medicamento", width: "lg", required: true, autocomplete: true },
+  { key: "dosis", label: "Dosis", width: "sm", required: true },
+  { key: "via_administracion", label: "Vía", width: "sm", datalist: ["VO", "IV", "IM", "SC", "SL", "Inhalatoria", "Tópica"] },
+  { key: "frecuencia", label: "Frecuencia", width: "sm", required: true },
+  { key: "duracion", label: "Duración", width: "sm" },
+  { key: "hora_inicio", label: "Inicia a las", width: "sm" },
+  { key: "cantidad", label: "Cantidad", width: "sm" },
+  { key: "indicaciones", label: "Indicaciones", width: "md" },
 ];
 
 const EXAM_FIELDS: FieldDef[] = [
-  { key: "nombre_examen", label: "Examen", placeholder: "Hemograma completo", width: "lg", required: true, autocomplete: true },
+  { key: "nombre_examen", label: "Examen", width: "lg", required: true, autocomplete: true },
   // select se completa en tiempo real con las categorías del backend
   // (ver fieldsByTab más abajo); acá queda vacío como placeholder.
   { key: "categoria", label: "Categoría", width: "sm", required: true, select: [] },
   { key: "urgencia", label: "Urgencia", width: "sm", select: ["Rutina", "Urgente"] },
-  { key: "indicaciones_previas", label: "Indicaciones previas", placeholder: "En ayunas 8h", width: "md" },
+  { key: "indicaciones_previas", label: "Indicaciones previas", width: "md" },
 ];
 
 const FORM_FIELDS: FieldDef[] = [
-  { key: "nombre_formula", label: "Fórmula", placeholder: "Crema compuesta", width: "lg", required: true, autocomplete: true },
-  { key: "ingredientes", label: "Ingredientes", placeholder: "Betametasona 0.1% + Ác. salicílico 3%", width: "lg", required: true },
-  { key: "forma_farmaceutica", label: "Forma farmacéutica", placeholder: "Crema", width: "sm" },
-  { key: "cantidad_preparar", label: "Cantidad a preparar", placeholder: "30g", width: "sm" },
-  { key: "via_administracion", label: "Vía", placeholder: "Tópica", width: "sm", datalist: ["VO", "IV", "IM", "SC", "SL", "Inhalatoria", "Tópica"] },
-  { key: "indicaciones", label: "Indicaciones", placeholder: "Aplicar en la noche", width: "md" },
+  { key: "nombre_formula", label: "Fórmula", width: "lg", required: true, autocomplete: true },
+  { key: "ingredientes", label: "Ingredientes", width: "lg", required: true },
+  { key: "forma_farmaceutica", label: "Forma farmacéutica", width: "sm" },
+  { key: "cantidad_preparar", label: "Cantidad a preparar", width: "sm" },
+  { key: "via_administracion", label: "Vía", width: "sm", datalist: ["VO", "IV", "IM", "SC", "SL", "Inhalatoria", "Tópica"] },
+  { key: "indicaciones", label: "Indicaciones", width: "md" },
 ];
 
 const FIELDS_BY_TAB: Record<Tab, FieldDef[]> = {
@@ -280,7 +280,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   const [highlighted, setHighlighted] = useState(-1);
   const [shakeField, setShakeField] = useState<string | null>(null);
 
-  const [indicaciones, setIndicaciones] = useState("Tomar agua y descansar");
+  const [indicaciones, setIndicaciones] = useState("");
 
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -288,7 +288,8 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
   // Qué se está imprimiendo ahora mismo (null = nada). Contiene la
   // categoría y la lista de recetas (grupos) a imprimir, cada una en
   // su propio membrete Oficio (8.5in × 6.5in) — dos caben por hoja.
-  const [imprimir, setImprimir] = useState<{ tab: Tab; grupoIds: number[] } | null>(null);
+  const [imprimir, setImprimir] = useState<{ tab: Tab; grupoId: number }[] | null>(null);
+  const [incluirMembrete, setIncluirMembrete] = useState(true);
 
   const fieldRefs = useRef<Record<string, HTMLInputElement | HTMLSelectElement | null>>({});
 
@@ -475,7 +476,7 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
       setMedGrupos(grupoInicial());
       setExamGrupos(grupoInicial());
       setFormGrupos(grupoInicial());
-      setIndicaciones("Tomar agua y descansar");
+      setIndicaciones("");
       setGrupoActivoId({ medicamentos: 1, examenes: 1, formulas: 1 });
       setGrupoPreview(1);
       setDraft(emptyDraftFor(tab, categoriasExamen));
@@ -762,20 +763,25 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
     const grupo = gruposOfTab(tab).find((g) => g.id === grupoId);
     if (!grupo?.items.length) return;
 
-    setImprimir({
-      tab,
-      grupoIds: [grupoId],
-    });
+    setImprimir([{ tab, grupoId }]);
   };
 
   const handleImprimirTodas = () => {
-    const ids = gruposConItemsTab.map((g) => g.id);
-    if (!ids.length) return;
+    if (!gruposConItemsTab.length) return;
+    setImprimir(gruposConItemsTab.map((g) => ({ tab, grupoId: g.id })));
+  };
 
-    setImprimir({
-      tab,
-      grupoIds: ids,
-    });
+  const TABS: Tab[] = ["medicamentos", "examenes", "formulas"];
+  const totalItemsTodasCategorias = TABS.reduce((acc, t) => acc + flatten(gruposOfTab(t)).length, 0);
+
+  const handleImprimirTodasCategorias = () => {
+    const items = TABS.flatMap((t) =>
+      gruposOfTab(t)
+        .filter((g) => g.items.length)
+        .map((g) => ({ tab: t, grupoId: g.id }))
+    );
+    if (!items.length) return;
+    setImprimir(items);
   };
 
   useEffect(() => {
@@ -1009,10 +1015,16 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
           </div>
         )}
         <div className={styles["cmo-fecha"]}>
+
+
+          
           <span>{fechaPartes.dia}</span>
           <span>{fechaPartes.mes}</span>
           <span>{fechaPartes.anio}</span>
         </div>
+        {indicaciones.trim() && (
+          <div className={styles["cmo-rp-indicaciones-generales"]}>{indicaciones}</div>
+        )}
       </>
     );
   };
@@ -1230,10 +1242,19 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
                 </div>
               )}
 
-              <div className={cx(styles["cmo-canvas"], styles["cmo-preview"])}>
-                <img src={RecetaImprimir} alt="Vista previa receta CMO" />
+              <div className={cx(styles["cmo-canvas"], styles["cmo-preview"], !incluirMembrete && styles["sin-membrete"])}>
+                {incluirMembrete && <img src={RecetaImprimir} alt="Vista previa receta CMO" />}
                 {renderSlip(tab, grupoPreview)}
               </div>
+
+              <label className={styles["membrete-toggle"]}>
+                <input
+                  type="checkbox"
+                  checked={incluirMembrete}
+                  onChange={(e) => setIncluirMembrete(e.target.checked)}
+                />
+                Incluir membrete
+              </label>
 
               <div className={styles["print-actions"]}>
                 <button
@@ -1250,7 +1271,15 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
                   disabled={!gruposConItemsTab.length}
                   onClick={handleImprimirTodas}
                 >
-                  Imprimir todo con membrete{gruposConItemsTab.length > 1 ? ` · ${gruposConItemsTab.length}` : ""}
+                  Imprimir todo{gruposConItemsTab.length > 1 ? ` · ${gruposConItemsTab.length}` : ""}
+                </button>
+                <button
+                  type="button"
+                  className={styles["icon-btn"]}
+                  disabled={!totalItemsTodasCategorias}
+                  onClick={handleImprimirTodasCategorias}
+                >
+                  Imprimir las 3 categorías
                 </button>
               </div>
             </div>
@@ -1267,17 +1296,19 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
          Oficio). Dos membretes seguidos = 13in = una hoja Oficio
          completa, así que al imprimir varias recetas caen 2 por página
          sin configuración extra (ver .cmo-slip:nth-child(even) en
-         Receta.module.css). */}
+         Receta.module.css). Sin membrete, el bloque queda en blanco
+         (para papel con membrete pre-impreso) pero el texto se ubica
+         exactamente igual, calibrado a las mismas 8.5in × 6.5in. */}
       {imprimir &&
         createPortal(
           <div id="cmo-print-root" className={styles["cmo-print-all"]}>
-            {imprimir.grupoIds.map((gid) => (
+            {imprimir.map(({ tab: t, grupoId }) => (
               <div
-                key={gid}
-                className={cx(styles["cmo-canvas"], styles["cmo-slip"])}
+                key={`${t}-${grupoId}`}
+                className={cx(styles["cmo-canvas"], styles["cmo-slip"], !incluirMembrete && styles["sin-membrete"])}
               >
-                <img src={RecetaImprimir} alt="Receta CMO" />
-                {renderSlip(imprimir.tab, gid)}
+                {incluirMembrete && <img src={RecetaImprimir} alt="Receta CMO" />}
+                {renderSlip(t, grupoId)}
               </div>
             ))}
           </div>,

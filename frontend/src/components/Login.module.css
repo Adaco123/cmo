@@ -1,0 +1,379 @@
+/* Login.module.css
+   Rediseño del login alineado a las variables reales de index.css
+   (--bg-body, --primary, --login-gradient, etc.), sin depender de
+   EcoVisionHome.css como hacía el Login anterior.
+
+   Motivo visual: "signos vitales" — una franja de monitor cardiaco
+   (ECG) en el panel de marca y un anillo giratorio tipo escaneo
+   alrededor de la tarjeta de acceso, ambos construidos en CSS puro
+   (sin canvas ni JS), más el logo de assets/cmo.png como marca de
+   agua y como isotipo con un latido sutil. */
+
+.stage,
+.stage *,
+.stage *::before,
+.stage *::after {
+  box-sizing: border-box;
+}
+
+.stage {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  overflow: hidden;
+  font: 16px/145% var(--sans);
+  letter-spacing: 0.18px;
+  color: var(--text-on-dark);
+  background: var(--bg-body);
+}
+
+/* ---- Marca de agua a nivel de página completa: centrada, arriba,
+   detrás de ambos paneles (por eso vive en .stage y no en .brandPane) ---- */
+.watermark {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.watermark img {
+  width: min(72vw, 900px);
+  margin-top: 2vh;
+  opacity: 0.07;
+}
+
+/* ================= PANEL IZQUIERDO — identidad + monitor ================= */
+.brandPane {
+  position: relative;
+  z-index: 1;
+  flex: 1.05;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 64px 72px;
+  overflow: hidden;
+  background: radial-gradient(circle at 18% 20%, color-mix(in srgb, var(--primary) 16%, transparent) 0%, transparent 55%);
+}
+
+.glowOrb {
+  position: absolute;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
+  opacity: 0.14;
+  filter: blur(60px);
+  top: -10%;
+  left: -12%;
+  animation: drift 18s ease-in-out infinite;
+}
+
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(60px, 40px) scale(1.15); }
+}
+
+.heading {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(2rem, 3.4vw, 2.9rem);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 0 0 16px;
+  max-width: 480px;
+  letter-spacing: -0.02em;
+  color: var(--text-on-dark);
+}
+
+.desc {
+  position: relative;
+  z-index: 1;
+  max-width: 420px;
+  color: var(--text-on-dark-muted);
+  font-size: 1rem;
+  margin: 0 0 36px;
+}
+
+/* ---- Franja de monitor cardiaco ---- */
+.ecgTrack {
+  position: relative;
+  width: 100%;
+  height: 70px;
+  overflow: hidden;
+  margin: 0 0 40px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+
+.ecgScroll {
+  display: flex;
+  width: 200%;
+  height: 100%;
+  animation: scrollLeft 5s linear infinite;
+}
+
+.ecgScroll svg {
+  flex-shrink: 0;
+  width: 1200px;
+  height: 70px;
+}
+
+.ecgScroll path {
+  fill: none;
+  stroke: var(--status-inactive);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--status-inactive) 70%, transparent));
+  opacity: 0.75;
+}
+
+@keyframes scrollLeft {
+  from { transform: translateX(0); }
+  to { transform: translateX(-1200px); }
+}
+
+.statsRow {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 36px;
+}
+
+.stat b {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-on-dark);
+}
+
+.stat span {
+  font-size: 0.78rem;
+  color: var(--text-on-dark-muted);
+}
+
+/* ================= PANEL DERECHO — formulario ================= */
+.formPane {
+  position: relative;
+  z-index: 1;
+  flex: 0.9;
+  min-width: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.loginTilt {
+  width: 400px;
+  max-width: 100%;
+}
+
+.card {
+  padding: 38px 34px 32px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+
+.brand img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--primary) 55%, transparent));
+  animation: heartbeat 2.4s ease-in-out infinite;
+}
+
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  12% { transform: scale(1.08); }
+  24% { transform: scale(1); }
+  36% { transform: scale(1.05); }
+  48% { transform: scale(1); }
+}
+
+.brandName {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-on-dark);
+}
+
+.brandName span {
+  display: block;
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--text-on-dark-muted);
+  margin-top: 2px;
+}
+
+.cardHeading {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+  color: var(--text-on-dark);
+}
+
+.subtitle {
+  margin: 0 0 26px;
+  color: var(--text-on-dark-muted);
+  font-size: 0.86rem;
+}
+
+.field {
+  margin-bottom: 17px;
+  position: relative;
+}
+
+.field label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-on-dark-muted);
+  margin-bottom: 6px;
+}
+
+.field input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-input-dark);
+  color: var(--text-on-dark);
+  font-size: 0.92rem;
+  font-family: var(--sans);
+  outline: none;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.field input::placeholder {
+  color: #5A7089;
+}
+
+.field input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+.formError {
+  margin: -4px 0 14px;
+  font-size: 0.82rem;
+  color: var(--status-inactive);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 2px 0 24px;
+  font-size: 0.8rem;
+}
+
+.row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-on-dark-muted);
+  cursor: pointer;
+}
+
+.row input[type='checkbox'] {
+  accent-color: var(--primary);
+  width: 15px;
+  height: 15px;
+}
+
+.row a {
+  color: var(--primary-light);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.row a:hover {
+  text-decoration: underline;
+}
+
+.submitBtn {
+  position: relative;
+  width: 100%;
+  padding: 13px;
+  border: none;
+  border-radius: var(--radius-xl);
+  background: linear-gradient(135deg, var(--primary), var(--primary-light), var(--primary));
+  background-size: 200% 100%;
+  background-position: 0% 0%;
+  color: #04211d;
+  font-weight: 600;
+  font-size: 0.94rem;
+  cursor: pointer;
+  box-shadow: 0 8px 26px color-mix(in srgb, var(--primary) 35%, transparent);
+  transition: background-position 0.5s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background-position: 100% 0%;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 34px color-mix(in srgb, var(--primary) 45%, transparent);
+}
+
+.submitBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.submitBtn:focus-visible {
+  outline: 2px solid var(--text-on-dark);
+  outline-offset: 2px;
+}
+
+.hint {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 0.76rem;
+  color: var(--text-on-dark-muted);
+}
+
+@media (max-width: 980px) {
+  .stage {
+    flex-direction: column;
+  }
+  .brandPane {
+    padding: 48px 32px 32px;
+    flex: none;
+  }
+  .formPane {
+    min-width: 0;
+    flex: none;
+    padding: 32px;
+  }
+  .watermark img {
+    width: min(85vw, 640px);
+    margin-top: 6vh;
+  }
+}
+
+@media (max-width: 480px) {
+  .statsRow {
+    flex-wrap: wrap;
+    row-gap: 12px;
+  }
+  .card {
+    padding: 30px 22px 26px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glowOrb,
+  .ecgScroll,
+  .brand img,
+  .submitBtn {
+    animation: none;
+  }
+}

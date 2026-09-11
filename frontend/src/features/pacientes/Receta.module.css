@@ -232,7 +232,14 @@
 .receta-widget .receta-picker-btn:hover { border-color: var(--primary); color: var(--primary); }
 .receta-widget .receta-picker-btn.active { background: var(--accent-bg); border-color: var(--primary); color: var(--primary-light); }
 
-.receta-widget .print-actions { display: flex; gap: 8px; margin-top: 12px; }
+.receta-widget .membrete-toggle {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.78rem; color: var(--text-on-dark-muted);
+  margin-top: 10px; cursor: pointer; user-select: none;
+}
+.receta-widget .membrete-toggle input { width: 14px; height: 14px; cursor: pointer; }
+
+.receta-widget .print-actions { display: flex; gap: 8px; margin-top: 10px; }
 .receta-widget .print-actions .icon-btn { width: auto; flex: 1; padding: 0 14px; font-size: 0.78rem; font-weight: 700; gap: 6px; }
 
 /* ---------- toast ---------- */
@@ -355,6 +362,20 @@
   object-fit: fill;
 }
 
+/* Sin membrete: el canvas queda en blanco (en vez de heredar el fondo
+   oscuro del drawer) y el texto —diseñado para leerse sobre la imagen
+   del membrete— pasa a negro puro, incluido el "Edad:" que normalmente
+   sale en el color de acento (var(--primary)). */
+.cmo-canvas.sin-membrete {
+  background: #fff;
+}
+.cmo-canvas.sin-membrete .cmo-rp,
+.cmo-canvas.sin-membrete .cmo-rp-header,
+.cmo-canvas.sin-membrete .cmo-rp-header strong,
+.cmo-canvas.sin-membrete .cmo-rp-indicaciones-generales {
+  color: #000;
+}
+
 .cmo-rp {
   position: absolute;
   top: 27%;
@@ -376,14 +397,31 @@
 .cmo-rp-meta { font-size: 0.8em; color: #555; }
 .cmo-fecha {
   position: absolute;
-  top: 79%;
-  left: 15.4%;
+  top: 80%;
+  left: 15.8%;
   display: flex;
   gap: 45%;
   color: black;
   font-family: 'Harlow Solid Italic', cursive;
   font-size: 1.4cqw;
   text-align: center;
+}
+
+/* Indicaciones generales: texto vertical (de arriba hacia abajo) pegado
+   al borde derecho del membrete, para no competir con el listado
+   principal. writing-mode:vertical-rl deja las letras derechas (no
+   rotadas de lado) con el flujo de lectura hacia abajo. */
+.cmo-rp-indicaciones-generales {
+  position: absolute;
+  top: 6%;
+  bottom: 6%;
+  right: 2%;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 1.3cqw;
+  line-height: 1.3;
+  color: #16233A;
+  overflow: hidden;
 }
 
 .cmo-rp-header {
@@ -606,10 +644,10 @@
   /*
     El membrete debe ocupar exactamente todo el bloque.
 
-    mosol.png = 1435 × 1096 y 8.5 × 6.5 tienen prácticamente la
-    misma proporción. Usamos fill para evitar que se recorte
-    cualquier parte del membrete. Puede existir una pequeña
-    deformación, pero no se pierde contenido de la imagen.
+    mosol.png = 1670 × 1276 (versión HD) y 8.5 × 6.5 tienen
+    prácticamente la misma proporción. Usamos fill para evitar que
+    se recorte cualquier parte del membrete. Puede existir una
+    pequeña deformación, pero no se pierde contenido de la imagen.
   */
   .cmo-slip img {
     display: block !important;

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getRegistroClinicoCompleto } from '../../api/historialClinico';
 import type { RegistroClinicoCompletoDetalle } from '../../api/historialClinico';
@@ -119,6 +119,19 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
   const [error, setError] = useState<string | null>(null);
   const [galeria, setGaleria] = useState<GaleriaPorExamen>({});
   const [imagenActiva, setImagenActiva] = useState<ImagenActiva | null>(null);
+
+  // Lupa dentro del lightbox: mover el mouse (o el dedo) sobre la imagen
+  // amplía la zona bajo el cursor, sin perder de vista la foto completa.
+  const [lupaPos, setLupaPos] = useState({ x: 0, y: 0 });
+  const [lupaVisible, setLupaVisible] = useState(false);
+  const LUPA_ZOOM = 2.6;
+  const LUPA_DIAMETRO = 180;
+  const imgWrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setLupaVisible(false);
+  }, [imagenActiva]);
+
   const [visorIndex, setVisorIndex] = useState<Record<number, number>>({});
   const [qrModalExamenId, setQrModalExamenId] = useState<number | null>(null);
 
@@ -179,6 +192,18 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [imagenActiva]);
+
+  // Sigue el cursor (o el dedo) dentro del recuadro de la imagen y calcula
+  // dónde debe apuntar la lupa, igual que en la demo.
+  const moverLupa = (clientX: number, clientY: number) => {
+    const wrap = imgWrapRef.current;
+    if (!wrap) return;
+    const r = wrap.getBoundingClientRect();
+    const x = Math.max(0, Math.min(clientX - r.left, r.width));
+    const y = Math.max(0, Math.min(clientY - r.top, r.height));
+    setLupaPos({ x, y });
+    setLupaVisible(true);
+  };
 
   const obsValor = (examen: { id: number; observaciones?: string | null }): string =>
     obsDrafts[examen.id] ?? examen.observaciones ?? '';
@@ -664,12 +689,43 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
             >
               <FontAwesomeIcon icon={faXmark} />
             </button>
-            <img
-              src={imagenActiva.url}
-              alt={imagenActiva.archivo.nombre_archivo}
-              className={styles.lightboxImg}
+            <div
+              ref={imgWrapRef}
+              className={styles.lightboxImgWrap}
               onClick={(e) => e.stopPropagation()}
-            />
+              onMouseMove={(e) => moverLupa(e.clientX, e.clientY)}
+              onMouseLeave={() => setLupaVisible(false)}
+              onTouchStart={(e) => {
+                if (e.touches.length === 1) moverLupa(e.touches[0].clientX, e.touches[0].clientY);
+              }}
+              onTouchMove={(e) => {
+                if (e.touches.length === 1) moverLupa(e.touches[0].clientX, e.touches[0].clientY);
+              }}
+              onTouchEnd={() => setLupaVisible(false)}
+            >
+              <img
+                src={imagenActiva.url}
+                alt={imagenActiva.archivo.nombre_archivo}
+                className={styles.lightboxImg}
+                draggable={false}
+              />
+              {lupaVisible && (
+                <div
+                  className={styles.lightboxLupa}
+                  style={{
+                    width: LUPA_DIAMETRO,
+                    height: LUPA_DIAMETRO,
+                    left: lupaPos.x - LUPA_DIAMETRO / 2,
+                    top: lupaPos.y - LUPA_DIAMETRO / 2,
+                    backgroundImage: `url(${imagenActiva.url})`,
+                    backgroundSize: imgWrapRef.current
+                      ? `${imgWrapRef.current.clientWidth * LUPA_ZOOM}px ${imgWrapRef.current.clientHeight * LUPA_ZOOM}px`
+                      : undefined,
+                    backgroundPosition: `${-(lupaPos.x * LUPA_ZOOM - LUPA_DIAMETRO / 2)}px ${-(lupaPos.y * LUPA_ZOOM - LUPA_DIAMETRO / 2)}px`,
+                  }}
+                />
+              )}
+            </div>
             <div className={styles.lightboxCaption} onClick={(e) => e.stopPropagation()}>
               <span>{imagenActiva.examenNombre}</span>
               <a
