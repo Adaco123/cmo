@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import gsap from 'gsap';
 import { createPortal } from 'react-dom';
 import { subirArchivoExamen, descartarSesionCaptura } from '../../api/archivos';
+import { getTiposArchivo, type TipoArchivo } from '../../api/tiposArchivo';
 import type { Paciente as ApiPaciente } from '../../api/pacientes';
 import Calendario from '../citas/Calendario';
 import { useCalendario } from '../../components/CalendarioProvider';
@@ -24,10 +25,20 @@ import { extractErrorMessage } from '../../utils/errors';
 // normales se usa medicoId, que sale del médico realmente logueado
 // (ver useAuth() dentro del componente).
 const MEDICO_ID = 1;
-const TIPO_ARCHIVO_POR_EXT: Record<string, number> = {
-  jpg: 1, jpeg: 1, png: 1,
-  pdf: 2,
+
+/** Extensión -> nombre de categoría en el catálogo tipos_archivo. El id
+ *  real se resuelve contra el catálogo cargado del backend (ver
+ *  idTipoArchivoPorExt) — nunca hardcodear el número, mismo criterio que
+ *  idEstadoPorDefecto en CrearCita.tsx. */
+const NOMBRE_TIPO_ARCHIVO_POR_EXT: Record<string, string> = {
+  jpg: 'Imagen', jpeg: 'Imagen', png: 'Imagen',
+  pdf: 'PDF',
 };
+
+function idTipoArchivoPorExt(ext: string, lista: TipoArchivo[]): number {
+  const nombreBuscado = NOMBRE_TIPO_ARCHIVO_POR_EXT[ext];
+  return lista.find((t) => t.nombre === nombreBuscado)?.id ?? lista[0]?.id ?? 1;
+}
 
 /** "YYYY-MM-DD" en fecha LOCAL, a diferencia de toISOString() que usa UTC
  *  y puede adelantar un día en horas de la noche (Bolivia es UTC-4). */
@@ -183,6 +194,14 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
   const examenesRef = useRef<ExamenesHandle>(null);
 
   useEffect(() => { vitalRefs.current.pa_sys?.focus(); }, []);
+
+  // Catálogo de tipos de archivo (para resolver el id por nombre al subir)
+  const [tiposArchivo, setTiposArchivo] = useState<TipoArchivo[]>([]);
+  useEffect(() => {
+    getTiposArchivo()
+      .then(setTiposArchivo)
+      .catch((err) => console.error('No se pudo cargar el catálogo de tipos de archivo', err));
+  }, []);
 
   const setVitalRef = (key: VitalKey) => (el: HTMLInputElement | null): void => {
     vitalRefs.current[key] = el;
@@ -384,7 +403,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
 
         for (const archivoObj of examenesFlat[i].archivos) {
           const ext = archivoObj.name.split('.').pop()?.toLowerCase() || '';
-          const tipoArchivoId = TIPO_ARCHIVO_POR_EXT[ext] ?? 1;
+          const tipoArchivoId = idTipoArchivoPorExt(ext, tiposArchivo);
           try {
             await subirArchivoExamen(examenCreado.id, archivoObj, tipoArchivoId);
           } catch (errArchivo) {

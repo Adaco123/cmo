@@ -7,6 +7,7 @@ import {
   subirArchivoPaciente,
   type ArchivoResponse,
 } from '../../api/archivos';
+import { getTiposArchivo, type TipoArchivo } from '../../api/tiposArchivo';
 import CrearCita from '../../components/CrearCita';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -27,15 +28,22 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './PacienteExterno.module.css';
 
-// Mismo criterio que RegistroClinico.tsx: 1 = imagen, 2 = pdf.
-const TIPO_ARCHIVO_POR_EXT: Record<string, number> = {
-  jpg: 1,
-  jpeg: 1,
-  png: 1,
-  pdf: 2,
+// Mismo criterio que RegistroClinico.tsx: el id real se resuelve contra
+// el catálogo tipos_archivo cargado del backend, nunca hardcodeado (ver
+// idTipoArchivoPorExt).
+const NOMBRE_TIPO_ARCHIVO_POR_EXT: Record<string, string> = {
+  jpg: 'Imagen',
+  jpeg: 'Imagen',
+  png: 'Imagen',
+  pdf: 'PDF',
 };
 
-const EXTENSIONES_VALIDAS = Object.keys(TIPO_ARCHIVO_POR_EXT);
+function idTipoArchivoPorExt(ext: string, lista: TipoArchivo[]): number {
+  const nombreBuscado = NOMBRE_TIPO_ARCHIVO_POR_EXT[ext];
+  return lista.find((t) => t.nombre === nombreBuscado)?.id ?? lista[0]?.id ?? 1;
+}
+
+const EXTENSIONES_VALIDAS = Object.keys(NOMBRE_TIPO_ARCHIVO_POR_EXT);
 
 const esPdf = (nombreArchivo: string) => nombreArchivo.toLowerCase().endsWith('.pdf');
 
@@ -88,6 +96,14 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
 
   const inputFileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
+
+  // Catálogo de tipos de archivo (para resolver el id por nombre al subir)
+  const [tiposArchivo, setTiposArchivo] = useState<TipoArchivo[]>([]);
+  useEffect(() => {
+    getTiposArchivo()
+      .then(setTiposArchivo)
+      .catch((err) => console.error('No se pudo cargar el catálogo de tipos de archivo', err));
+  }, []);
 
   // Carga los archivos ya subidos del paciente al montar (y de nuevo si
   // el modal se reutilizara para otro paciente sin desmontarse).
@@ -145,7 +161,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
     try {
       for (const pendiente of archivosPendientes) {
         const ext = pendiente.file.name.split('.').pop()?.toLowerCase() ?? '';
-        const tipoArchivoId = TIPO_ARCHIVO_POR_EXT[ext] ?? 1;
+        const tipoArchivoId = idTipoArchivoPorExt(ext, tiposArchivo);
         const subido = await subirArchivoPaciente(paciente.id, pendiente.file, tipoArchivoId);
         setArchivosSubidos((prev) => [subido, ...prev]);
       }

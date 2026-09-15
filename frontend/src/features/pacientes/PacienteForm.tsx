@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPaciente, type PacientePayload } from '../../api/pacientes';
+import { getOrigenesPaciente, type OrigenPaciente } from '../../api/origenesPaciente';
 import styles from './PacienteForm.module.css';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -37,8 +38,19 @@ interface PacienteFormData {
 }
 
 const CONSULTORIO_ID = 1;
+
+// Fallback solo para el primer render, antes de que el catálogo
+// origenes_paciente responda — una vez cargado, el id real se resuelve
+// por nombre (ver idOrigenPorNombre), nunca hardcodeado. Mismo criterio
+// que idEstadoPorDefecto en CrearCita.tsx.
 const ORIGEN_MIS_PACIENTES = 1;
 const ORIGEN_EXTERNO = 2;
+const NOMBRE_ORIGEN_PROPIO = 'Propio';
+const NOMBRE_ORIGEN_EXTERNO = 'Externo';
+
+function idOrigenPorNombre(lista: OrigenPaciente[], nombre: string): number | undefined {
+  return lista.find((o) => o.nombre === nombre)?.id;
+}
 
 interface PacienteFormProps {
   onSuccess?: () => void;
@@ -84,6 +96,29 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose, origenI
     );
   }, []);
 
+  // Catálogo de orígenes de paciente (para resolver el id por nombre)
+  const [origenesPaciente, setOrigenesPaciente] = useState<OrigenPaciente[]>([]);
+  useEffect(() => {
+    getOrigenesPaciente()
+      .then(setOrigenesPaciente)
+      .catch((err) => console.error('No se pudo cargar el catálogo de orígenes de paciente', err));
+  }, []);
+
+  // Una vez cargado el catálogo, corrige el valor por defecto (si no se
+  // pasó origenInicial explícito) para que apunte al id real de "Propio"
+  // en vez del fallback numérico usado en el primer render.
+  useEffect(() => {
+    if (origenInicial != null || origenesPaciente.length === 0) return;
+    const idPropio = idOrigenPorNombre(origenesPaciente, NOMBRE_ORIGEN_PROPIO);
+    if (idPropio && formData.origen_id === String(ORIGEN_MIS_PACIENTES)) {
+      setFormData((prev) => ({ ...prev, origen_id: String(idPropio) }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [origenesPaciente]);
+
+  const origenPropioId = idOrigenPorNombre(origenesPaciente, NOMBRE_ORIGEN_PROPIO) ?? ORIGEN_MIS_PACIENTES;
+  const origenExternoId = idOrigenPorNombre(origenesPaciente, NOMBRE_ORIGEN_EXTERNO) ?? ORIGEN_EXTERNO;
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -123,7 +158,7 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose, origenI
       telefono: normalizeOptional(formData.telefono),
       correo: normalizeOptional(formData.correo),
 
-      origen_id: Number(formData.origen_id || ORIGEN_MIS_PACIENTES),
+      origen_id: Number(formData.origen_id || origenPropioId),
       medico_referente_externo: normalizeOptional(formData.medico_referente_externo),
       consultorio_id: Number(formData.consultorio_id || CONSULTORIO_ID),
       estado: formData.estado,
@@ -284,8 +319,8 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose, origenI
               <div className={styles.fieldGroup}>
                 <label htmlFor="origen_id"><FontAwesomeIcon icon={faHospital} /> Origen</label>
                 <select id="origen_id" name="origen_id" value={formData.origen_id} onChange={handleChange}>
-                  <option value={String(ORIGEN_MIS_PACIENTES)}>Mis pacientes</option>
-                  <option value={String(ORIGEN_EXTERNO)}>Externo</option>
+                  <option value={String(origenPropioId)}>Mis pacientes</option>
+                  <option value={String(origenExternoId)}>Externo</option>
                 </select>
               </div>
               <div className={styles.fieldGroup}>

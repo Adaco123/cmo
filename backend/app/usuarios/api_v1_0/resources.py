@@ -3,7 +3,13 @@ import re
 
 from flask import request
 from flask_restful import Api, Resource
-from flask_jwt_extended import create_access_token, jwt_required, current_user
+from flask_jwt_extended import (
+    create_access_token,
+    create_refresh_token,
+    get_jwt_identity,
+    jwt_required,
+    current_user,
+)
 
 from app.usuarios.models import Usuario
 from app.roles.models import Rol
@@ -84,14 +90,32 @@ class Login_Resource(Resource):
             if user is not None and user.estado and user.check_password(contra):
                 rol = user.rol.nombre if user.rol else None
                 token = create_access_token(identity=str(user.id), additional_claims={"role": rol})
+                refresh_token = create_refresh_token(identity=str(user.id))
                 return {
                     'access_token': token,
+                    'refresh_token': refresh_token,
                     'message': 'Iniciado correctamente',
                     'rol': rol,
                     'usuario': user.usuario,
                     'id': user.id,
                 }, 200
             return {'error': 'Credenciales incorrectas o usuario inactivo'}, 401
+        except Exception as e:
+            return {'error': f'Error interno del servidor: {str(e)}'}, 500
+
+
+class Refresh_Resource(Resource):
+    @jwt_required(refresh=True)
+    def post(self):
+        try:
+            identity = get_jwt_identity()
+            user = Usuario.get_by_id(int(identity))
+            if not user or not user.estado:
+                return {'error': 'Usuario no encontrado o inactivo'}, 401
+
+            rol = user.rol.nombre if user.rol else None
+            nuevo_token = create_access_token(identity=str(user.id), additional_claims={"role": rol})
+            return {'access_token': nuevo_token}, 200
         except Exception as e:
             return {'error': f'Error interno del servidor: {str(e)}'}, 500
 
@@ -220,6 +244,7 @@ class UsuariosList_Resource(Resource):
 
 api.add_resource(Registro_Resource, '/registrar')
 api.add_resource(Login_Resource, '/login')
+api.add_resource(Refresh_Resource, '/refresh')
 api.add_resource(Usuario_Resource, '/me')
 api.add_resource(UsuarioEdit_Resource, '/<int:usuario_id>')
 api.add_resource(CambiarContrasena_Resource, '/cambiar-contrasena')

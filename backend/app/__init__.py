@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -75,6 +76,14 @@ def create_app(settings_module):
     
     app.config["JWT_SECRET_KEY"] = jwt_secret_key
     app.config["JWT_TOKEN_LOCATION"] = ["headers"]
+    # Antes no se definían estos valores y flask_jwt_extended usaba su
+    # default de 15 minutos para el access token, sin ningún refresh
+    # token disponible. Esto hacía que cualquier inactividad (o incluso
+    # sesiones activas de más de 15 min) terminara en 401. Ahora el
+    # access token dura más y el refresh token permite renovarlo sin
+    # tener que loguearse de nuevo.
+    app.config.setdefault("JWT_ACCESS_TOKEN_EXPIRES", timedelta(minutes=30))
+    app.config.setdefault("JWT_REFRESH_TOKEN_EXPIRES", timedelta(days=7))
 
     cors_origins = app.config.get("CORS_ORIGINS", "")
     allowed_origins = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]

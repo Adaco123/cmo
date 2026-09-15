@@ -1,6 +1,7 @@
 // Cobrar.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { crearPago, type PagoPayload } from '../../api/pagos';
+import { getMetodosPago, type MetodoPago } from '../../api/metodosPago';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
 import styles from './Cobrar.module.css';
@@ -15,12 +16,13 @@ interface CobrarProps {
   onClose?: () => void;
 }
 
-// Mapeo temporal método -> id en la tabla metodos_pago.
-// Ajusta los IDs si no coinciden con tu catálogo real.
-const METODO_PAGO_IDS: Record<string, number> = {
-  Efectivo: 1,
-  QR: 2,
-};
+/** Busca el id de metodos_pago por nombre — nunca hardcodear el número,
+ *  el id real depende de lo que haya sembrado el backend (ver
+ *  _asegurar_metodos_pago_por_defecto). Mismo criterio que
+ *  idEstadoPorDefecto en CrearCita.tsx. */
+function idMetodoPagoPorNombre(lista: MetodoPago[], nombre: string): number | undefined {
+  return lista.find((m) => m.nombre === nombre)?.id;
+}
 
 /**
  * Modal para registrar el cobro de una consulta. Es autocontenido:
@@ -38,6 +40,15 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado, onClose }) => {
   const [metodoPago, setMetodoPago] = useState<string>('Efectivo');
   const [montoRecibido, setMontoRecibido] = useState<string>('');
   const [referencia, setReferencia] = useState<string>('');
+
+  // Catálogo de métodos de pago (para resolver el id por nombre al enviar)
+  const [metodosPago, setMetodosPago] = useState<MetodoPago[]>([]);
+
+  useEffect(() => {
+    getMetodosPago()
+      .then(setMetodosPago)
+      .catch((err) => console.error('No se pudo cargar el catálogo de métodos de pago', err));
+  }, []);
 
   // Estados de la petición al backend
   const [enviando, setEnviando] = useState<boolean>(false);
@@ -73,11 +84,19 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado, onClose }) => {
       }
     }
 
+    const metodoPagoId = idMetodoPagoPorNombre(metodosPago, metodoPago);
+    if (!metodoPagoId) {
+      const mensaje = 'No se pudo determinar el método de pago. Intenta nuevamente.';
+      setError(mensaje);
+      showError(mensaje);
+      return;
+    }
+
     const payload: PagoPayload = {
       consulta_id: consultaId ?? null,
       monto: baseNum,
       descuento: descNum,
-      metodo_pago_id: METODO_PAGO_IDS[metodoPago],
+      metodo_pago_id: metodoPagoId,
       monto_pago: totalPagar,
       referencia: referencia || null,
     };

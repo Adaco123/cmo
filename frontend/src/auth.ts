@@ -19,6 +19,7 @@ export interface Usuario {
 
 interface LoginResponse {
   access_token: string;
+  refresh_token?: string;
   rol?: string | null;
   usuario?: string | null;
   id?: number | string;
@@ -56,6 +57,7 @@ function getErrorMessage(err: unknown): string {
 
 class AuthStore {
   private readonly tokenKey = 'token';
+  private readonly refreshTokenKey = 'refresh_token';
   private readonly userKey = 'user';
 
   state = {
@@ -105,7 +107,7 @@ class AuthStore {
     }
   }
 
-  setToken(token: string | null) {
+  setToken(token: string | null, refreshToken?: string | null) {
     this.state.token = token;
     if (token) {
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -113,6 +115,12 @@ class AuthStore {
     } else {
       delete api.defaults.headers.common['Authorization'];
       localStorage.removeItem(this.tokenKey);
+    }
+
+    if (refreshToken) {
+      localStorage.setItem(this.refreshTokenKey, refreshToken);
+    } else if (refreshToken === null) {
+      localStorage.removeItem(this.refreshTokenKey);
     }
   }
 
@@ -127,7 +135,7 @@ class AuthStore {
       const payload: Record<string, string> = { correo: usernameOrEmail, contra: password };
       const res = await api.post<LoginResponse>('/api/usuarios/login', payload);
       if (res.status === 200 && res.data && res.data.access_token) {
-        this.setToken(res.data.access_token);
+        this.setToken(res.data.access_token, res.data.refresh_token ?? null);
         // fetch full user object from /me
         try {
           const me = await api.get('/api/usuarios/me');
@@ -168,7 +176,7 @@ class AuthStore {
 
   logout() {
     this.setUser(null);
-    this.setToken(null);
+    this.setToken(null, null);
   }
 }
 

@@ -30,26 +30,108 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
+function forzarLogout() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('refresh_token');
+  delete api.defaults.headers.common['Authorization'];
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login';
+  }
+}
+
+let isRefreshing = false;
+let pendingQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (err: unknown) => void;
+}> = [];
+
+function resolvePendingQueue(error: unknown, token: string | null) {
+  pendingQueue.forEach(({ resolve, reject }) => {
+    if (token) resolve(token);
+    else reject(error);
+  });
+  pendingQueue = [];
+}
+
+// Pide un access_token nuevo usando el refresh_token guardado. Usa una
+// instancia de axios "pelada" (sin los interceptors de arriba) para no
+// entrar en loop si esta misma petición devuelve 401.
+async function refrescarAccessToken(): Promise<string> {
+  const refreshToken = localStorage.getItem('refresh_token');
+  if (!refreshToken) {
+    throw new Error('No hay refresh token disponible');
+  }
+  const res = await axios.post(
+    `${baseURL}/api/usuarios/refresh`,
+    {},
+    { headers: { Authorization: `Bearer ${refreshToken}` } },
+  );
+  const nuevoToken = res.data.access_token;
+  localStorage.setItem('token', nuevoToken);
+  api.defaults.headers.common['Authorization'] = `Bearer ${nuevoToken}`;
+  return nuevoToken;
+}
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Si la petición que falló NO llevaba token (ej. un fetch de un
-      // Provider global disparado antes de terminar el login), este 401
-      // no dice nada sobre la sesión actual — solo que ese pedido en
-      // particular no estaba autenticado. Forzar logout acá borraría un
-      // token válido recién guardado si esa respuesta llega tarde,
-      // después de que el usuario ya inició sesión.
-      const teniaToken = !!(error.config?.headers as any)?.['Authorization'];
-      if (teniaToken) {
-        localStorage.removeItem('token');
-        delete api.defaults.headers.common['Authorization'];
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
-        }
-      }
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status !== 401) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    // Si la petición que falló NO llevaba token (ej. un fetch de un
+    // Provider global disparado antes de terminar el login), este 401
+    // no dice nada sobre la sesión actual — solo que ese pedido en
+    // particular no estaba autenticado.
+    const teniaToken = !!(originalRequest?.headers as any)?.['Authorization'];
+    if (!teniaToken) {
+      return Promise.reject(error);
+    }
+
+    // El propio intento de refresh falló (refresh token vencido o
+    // inválido) — ahí sí no queda otra que mandar a login.
+    if (originalRequest?.url?.includes('/usuarios/refresh')) {
+      forzarLogout();
+      return Promise.reject(error);
+    }
+
+    // Evita reintentar infinitamente la misma request.
+    if (originalRequest._retry) {
+      forzarLogout();
+      return Promise.reject(error);
+    }
+    originalRequest._retry = true;
+
+    if (isRefreshing) {
+      // Ya hay un refresh en curso (ej. varias requests en paralelo
+      // vencieron a la vez): esperar a que termine y reintentar con
+      // el token nuevo en vez de disparar varios refresh a la vez.
+      return new Promise((resolve, reject) => {
+        pendingQueue.push({
+          resolve: (token: string) => {
+            originalRequest.headers['Authorization'] = `Bearer ${token}`;
+            resolve(api(originalRequest));
+          },
+          reject,
+        });
+      });
+    }
+
+    isRefreshing = true;
+    try {
+      const nuevoToken = await refrescarAccessToken();
+      resolvePendingQueue(null, nuevoToken);
+      originalRequest.headers['Authorization'] = `Bearer ${nuevoToken}`;
+      return api(originalRequest);
+    } catch (refreshError) {
+      resolvePendingQueue(refreshError, null);
+      forzarLogout();
+      return Promise.reject(refreshError);
+    } finally {
+      isRefreshing = false;
+    }
   },
 );
 
