@@ -1,9 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useReportesHoy } from './ReportesHoyProvider';
 import './PagosHoyWidget.css';
 
 const formatMonto = (valor: number) =>
   new Intl.NumberFormat('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valor);
+
+const STORAGE_KEY = 'pagosHoyWidget:position';
+
+type Posicion = { x: number; y: number };
+
+const clamp = (valor: number, min: number, max: number) => Math.min(Math.max(valor, min), max);
 
 const PagosHoyWidget: React.FC = () => {
   const { pagosHoyData, loading, error } = useReportesHoy();
@@ -12,6 +18,72 @@ const PagosHoyWidget: React.FC = () => {
 
   const [displayMonto, setDisplayMonto] = useState(0);
   const prevMonto = useRef(0);
+
+  const widgetRef = useRef<HTMLDivElement>(null);
+  const [posicion, setPosicion] = useState<Posicion | null>(null);
+  const arrastreRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
+  const [arrastrando, setArrastrando] = useState(false);
+
+  // Cargar posición guardada al montar
+  useEffect(() => {
+    try {
+      const guardada = localStorage.getItem(STORAGE_KEY);
+      if (guardada) {
+        setPosicion(JSON.parse(guardada));
+      }
+    } catch {
+      // ignorar si no se puede leer
+    }
+  }, []);
+
+  const onPointerMove = useCallback((e: PointerEvent) => {
+    if (!arrastreRef.current || !widgetRef.current) return;
+    const { offsetX, offsetY } = arrastreRef.current;
+    const ancho = widgetRef.current.offsetWidth;
+    const alto = widgetRef.current.offsetHeight;
+    const nuevaX = clamp(e.clientX - offsetX, 0, window.innerWidth - ancho);
+    const nuevaY = clamp(e.clientY - offsetY, 0, window.innerHeight - alto);
+    setPosicion({ x: nuevaX, y: nuevaY });
+  }, []);
+
+  const onPointerUp = useCallback(() => {
+    arrastreRef.current = null;
+    setArrastrando(false);
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    setPosicion((actual) => {
+      if (actual) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(actual));
+        } catch {
+          // ignorar si no se puede guardar
+        }
+      }
+      return actual;
+    });
+  }, [onPointerMove]);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!widgetRef.current) return;
+    const rect = widgetRef.current.getBoundingClientRect();
+    arrastreRef.current = {
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+    };
+    // Fija la posición actual en px para poder moverla libremente desde ahí
+    setPosicion({ x: rect.left, y: rect.top });
+    setArrastrando(true);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  };
+
+  // Limpieza de listeners si el componente se desmonta mientras se arrastra
+  useEffect(() => {
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+  }, [onPointerMove, onPointerUp]);
 
   // Animación de conteo cuando cambia el monto
   useEffect(() => {
@@ -33,9 +105,17 @@ const PagosHoyWidget: React.FC = () => {
     return () => cancelAnimationFrame(raf);
   }, [monto]);
 
+  const estiloPosicion: React.CSSProperties = posicion
+    ? { left: posicion.x, top: posicion.y, right: 'auto', bottom: 'auto' }
+    : {};
+
   return (
-    <div className="pulse-widget">
-      <div className="pulse-widget-top">
+    <div
+      ref={widgetRef}
+      className={`pulse-widget${arrastrando ? ' pulse-widget-dragging' : ''}`}
+      style={estiloPosicion}
+    >
+      <div className="pulse-widget-top pulse-widget-drag-handle" onPointerDown={onPointerDown}>
         <span className="pulse-widget-dot" />
         <span className="pulse-widget-label">Caja de hoy</span>
       </div>

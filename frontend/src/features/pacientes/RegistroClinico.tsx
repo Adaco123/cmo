@@ -350,7 +350,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
   };
 
   const [saveError, setSaveError] = useState<string | null>(null);
-  const { showError, showSuccess } = useErrorToast();
+  const { showError, showSuccess, confirm } = useErrorToast();
 
   const handleGuardar = async () => {
     // Evita doble-submit: el botón ya se deshabilita con `saving`, pero
@@ -468,7 +468,25 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
   // Cerrar/cancelar TODO el registro clínico (no solo un drawer interno)
   // descarta las sesiones de captura QR abiertas ligadas al paciente:
   // esas fotos no deben quedar huérfanas si el médico no llegó a guardar.
-  const handleCerrarTodo = useCallback(() => {
+  // Antes de cerrar, si hay algo cargado que se perdería (vitales,
+  // secciones de texto, alergia nueva, nota/fecha de control, exámenes
+  // en el drawer, o una receta armada), se pide confirmación — mismo
+  // patrón que el window.confirm ya usado en VerPaciente.tsx.
+  const handleCerrarTodo = useCallback(async () => {
+    const hayDatosSinGuardar =
+      Object.values(vitales).some((v) => v.trim()) ||
+      Object.entries(secciones).some(([key, v]) => key !== 'tratamiento' && v.trim()) ||
+      !!alergiasRegistro.trim() ||
+      !!controlNota.trim() ||
+      !!controlFecha ||
+      examCount > 0 ||
+      recetaRef.current?.getPayload() !== null;
+
+    if (hayDatosSinGuardar) {
+      const aceptar = await confirm('Tienes datos sin guardar en este registro clínico. ¿Seguro que quieres cerrar?');
+      if (!aceptar) return;
+    }
+
     const sids = examenesRef.current?.getSidsCapturaPendientes() ?? [];
     sids.forEach((sid) => {
       descartarSesionCaptura(sid).catch(() => {
@@ -476,7 +494,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
       });
     });
     onClose?.();
-  }, [onClose]);
+  }, [onClose, vitales, secciones, alergiasRegistro, controlNota, controlFecha, examCount, confirm]);
 
   return (
     <div className={styles.backdrop} onClick={() => handleCerrarTodo()}>

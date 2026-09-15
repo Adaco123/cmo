@@ -27,6 +27,41 @@
   border-left-color: var(--success);
 }
 
+.toast.confirm {
+  border-left-color: var(--primary);
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 0.6rem;
+  align-self: flex-end;
+}
+
+.btnConfirmCancelar,
+.btnConfirmAceptar {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.35rem 0.8rem;
+  border-radius: var(--radius-sm);
+}
+
+.btnConfirmCancelar {
+  background: none;
+  color: var(--text-on-dark);
+  border: 1px solid var(--border-color);
+}
+
+.btnConfirmAceptar {
+  background: var(--primary);
+  color: var(--text-on-dark);
+}
+
 @keyframes errorToastIn {
   from { opacity: 0; transform: translateX(-50%) translateY(10px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }

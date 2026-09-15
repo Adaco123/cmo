@@ -137,8 +137,11 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
 
   // Edición de observaciones de un examen ya existente (ej. completar el
   // resultado del examen "Pendiente" que se creó junto con la solicitud).
+  // Por defecto se muestra solo el texto ya guardado; el botón de lápiz
+  // habilita el textarea para editarlo.
   const [obsDrafts, setObsDrafts] = useState<Record<number, string>>({});
   const [guardandoObsId, setGuardandoObsId] = useState<number | null>(null);
+  const [obsEditando, setObsEditando] = useState<Record<number, boolean>>({});
 
   const nombrePacienteCompleto = paciente ? `${paciente.nombres} ${paciente.apellidos}`.trim() : '';
 
@@ -227,12 +230,18 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
         const { [examenId]: _quitado, ...resto } = d;
         return resto;
       });
+      setObsEditando((e) => ({ ...e, [examenId]: false }));
     } catch {
       // El input se queda con lo que el médico tipeó para que no lo pierda;
       // puede reintentar tocando "Guardar" de nuevo.
     } finally {
       setGuardandoObsId(null);
     }
+  };
+
+  const handleEditarObs = (examen: { id: number; observaciones?: string | null }) => {
+    setObsDrafts((d) => ({ ...d, [examen.id]: d[examen.id] ?? examen.observaciones ?? '' }));
+    setObsEditando((e) => ({ ...e, [examen.id]: true }));
   };
 
   const registro = detalle?.registro ?? null;
@@ -284,6 +293,33 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
       const lista = recetasPorSeguimiento.get(r.seguimiento_control_id) || [];
       lista.push(r);
       recetasPorSeguimiento.set(r.seguimiento_control_id, lista);
+    }
+  });
+
+  // Un ExamenComplementario nace como espejo de un RecetaExamen (vía
+  // receta_examen_id). Para saber si ese examen fue pedido en un
+  // seguimiento de control (y no en la consulta inicial), se mapea cada
+  // RecetaExamen.id a la seguimiento_control_id de su receta.
+  const recetaExamenIdASeguimiento = new Map<number, number>();
+  recetas.forEach((r) => {
+    if (r.seguimiento_control_id) {
+      r.examenes.forEach((e) => recetaExamenIdASeguimiento.set(e.id, r.seguimiento_control_id as number));
+    }
+  });
+
+  // Exámenes de la consulta inicial (sección de arriba) vs. exámenes
+  // pedidos dentro de un seguimiento (se muestran solo en la tarjeta de
+  // ese seguimiento, para no duplicarlos).
+  const examenesIniciales = examenes_complementarios.filter(
+    (ex) => !(ex.receta_examen_id && recetaExamenIdASeguimiento.has(ex.receta_examen_id)),
+  );
+  const examenesPorSeguimiento = new Map<number, typeof examenes_complementarios>();
+  examenes_complementarios.forEach((ex) => {
+    if (ex.receta_examen_id && recetaExamenIdASeguimiento.has(ex.receta_examen_id)) {
+      const seguimientoId = recetaExamenIdASeguimiento.get(ex.receta_examen_id) as number;
+      const lista = examenesPorSeguimiento.get(seguimientoId) || [];
+      lista.push(ex);
+      examenesPorSeguimiento.set(seguimientoId, lista);
     }
   });
 
@@ -411,6 +447,135 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
     });
   };
 
+  // Tarjeta de un examen complementario: encabezado, botón de agregar
+  // fotos, resultado, observaciones (con edición) y visor de galería.
+  // Se reutiliza tanto en la sección general como dentro de cada
+  // seguimiento de control.
+  const renderExamen = (examen: (typeof examenes_complementarios)[number]) => {
+    const imagenes = galeria[examen.id] || [];
+    const idxActivo = visorIndex[examen.id] ?? 0;
+    const activa = imagenes[idxActivo];
+    const esPendiente =
+      examen.receta_examen_id != null &&
+      !examen.resultado &&
+      !examen.observaciones &&
+      imagenes.length === 0;
+    const editando = !!obsEditando[examen.id];
+
+    return (
+      <div key={examen.id} className={styles.examCard}>
+        <div className={styles.examHead}>
+          <div className={styles.examHeadInfo}>
+            <span className={styles.examNombre}>{examen.nombre_examen}</span>
+            {examen.categoria?.nombre && (
+              <span className={styles.examCategoria}>{examen.categoria.nombre}</span>
+            )}
+            {esPendiente && <span className={styles.examPendiente}>Pendiente</span>}
+          </div>
+          <button
+            type="button"
+            className={styles.btnAgregarFotos}
+            onClick={() => setQrModalExamenId(examen.id)}
+          >
+            <FontAwesomeIcon icon={faCamera} /> Agregar fotografías
+          </button>
+        </div>
+        {examen.resultado && <p className={styles.examResultado}>{examen.resultado}</p>}
+
+        <div className={styles.examObsEdit}>
+          {editando ? (
+            <>
+              <textarea
+                className={styles.examObsInput}
+                rows={2}
+                placeholder="Observaciones del médico..."
+                autoFocus
+                value={obsValor(examen)}
+                onChange={(e) =>
+                  setObsDrafts((d) => ({ ...d, [examen.id]: e.target.value }))
+                }
+              />
+              <button
+                type="button"
+                className={styles.btnGuardarObs}
+                disabled={guardandoObsId === examen.id}
+                onClick={() => handleGuardarObs(examen.id)}
+              >
+                {guardandoObsId === examen.id ? 'Guardando...' : 'Guardar'}
+              </button>
+            </>
+          ) : (
+            <>
+              <p className={styles.examObsTexto}>
+                {examen.observaciones || 'Sin observaciones'}
+              </p>
+              <button
+                type="button"
+                className={styles.btnEditarObs}
+                aria-label="Editar observaciones"
+                onClick={() => handleEditarObs(examen)}
+              >
+                <FontAwesomeIcon icon={faPen} />
+              </button>
+            </>
+          )}
+        </div>
+
+        {imagenes.length > 0 && activa && (
+          <div className={styles.visor}>
+            <button
+              type="button"
+              className={styles.visorMain}
+              onClick={() =>
+                setImagenActiva({
+                  archivo: activa.archivo,
+                  url: activa.url,
+                  examenNombre: examen.nombre_examen,
+                })
+              }
+            >
+              <img src={activa.url} alt={activa.archivo.nombre_archivo} />
+              {imagenes.length > 1 && (
+                <span className={styles.visorBadge}>{idxActivo + 1} / {imagenes.length}</span>
+              )}
+              <span
+                role="button"
+                tabIndex={0}
+                className={styles.visorExpand}
+                aria-label="Ver en pantalla completa"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setImagenActiva({
+                    archivo: activa.archivo,
+                    url: activa.url,
+                    examenNombre: examen.nombre_examen,
+                  });
+                }}
+              >
+                <FontAwesomeIcon icon={faExpand} />
+              </span>
+            </button>
+
+            {imagenes.length > 1 && (
+              <div className={styles.visorThumbs}>
+                {imagenes.map(({ archivo, url }, idx) => (
+                  <button
+                    key={archivo.id}
+                    type="button"
+                    className={`${styles.visorThumb} ${idx === idxActivo ? styles.active : ''}`}
+                    onClick={() => cambiarVisor(examen.id, idx)}
+                  >
+                    <img src={url} alt={archivo.nombre_archivo} loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className={styles.container}>
       <div className={styles.hud}>
@@ -521,117 +686,13 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
           </div>
         </section>
 
-        {/* ---- Exámenes complementarios: visor tipo carrete ---- */}
+        {/* ---- Exámenes complementarios: visor tipo carrete ----
+           Solo los de la consulta inicial; los pedidos en un seguimiento
+           se muestran dentro de la tarjeta de ese seguimiento. */}
         <section className={styles.section}>
           <div className={styles.eyebrow}><FontAwesomeIcon icon={faFlaskVial} /> Exámenes complementarios</div>
-          {examenes_complementarios.length === 0 && <p className={styles.vacio}>Sin exámenes registrados.</p>}
-          {examenes_complementarios.map((examen) => {
-            const imagenes = galeria[examen.id] || [];
-            const idxActivo = visorIndex[examen.id] ?? 0;
-            const activa = imagenes[idxActivo];
-            const esPendiente =
-              examen.receta_examen_id != null &&
-              !examen.resultado &&
-              !examen.observaciones &&
-              imagenes.length === 0;
-            const obsSucia = obsValor(examen) !== (examen.observaciones || '');
-
-            return (
-              <div key={examen.id} className={styles.examCard}>
-                <div className={styles.examHead}>
-                  <div className={styles.examHeadInfo}>
-                    <span className={styles.examNombre}>{examen.nombre_examen}</span>
-                    {examen.categoria?.nombre && (
-                      <span className={styles.examCategoria}>{examen.categoria.nombre}</span>
-                    )}
-                    {esPendiente && <span className={styles.examPendiente}>Pendiente</span>}
-                  </div>
-                  <button
-                    type="button"
-                    className={styles.btnAgregarFotos}
-                    onClick={() => setQrModalExamenId(examen.id)}
-                  >
-                    <FontAwesomeIcon icon={faCamera} /> Agregar fotografías
-                  </button>
-                </div>
-                {examen.resultado && <p className={styles.examResultado}>{examen.resultado}</p>}
-
-                <div className={styles.examObsEdit}>
-                  <textarea
-                    className={styles.examObsInput}
-                    rows={2}
-                    placeholder="Observaciones del médico..."
-                    value={obsValor(examen)}
-                    onChange={(e) =>
-                      setObsDrafts((d) => ({ ...d, [examen.id]: e.target.value }))
-                    }
-                  />
-                  {obsSucia && (
-                    <button
-                      type="button"
-                      className={styles.btnGuardarObs}
-                      disabled={guardandoObsId === examen.id}
-                      onClick={() => handleGuardarObs(examen.id)}
-                    >
-                      {guardandoObsId === examen.id ? 'Guardando...' : 'Guardar'}
-                    </button>
-                  )}
-                </div>
-
-                {imagenes.length > 0 && activa && (
-                  <div className={styles.visor}>
-                    <button
-                      type="button"
-                      className={styles.visorMain}
-                      onClick={() =>
-                        setImagenActiva({
-                          archivo: activa.archivo,
-                          url: activa.url,
-                          examenNombre: examen.nombre_examen,
-                        })
-                      }
-                    >
-                      <img src={activa.url} alt={activa.archivo.nombre_archivo} />
-                      {imagenes.length > 1 && (
-                        <span className={styles.visorBadge}>{idxActivo + 1} / {imagenes.length}</span>
-                      )}
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        className={styles.visorExpand}
-                        aria-label="Ver en pantalla completa"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setImagenActiva({
-                            archivo: activa.archivo,
-                            url: activa.url,
-                            examenNombre: examen.nombre_examen,
-                          });
-                        }}
-                      >
-                        <FontAwesomeIcon icon={faExpand} />
-                      </span>
-                    </button>
-
-                    {imagenes.length > 1 && (
-                      <div className={styles.visorThumbs}>
-                        {imagenes.map(({ archivo, url }, idx) => (
-                          <button
-                            key={archivo.id}
-                            type="button"
-                            className={`${styles.visorThumb} ${idx === idxActivo ? styles.active : ''}`}
-                            onClick={() => cambiarVisor(examen.id, idx)}
-                          >
-                            <img src={url} alt={archivo.nombre_archivo} loading="lazy" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {examenesIniciales.length === 0 && <p className={styles.vacio}>Sin exámenes registrados.</p>}
+          {examenesIniciales.map(renderExamen)}
         </section>
 
         {/* ---- Receta de la consulta inicial ---- */}
@@ -660,6 +721,12 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
               </div>
               <p>{s.evolucion}</p>
               {(recetasPorSeguimiento.get(s.id) || []).map((r) => renderReceta(r, s.fecha))}
+              {(examenesPorSeguimiento.get(s.id) || []).length > 0 && (
+                <div className={styles.examenesSeguimiento}>
+                  <div className={styles.eyebrow}><FontAwesomeIcon icon={faFlaskVial} /> Exámenes de este seguimiento</div>
+                  {(examenesPorSeguimiento.get(s.id) || []).map(renderExamen)}
+                </div>
+              )}
             </div>
           ))}
         </section>

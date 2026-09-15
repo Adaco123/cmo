@@ -4,7 +4,7 @@ import { extractErrorMessage } from '../utils/errors';
 
 interface ToastState {
   mensaje: string;
-  tipo: 'error' | 'success';
+  tipo: 'error' | 'success' | 'confirm';
 }
 
 interface ErrorToastContextValue {
@@ -14,6 +14,12 @@ interface ErrorToastContextValue {
   showErrorFrom: (err: unknown, fallback: string) => void;
   /** Muestra un mensaje de éxito (ej. tras un 200/201) como texto plano. */
   showSuccess: (msg: string) => void;
+  /**
+   * Pregunta algo con botones "Sí, cerrar" / "Cancelar" en vez del
+   * window.confirm nativo del navegador. No se autocierra: espera a que
+   * el usuario elija. Devuelve una promesa que resuelve `true` si aceptó.
+   */
+  confirm: (mensaje: string) => Promise<boolean>;
 }
 
 const ErrorToastContext = createContext<ErrorToastContextValue | null>(null);
@@ -28,6 +34,7 @@ const ErrorToastContext = createContext<ErrorToastContextValue | null>(null);
 export const ErrorToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toast, setToast] = useState<ToastState | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const confirmResolverRef = useRef<((valor: boolean) => void) | null>(null);
 
   const mostrar = useCallback((mensaje: string, tipo: ToastState['tipo'], duracion: number) => {
     setToast({ mensaje, tipo });
@@ -46,24 +53,49 @@ export const ErrorToastProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     [showError],
   );
 
+  const resolverConfirm = useCallback((valor: boolean) => {
+    confirmResolverRef.current?.(valor);
+    confirmResolverRef.current = null;
+    setToast(null);
+  }, []);
+
+  const confirm = useCallback((mensaje: string) => {
+    return new Promise<boolean>((resolve) => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      confirmResolverRef.current = resolve;
+      setToast({ mensaje, tipo: 'confirm' });
+    });
+  }, []);
+
   return (
-    <ErrorToastContext.Provider value={{ showError, showErrorFrom, showSuccess }}>
+    <ErrorToastContext.Provider value={{ showError, showErrorFrom, showSuccess, confirm }}>
       {children}
       {toast && (
         <div
-          className={`${styles.toast} ${toast.tipo === 'success' ? styles.success : ''}`}
-          role="alert"
+          className={`${styles.toast} ${toast.tipo === 'success' ? styles.success : ''} ${toast.tipo === 'confirm' ? styles.confirm : ''}`}
+          role={toast.tipo === 'confirm' ? 'alertdialog' : 'alert'}
         >
           <span>{toast.mensaje}</span>
-          <button
-            type="button"
-            onClick={() => {
-              if (timerRef.current) clearTimeout(timerRef.current);
-              setToast(null);
-            }}
-          >
-            Cerrar
-          </button>
+          {toast.tipo === 'confirm' ? (
+            <div className={styles.confirmActions}>
+              <button type="button" className={styles.btnConfirmCancelar} onClick={() => resolverConfirm(false)}>
+                Cancelar
+              </button>
+              <button type="button" className={styles.btnConfirmAceptar} onClick={() => resolverConfirm(true)}>
+                Sí, cerrar
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                if (timerRef.current) clearTimeout(timerRef.current);
+                setToast(null);
+              }}
+            >
+              Cerrar
+            </button>
+          )}
         </div>
       )}
     </ErrorToastContext.Provider>
