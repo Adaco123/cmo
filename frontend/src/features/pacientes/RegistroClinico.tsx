@@ -706,13 +706,13 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                 </div>
                 {controlFecha && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Hora</span>
+                    <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>Hora</span>
                     <input type="time" value={controlHoraInicio} onChange={e => setControlHoraInicio(e.target.value)}
-                      style={{ background: 'var(--bg-input)', border: '1.5px solid var(--border-color)', borderRadius: 10, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, padding: '8px 6px', color: 'var(--text-main)' }} />
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>a</span>
+                      style={{ background: 'var(--bg-input)', border: '1.5px solid var(--border-color)', borderRadius: 10, fontFamily: 'var(--mono)', fontWeight: 600, padding: '8px 6px', color: 'var(--text-main)' }} />
+                    <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>a</span>
                     <input type="time" value={controlHoraFin} disabled title="Se calcula sola: hora de inicio + 45 min"
-                      style={{ background: 'var(--bg-input)', border: '1.5px solid var(--border-color)', borderRadius: 10, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, padding: '8px 6px', color: 'var(--text-muted)', opacity: 0.75, cursor: 'not-allowed' }} />
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>(+45 min automático)</span>
+                      style={{ background: 'var(--bg-input)', border: '1.5px solid var(--border-color)', borderRadius: 10, fontFamily: 'var(--mono)', fontWeight: 600, padding: '8px 6px', color: 'var(--text-muted)', opacity: 0.75, cursor: 'not-allowed' }} />
+                    <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>(+45 min automático)</span>
                   </div>
                 )}
                 {!controlNota.trim() && controlFecha && (
@@ -725,7 +725,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
           </div>
 
           {saveError && (
-            <div style={{ color: 'var(--status-inactive)', marginBottom: 8, fontSize: 13 }}>
+            <div style={{ color: 'var(--status-inactive)', marginBottom: 8, fontSize: 'var(--fs-sm)' }}>
               {saveError}
             </div>
           )}

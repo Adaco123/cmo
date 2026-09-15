@@ -329,7 +329,7 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
       </div>
 
       {saveError && (
-        <div style={{ color: 'var(--status-inactive)', marginBottom: 8, fontSize: 13 }}>
+        <div style={{ color: 'var(--status-inactive)', marginBottom: 8, fontSize: 'var(--fs-sm)' }}>
           {saveError}
         </div>
       )}

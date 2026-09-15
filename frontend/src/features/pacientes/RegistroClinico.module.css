@@ -131,7 +131,7 @@
 
 .brand h1 {
   font-family: var(--sans);
-  font-size: 15px;
+  font-size: var(--fs-base);
   margin: 0;
   font-weight: 700;
   /* sobre --bg-body directo, no --text-main (ver nota de arriba) */
@@ -170,7 +170,7 @@
 .railLabel {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-on-dark-muted);
   margin-top: 6px;
 }
@@ -368,7 +368,7 @@
 }
 
 .field.fieldPlain .flabel i.ficon {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   width: 1.1rem;
 }
 
@@ -442,7 +442,7 @@
   border-radius: var(--radius-sm);
   color: var(--text-main);
   font-family: var(--mono);
-  font-size: 14px;
+  font-size: var(--fs-base);
   font-weight: 600;
   padding: 0.5rem 4px;
   outline: none;
@@ -470,7 +470,7 @@
 }
 
 .vslot .unit {
-  font-size: 9px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
@@ -654,7 +654,7 @@
   border-radius: var(--radius-xl);
   padding: 18px 20px;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.7;
   color: var(--text-main);
   overflow: auto;
@@ -694,7 +694,7 @@
   border-radius: var(--radius-xl);
   cursor: pointer;
   color: var(--text-main);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   box-shadow: var(--shadow-hover);
   transition: all var(--transition-fast);
@@ -707,13 +707,13 @@
 }
 
 .dockBtn .ico {
-  font-size: 16px;
+  font-size: var(--fs-md);
   color: var(--primary-dark);
 }
 
 .dockBtn kbd {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   background: var(--bg-input);
   padding: 2px 6px;
   border-radius: 5px;
@@ -729,7 +729,7 @@
   border-radius: 9px;
   background: var(--status-active);
   color: #fff;
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   display: none;
   align-items: center;
@@ -780,7 +780,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.3px;
@@ -790,7 +790,7 @@
 
 .pinfoItem .pk .ficon {
   color: var(--primary);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .pinfoItem .pv {
@@ -832,7 +832,7 @@
   padding: 6px 12px;
   border-radius: var(--radius-xl);
   color: var(--status-inactive);
-  font-size: 14px;
+  font-size: var(--fs-base);
   font-weight: 700;
   box-shadow: var(--shadow-hover);
   margin-bottom: 4px;
@@ -841,7 +841,7 @@
 
 .allergyAlert .ficon {
   color: var(--status-inactive);
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 .allergyAlert:hover {
@@ -858,7 +858,7 @@
   padding: 6px 12px;
   border-radius: var(--radius-xl);
   color: var(--primary-dark);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   box-shadow: var(--shadow-hover);
   margin-bottom: 4px;
@@ -867,7 +867,7 @@
 
 .diagnosisAlert .ficon {
   color: var(--primary);
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 .diagnosisAlert:hover {

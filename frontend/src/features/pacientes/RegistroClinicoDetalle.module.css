@@ -87,7 +87,7 @@
   align-items: center;
   gap: 7px;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.8px;
   text-transform: uppercase;
@@ -125,7 +125,7 @@
 }
 
 .headlineTitle {
-  font-size: 20px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   letter-spacing: -0.2px;
   color: var(--text-main);
@@ -133,7 +133,7 @@
 
 .headlineFecha {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -243,7 +243,7 @@
 
 .gaugeNum {
   font-family: var(--mono);
-  font-size: 14px;
+  font-size: var(--fs-base);
   font-weight: 700;
   color: var(--text-main);
   font-variant-numeric: tabular-nums;
@@ -252,7 +252,7 @@
 
 .gaugeUnit {
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   margin-top: 1px;
 }
@@ -290,7 +290,7 @@
 }
 
 .paHead .gaugeNum {
-  font-size: 17px;
+  font-size: var(--fs-md);
 }
 
 .paBars {
@@ -383,7 +383,7 @@
 }
 
 .noteBody {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-main);
   line-height: 1.5;
 }
@@ -451,7 +451,7 @@
 .examCategoria {
   flex-shrink: 0;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.5px;
   color: var(--primary);
@@ -463,7 +463,7 @@
 }
 
 .examResultado {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-main);
   margin: 6px 0 2px;
   line-height: 1.5;
@@ -477,7 +477,7 @@
 
 .examPendiente {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -590,7 +590,7 @@
   top: 10px;
   left: 10px;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.4px;
   color: var(--text-main);
@@ -718,7 +718,7 @@
   align-items: center;
   gap: 14px;
   color: var(--text-on-dark);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .lightboxCaption span:first-child {
@@ -807,7 +807,7 @@
 }
 
 .indicaciones {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-main);
   font-style: italic;
   padding-bottom: 10px;
@@ -822,7 +822,7 @@
 .bloqueLabel {
   display: block;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.8px;
   text-transform: uppercase;
@@ -831,7 +831,7 @@
 }
 
 .itemReceta {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-main);
   padding: 8px 10px;
   background: var(--bg-card);
@@ -844,7 +844,7 @@
 }
 
 .itemIndicaciones {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   margin-top: 3px;
   line-height: 1.4;
@@ -853,7 +853,7 @@
 .tagUrgente {
   margin-left: 8px;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -903,7 +903,7 @@
 
 .seguimientoHead b {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-main);
 }
 
@@ -916,7 +916,7 @@
 }
 
 .seguimientoCard > p {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-main);
   line-height: 1.55;
   margin-bottom: 12px;

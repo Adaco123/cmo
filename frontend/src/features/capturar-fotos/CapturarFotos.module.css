@@ -26,12 +26,12 @@
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  font-size: 15px;
+  font-size: var(--fs-base);
   padding: 0 20px;
 }
 .mensajeError { color: var(--status-inactive, #C1443F); }
 .mensajeFinal { color: var(--primary-light, #2dd4bf); }
-.mensajeError svg, .mensajeFinal svg { font-size: 34px; }
+.mensajeError svg, .mensajeFinal svg { font-size: var(--fs-2xl); }
 
 .header {
   width: 100%;
@@ -39,7 +39,7 @@
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 2px 10px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 .headerLabel { color: var(--text-on-dark-muted, #A9C6DD); }
 .headerValor { font-weight: 600; }
@@ -83,7 +83,7 @@
   background: var(--primary-gradient, #14b8a6);
   color: #06231F;
   font-weight: 700;
-  font-size: 15px;
+  font-size: var(--fs-base);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -102,7 +102,7 @@
   padding: 13px;
   border-radius: 999px;
   font-weight: 700;
-  font-size: 14px;
+  font-size: var(--fs-base);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -123,7 +123,7 @@
 .contador {
   width: 100%;
   max-width: 480px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-on-dark-muted, #A9C6DD);
   margin: 4px 0 0;
 }
@@ -160,7 +160,7 @@
   border: none;
   background: rgba(0, 0, 0, 0.65);
   color: #fff;
-  font-size: 10px;
+  font-size: var(--fs-xs);
   display: flex;
   align-items: center;
   justify-content: center;

@@ -7,6 +7,7 @@ from flask_jwt_extended import create_access_token, jwt_required, current_user
 
 from app.usuarios.models import Usuario
 from app.roles.models import Rol
+from app.roles.api_v1_0.resources import _asegurar_roles_por_defecto
 from app.usuarios.schemas import UsuarioSchema
 from app.usuarios.api_v1_0 import usuarios_bp
 
@@ -24,6 +25,13 @@ def es_admin(usuario):
 class Registro_Resource(Resource):
     def post(self):
         try:
+            # En una base de datos nueva, "roles" empieza vacía y quien
+            # registre al primer usuario (típicamente vía script/Postman,
+            # no desde el frontend) necesita un rol_id válido. Esto
+            # garantiza que "Propietario" (id=1) y "Administrador" (id=2)
+            # ya existan antes de validar el rol_id recibido.
+            _asegurar_roles_por_defecto()
+
             data = request.get_json()
             campos_requeridos = ['usuario', 'correo', 'contra', 'rol_id']
             if not data or not all(k in data for k in campos_requeridos):

@@ -3,6 +3,7 @@ from flask import request, jsonify
 from flask_jwt_extended import jwt_required
 from marshmallow import ValidationError
 
+from app.db import db
 from app.tipos_archivo.models import TipoArchivo
 from app.tipos_archivo.schemas import TipoArchivoSchema
 from app.tipos_archivo.api_v1_0 import tipos_archivo_bp
@@ -10,10 +11,28 @@ from app.tipos_archivo.api_v1_0 import tipos_archivo_bp
 schema = TipoArchivoSchema()
 schema_list = TipoArchivoSchema(many=True)
 
+# Mismo patrón de auto-creación perezosa que ESTADOS_CITA_POR_DEFECTO en
+# estados_cita. El orden es obligatorio: tanto RegistroClinico.tsx como
+# PacienteExterno.tsx tienen TIPO_ARCHIVO_POR_EXT hardcodeado como
+# { jpg: 1, jpeg: 1, png: 1, pdf: 2 }, así que "Imagen" debe quedar con
+# id=1 y "PDF" con id=2.
+TIPOS_ARCHIVO_POR_DEFECTO = ["Imagen", "PDF"]
+
+
+def _asegurar_tipos_archivo_por_defecto():
+    hay_nuevos = False
+    for nombre in TIPOS_ARCHIVO_POR_DEFECTO:
+        if not TipoArchivo.query.filter_by(nombre=nombre).first():
+            db.session.add(TipoArchivo(nombre=nombre))
+            hay_nuevos = True
+    if hay_nuevos:
+        db.session.commit()
+
 
 @tipos_archivo_bp.route("/", methods=["GET"])
 @jwt_required()
 def listar_tipos_archivo():
+    _asegurar_tipos_archivo_por_defecto()
     items = TipoArchivo.get_all()
     return jsonify(schema_list.dump(items)), 200
 

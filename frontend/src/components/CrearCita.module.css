@@ -72,7 +72,7 @@
 }
 
 .header h1 {
-  font-size: 17px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--text-main);
   letter-spacing: -0.01em;
@@ -97,7 +97,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-main);
   margin-bottom: 10px;
@@ -107,7 +107,7 @@
 
 .sectionTitle svg {
   color: var(--accent);
-  font-size: 14px;
+  font-size: var(--fs-base);
   width: 18px;
   text-align: center;
 }
@@ -130,7 +130,7 @@
 }
 
 .fieldGroup label {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -141,7 +141,7 @@
 .fieldGroup textarea,
 .fieldGroup select {
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
   padding: 7px 10px;
   border: 1.5px solid var(--border-color);
@@ -179,7 +179,7 @@
   align-items: center;
   gap: 8px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
   padding: 7px 10px;
   border: 1.5px solid var(--border-color);
@@ -212,7 +212,7 @@
   background: var(--primary-gradient);
   position: relative;
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   box-shadow: var(--shadow);
   transition: all var(--transition-spring);
   overflow: hidden;
@@ -261,7 +261,7 @@
     grid-template-columns: 1fr;
   }
   .header h1 {
-    font-size: 15px;
+    font-size: var(--fs-base);
   }
   .section {
     padding: 12px;

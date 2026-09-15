@@ -10,6 +10,7 @@ from app.cobros.api_v1_0 import cobros_bp
 from app.consultas.models import Consulta
 from app.pacientes.models import Paciente
 from app.estados_cobro.models import EstadoCobro
+from app.estados_cobro.api_v1_0.resources import _asegurar_estados_cobro_por_defecto
 from app.pagos.models import Pago
 
 schema = CobroSchema()
@@ -19,6 +20,11 @@ api = Api(cobros_bp)
 
 
 def _estado_por_nombre(nombre):
+    # No dependemos de que alguien haya abierto antes el listado de
+    # estados_cobro (GET /api/estados_cobro/): en una base de datos
+    # nueva, el primer cobro que se registre podría ser la primera
+    # petición que toca este catálogo.
+    _asegurar_estados_cobro_por_defecto()
     encontrados = EstadoCobro.simple_filter(nombre=nombre)
     return encontrados[0] if encontrados else None
 

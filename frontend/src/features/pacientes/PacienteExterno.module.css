@@ -375,7 +375,7 @@
 }
 
 .accionBtn svg {
-  font-size: 15px;
+  font-size: var(--fs-base);
   color: var(--accent);
   flex-shrink: 0;
   width: 18px;
@@ -407,7 +407,7 @@
 }
 
 .contador {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   background: var(--bg-input);
   padding: 4px 12px;

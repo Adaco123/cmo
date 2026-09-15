@@ -343,7 +343,7 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
   }, []);
 
   const handleDescargarPdf = useCallback((registroId: number) => {
-    
+    setMenuAbiertoId(null);
     const nombreArchivo= `${paciente?.nombres ?? ''}${paciente?.apellidos ?? ''}${paciente?.documento ?? ''}`
       .replace(/\s+/g, '')
       .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]/g, '');
@@ -351,6 +351,7 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
   }, []);
 
   const handleDescargarConsentimiento = useCallback((registroId: number) => {
+    setMenuAbiertoId(null);
     const nombreArchivo= `${paciente?.nombres ?? ''}${paciente?.apellidos ?? ''}${paciente?.documento ?? ''}`
       .replace(/\s+/g, '')
       .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]/g, '')

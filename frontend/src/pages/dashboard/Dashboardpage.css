@@ -1112,7 +1112,7 @@ body {
   .report-grid { grid-template-columns: 1fr; }
   .table-card { padding: 18px; }
   .search-table input { width: 120px; }
-  .glow-btn { padding: 0.6em 1.2em; font-size: 12px; }
+  .glow-btn { padding: 0.6em 1.2em; font-size: var(--fs-sm); }
 }
 .glow-btn.danger {
   background: var(--status-inactive);

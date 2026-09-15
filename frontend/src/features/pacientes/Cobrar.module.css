@@ -83,7 +83,7 @@
   gap: 6px;
 }
 .cb-header h1 {
-  font-size: 17px;
+  font-size: var(--fs-md);
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -91,9 +91,9 @@
   color: var(--text-main);
   letter-spacing: -0.01em;
 }
-.cb-header h1 i { color: var(--accent); font-size: 15px; }
+.cb-header h1 i { color: var(--accent); font-size: var(--fs-base); }
 .cb-subtitle {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   margin-top: 1px;
 }
@@ -109,14 +109,14 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-main);
   margin-bottom: 10px;
 }
 .cb-section-title i {
   color: var(--accent);
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 /* FORMULARIO */
@@ -125,7 +125,7 @@
 }
 .cb-form-group label {
   display: block;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -139,7 +139,7 @@
   border: 1.5px solid var(--border-color);
   background: var(--bg-card);
   color: var(--text-main);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-family: inherit;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
@@ -169,7 +169,7 @@ select.cb-form-control option {
   color: var(--text-main);
 }
 .cb-total-field {
-  font-size: 15px;
+  font-size: var(--fs-base);
   font-weight: 700;
   color: var(--primary-dark);
   background: var(--accent-bg);
@@ -201,7 +201,7 @@ select.cb-form-control option {
   border: none;
   border-radius: var(--radius-sm);
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   cursor: pointer;
   transition: all var(--transition-fast);
   display: inline-flex;
@@ -239,7 +239,7 @@ select.cb-form-control option {
 @media (max-width: 600px) {
   .backdrop { padding: 16px; }
   .pago-container { padding: 16px 14px; }
-  .cb-header h1 { font-size: 15px; }
+  .cb-header h1 { font-size: var(--fs-base); }
   .cb-form-actions { flex-direction: column; }
   .cb-btn-primary,
   .cb-btn-secondary { width: 100%; }

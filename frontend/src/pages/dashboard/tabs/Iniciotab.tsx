@@ -87,7 +87,7 @@ const InicioTab: React.FC<InicioTabProps> = ({
         <div className="card-header">
           <h3>Citas de hoy</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: 'var(--text-muted)', opacity: 0.7, fontSize: '0.8rem' }}>
+            <span style={{ color: 'var(--text-muted)', opacity: 0.7, fontSize: 'var(--fs-sm)' }}>
               {new Intl.DateTimeFormat('es-BO', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}
             </span>
             <button

@@ -12,6 +12,7 @@ from app.cobros.models import Cobro
 from app.consultas.models import Consulta
 from app.metodos_pago.models import MetodoPago
 from app.estados_cobro.models import EstadoCobro
+from app.estados_cobro.api_v1_0.resources import _asegurar_estados_cobro_por_defecto
 from app.db import db
 
 schema = PagoSchema()
@@ -23,6 +24,11 @@ ESTADO_PAGADO_ID = 1
 
 
 def _estado_pagado():
+    # Garantiza que "Pagado" exista (y quede con id=1, por el orden fijo
+    # en ESTADOS_COBRO_POR_DEFECTO) incluso si nadie llamó antes a
+    # GET /api/estados_cobro/ ni a POST /api/cobros/ en esta base de
+    # datos nueva.
+    _asegurar_estados_cobro_por_defecto()
     return EstadoCobro.get_by_id(ESTADO_PAGADO_ID)
 
 
@@ -30,6 +36,7 @@ def _estado_por_nombre(nombre):
     # Mismo patrón que cobros/api_v1_0/resources.py: no asumimos un id fijo
     # para "Pendiente" porque, a diferencia de "Pagado", no hay una
     # constante establecida para él en este módulo.
+    _asegurar_estados_cobro_por_defecto()
     encontrados = EstadoCobro.simple_filter(nombre=nombre)
     return encontrados[0] if encontrados else None
 

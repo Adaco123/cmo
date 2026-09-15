@@ -89,10 +89,32 @@
   --accent-border: color-mix(in srgb, var(--primary) 45%, transparent);
   --social-bg: color-mix(in srgb, var(--bg-input) 80%, transparent);
 
-  /* ---- Tipografía ---- */
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  /* ---- Tipografía ----
+     Fuente única del sistema: Inter (ya cargada en index.html con los
+     pesos 300-900). Se mantiene un stack de respaldo por si la carga
+     de Google Fonts falla o tarda.
+     La firma de la receta impresa (Receta.module.css) es la única
+     excepción intencional: usa fuentes cursivas decorativas aparte,
+     sin tocar por ahora. */
+  --sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --heading: var(--sans);
   --mono: ui-monospace, Consolas, monospace;
+
+  /* ---- Escala de tamaños de fuente ----
+     8 pasos fijos que reemplazan los valores sueltos en px/rem que había
+     repartidos por todo el proyecto. En px (no rem) a propósito: el
+     :root de este archivo fija font-size a 18px de base (16px en
+     tablet/móvil vía la media query de abajo), así que un rem-token
+     heredaría esa base y cambiaría de tamaño según el viewport — con
+     px, el tamaño es predecible en cualquier pantalla. */
+  --fs-xs:  11px; /* metadatos, badges, hints pequeños */
+  --fs-sm:  13px; /* texto secundario, etiquetas */
+  --fs-base: 14px; /* texto de cuerpo por defecto */
+  --fs-md:  16px; /* texto destacado, subtítulos */
+  --fs-lg:  20px; /* títulos de sección/tarjeta */
+  --fs-xl:  24px; /* títulos de página */
+  --fs-2xl: 36px; /* subtítulos de landing */
+  --fs-3xl: 56px; /* hero de landing */
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
@@ -138,25 +160,25 @@ h2 {
 }
 
 h1 {
-  font-size: 56px;
+  font-size: var(--fs-3xl);
   letter-spacing: -1.68px;
   margin: 32px 0;
 }
 @media (max-width: 1024px) {
   h1 {
-    font-size: 36px;
+    font-size: var(--fs-2xl);
     margin: 20px 0;
   }
 }
 
 h2 {
-  font-size: 24px;
+  font-size: var(--fs-xl);
   line-height: 118%;
   letter-spacing: -0.24px;
   margin: 0 0 8px;
 }
 @media (max-width: 1024px) {
-  h2 { font-size: 20px; }
+  h2 { font-size: var(--fs-lg); }
 }
 
 p {
@@ -169,7 +191,7 @@ code {
   display: inline-flex;
   border-radius: 4px;
   color: var(--text-main);
-  font-size: 15px;
+  font-size: var(--fs-base);
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);

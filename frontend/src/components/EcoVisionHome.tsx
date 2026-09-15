@@ -13,8 +13,10 @@ import './EcoVisionHome.css';
  *  - Borde eléctrico animado (canvas) alrededor del visual
  *  - Simulación de ecografía animada (canvas)
  *
- * Recuerda agregar las fuentes de Google Fonts en tu index.html:
- * <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+ * La tipografía (Inter) ya se carga globalmente desde index.html —
+ * no hace falta agregar nada aparte para este componente. Antes se
+ * documentaba aquí un <link> aparte con Playfair Display, pero la
+ * landing se unificó a la fuente única del sistema (--sans).
  */
 interface CitaVista {
   id: number;

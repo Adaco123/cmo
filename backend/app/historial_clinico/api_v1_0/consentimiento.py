@@ -335,7 +335,7 @@ def _build_consentimiento_pdf(registro: RegistroClinico) -> bytes:
     # ---------------- Descripción del procedimiento ----------------
     story.append(_section_title("DESCRIPCIÓN DEL PROCEDIMIENTO:", styles))
     story.append(Spacer(1, 8))
-    story.append(_blank_lines(2))
+    story.append(_blank_lines(6))
     story.append(Spacer(1, 22))
 
     # ---------------- Firma + C.I. ----------------
@@ -345,7 +345,7 @@ def _build_consentimiento_pdf(registro: RegistroClinico) -> bytes:
     # ---------------- Evolución ----------------
     story.append(_section_title("EVOLUCIÓN", styles))
     story.append(Spacer(1, 8))
-    story.append(_blank_lines(4))
+    story.append(_blank_lines(8))
 
     doc.build(story)
     return buffer.getvalue()
