@@ -19,7 +19,7 @@ import InicioTab from './tabs/Iniciotab';
 import NuevaAtencionTab from './tabs/Nuevaatenciontab';
 import MisPacientesTab from './tabs/Mispacientestab';
 import PacientesExternosTab from './tabs/Pacientesexternostab';
-import SeguimientoControlTab from './tabs/Seguimientocontroltab';
+import SeguimientoControlTab from './tabs/SeguimientoControlTab';
 import ReportesTab from './tabs/Reportestab';
 import './Dashboardpage.css';
 import '../../components/CrearCita.module.css';

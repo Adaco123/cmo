@@ -651,6 +651,37 @@
   color: var(--text-muted);
 }
 
+/* Botón de captura por QR: mismos tokens que .btnSecundario, pero a lo
+   ancho del modal y pegado debajo del área de arrastre. */
+.btnCapturarQr {
+  width: 100%;
+  margin-top: 0.7rem;
+  font-family: inherit;
+  font-size: 0.83rem;
+  font-weight: 700;
+  color: var(--text-main);
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 0.6rem 1.1rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btnCapturarQr:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+
+.btnCapturarQr:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .uploadingText {
   font-size: 0.8rem;
   color: var(--text-muted);

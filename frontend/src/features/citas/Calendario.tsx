@@ -194,7 +194,7 @@ const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes,
                             className={styles.whatsappBtn}
                             href={buildWhatsAppUrl(
                               paciente.telefono,
-                              mensajeRecordatorio(nombrePaciente(cita.paciente_id), fechaLabel, hora, cita.motivo)
+                              mensajeRecordatorio(nombrePaciente(cita.paciente_id), fechaLabel, hora)
                             )}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -245,8 +245,7 @@ const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes,
                                   day: 'numeric',
                                   month: 'long',
                                   year: 'numeric',
-                                }).format(new Date(`${toDateKey(s.proxima_fecha_control!)}T00:00:00`)),
-                                s.evolucion
+                                }).format(new Date(`${toDateKey(s.proxima_fecha_control!)}T00:00:00`))
                               )
                             )}
                             target="_blank"

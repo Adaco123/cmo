@@ -1,7 +1,7 @@
 // Cobrar.tsx
 import React, { useEffect, useState } from 'react';
 import { crearPago, type PagoPayload } from '../../api/pagos';
-import { getMetodosPago, type MetodoPago } from '../../api/metodosPago';
+import { getMetodosPago, type MetodoPago } from '../../api/metodospago';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
 import styles from './Cobrar.module.css';
@@ -47,7 +47,7 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado, onClose }) => {
   useEffect(() => {
     getMetodosPago()
       .then(setMetodosPago)
-      .catch((err) => console.error('No se pudo cargar el catálogo de métodos de pago', err));
+      .catch((err:unknown) => console.error('No se pudo cargar el catálogo de métodos de pago', err));
   }, []);
 
   // Estados de la petición al backend

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import gsap from 'gsap';
 import { createPortal } from 'react-dom';
 import { subirArchivoExamen, descartarSesionCaptura } from '../../api/archivos';
-import { getTiposArchivo, type TipoArchivo } from '../../api/tiposArchivo';
+import { getTiposArchivo, type TipoArchivo } from '../../api/tiposarchivo';
 import type { Paciente as ApiPaciente } from '../../api/pacientes';
 import Calendario from '../citas/Calendario';
 import { useCalendario } from '../../components/CalendarioProvider';
@@ -200,7 +200,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
   useEffect(() => {
     getTiposArchivo()
       .then(setTiposArchivo)
-      .catch((err) => console.error('No se pudo cargar el catálogo de tipos de archivo', err));
+      .catch((err:unknown) => console.error('No se pudo cargar el catálogo de tipos de archivo', err));
   }, []);
 
   const setVitalRef = (key: VitalKey) => (el: HTMLInputElement | null): void => {
@@ -244,16 +244,24 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
   // fr (frec. respiratoria), talla y glu (glicemia) quedan fuera de esta
   // lista a propósito: siguen siendo campos editables, pero no son
   // obligatorios para poder guardar el registro.
-  const vitalesCompletos = [
-    !!(vitales.pa_sys.trim() && vitales.pa_dia.trim()),
-    !!vitales.fc.trim(), !!vitales.sat.trim(),
-    !!vitales.temp.trim(), !!vitales.peso.trim(),
+  const vitalesObligatorios: { label: string; completo: boolean }[] = [
+    { label: 'Presión arterial', completo: !!(vitales.pa_sys.trim() && vitales.pa_dia.trim()) },
+    { label: 'Frecuencia cardíaca', completo: !!vitales.fc.trim() },
+    { label: 'Saturación O2', completo: !!vitales.sat.trim() },
+    { label: 'Temperatura', completo: !!vitales.temp.trim() },
+    { label: 'Peso', completo: !!vitales.peso.trim() },
   ];
-  const faltan = vitalesCompletos.filter(v => !v).length;
-  const listoParaGuardar = faltan === 0;
+  const vitalesFaltantes = vitalesObligatorios.filter(v => !v.completo).map(v => v.label);
+  const faltan = vitalesFaltantes.length;
+  // Elegir fecha de control sin escribir la nota de evolución no debe
+  // poder guardarse: el backend exige `evolucion` no vacía para crear el
+  // seguimiento_control, y el frontend hasta ahora omitía el bloque
+  // entero en silencio si la nota estaba vacía — la fecha/hora elegidas
+  // se perdían sin ningún error visible.
+  const faltaNotaControl = !controlNota.trim() && !!controlFecha;
+  const listoParaGuardar = faltan === 0 && !faltaNotaControl;
 
   const [saving, setSaving] = useState(false);
-  const [payloadPreview, setPayloadPreview] = useState<string | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const [shake, setShake] = useState(false);
 
@@ -380,6 +388,11 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
     if (!listoParaGuardar) {
       setShake(true);
       setTimeout(() => setShake(false), 400);
+      if (faltan > 0) {
+        showError(`Faltan signos vitales obligatorios: ${vitalesFaltantes.join(', ')}.`);
+      } else if (faltaNotaControl) {
+        showError('Elegiste una fecha de consulta control pero falta escribir la nota de evolución.');
+      }
       return;
     }
     if (!pacienteIdFinal) {
@@ -392,7 +405,6 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
     try {
       const examenesFlat = getExamenesFlat();
       const payload = buildRegistroCompletoPayload(examenesFlat);
-      setPayloadPreview(JSON.stringify(payload, null, 2));
 
       const resultado = await createRegistroCompleto(payload);
 
@@ -753,22 +765,14 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
             <div className={`${styles.status} ${listoParaGuardar ? styles.ok : ''}`}>
               {listoParaGuardar
                 ? <><b>Listo para guardar</b> · todos los signos vitales completos</>
-                : <>Faltan <b>{faltan}</b> {faltan === 1 ? 'signo vital obligatorio' : 'signos vitales obligatorios'}</>}
+                : faltan > 0
+                  ? <>Faltan <b>{faltan}</b> {faltan === 1 ? 'signo vital obligatorio' : 'signos vitales obligatorios'}</>
+                  : <>Elegiste fecha de control pero falta la <b>nota de evolución</b></>}
             </div>
-            <button className={`${styles.btnSaveModern} ${shake ? styles.shake : ''}`} disabled={!listoParaGuardar || saving} onClick={handleGuardar}>
+            <button className={`${styles.btnSaveModern} ${shake ? styles.shake : ''}`} disabled={saving} onClick={handleGuardar}>
               <i className="fas fa-save"></i> {saving ? 'Guardando...' : 'Guardar registro clínico'} <kbd>Ctrl + Enter</kbd>
             </button>
           </div>
-
-          {payloadPreview && (
-            <div className={`${styles.payload} ${styles.show}`}>
-              <div className={styles.payloadHead}>
-                <span>Payload enviado a guardar</span>
-                <span style={{ cursor: 'pointer', color: 'var(--accent)' }} onClick={() => navigator.clipboard.writeText(payloadPreview)}>Copiar JSON</span>
-              </div>
-              <pre>{payloadPreview}</pre>
-            </div>
-          )}
 
           <div className={styles.dock}>
             <div className={styles.diagnosisAlert}>

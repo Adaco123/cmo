@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { type Paciente } from '../../api/pacientes';
 import {
   descargarArchivoBlob,
+  descartarSesionCaptura,
   eliminarArchivo as eliminarArchivoApi,
   getArchivosPorPaciente,
   subirArchivoPaciente,
   type ArchivoResponse,
 } from '../../api/archivos';
-import { getTiposArchivo, type TipoArchivo } from '../../api/tiposArchivo';
+import CapturaQrModal from './CapturaQrModal';
+import { getTiposArchivo, type TipoArchivo } from '../../api/tiposarchivo';
 import CrearCita from '../../components/CrearCita';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -25,6 +28,7 @@ import {
   faExclamationCircle,
   faEllipsisVertical,
   faTrash,
+  faCamera,
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './PacienteExterno.module.css';
 
@@ -81,6 +85,14 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
   const [showCrearCita, setShowCrearCita] = useState(false);
   const [showAdjuntar, setShowAdjuntar] = useState(false);
 
+  // Captura de fotos por QR: sesión TRANSITORIA en contexto del paciente,
+  // mismo patrón que Examenes.tsx. Cada foto se descarga en cuanto llega y
+  // entra a archivosPendientes como un File más — no queda ligada a nada en
+  // el backend, se sube recién con "Guardar", igual que un archivo arrastrado
+  // a mano (y así pasa por subirArchivoPaciente, que crea la Consulta de hoy).
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const qrSidActualRef = useRef<string | null>(null);
+
   // Menú "..." de cada archivo (Descargar / Eliminar), igual patrón que
   // el menú de 3 puntos de las tarjetas del timeline en VerPaciente.tsx.
   const [menuAbiertoId, setMenuAbiertoId] = useState<number | null>(null);
@@ -102,7 +114,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
   useEffect(() => {
     getTiposArchivo()
       .then(setTiposArchivo)
-      .catch((err) => console.error('No se pudo cargar el catálogo de tipos de archivo', err));
+      .catch((err:unknown) => console.error('No se pudo cargar el catálogo de tipos de archivo', err));
   }, []);
 
   // Carga los archivos ya subidos del paciente al montar (y de nuevo si
@@ -147,6 +159,26 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
       const sinDuplicados = nuevos.filter((n) => !existentes.has(n.localId));
       return [...prev, ...sinDuplicados];
     });
+  }, []);
+
+  /** Se llama por cada foto nueva detectada en la sesión de captura QR: la
+   *  descarga del servidor, la mete en la misma lista de pendientes que el
+   *  drag-and-drop y borra la copia transitoria del servidor. */
+  const handleFotoQrNueva = useCallback((archivoId: number) => {
+    (async () => {
+      try {
+        const blob = await descargarArchivoBlob(archivoId);
+        const file = new File([blob], `foto-qr-${archivoId}.jpg`, { type: blob.type || 'image/jpeg' });
+        setArchivosPendientes((prev) => [...prev, { localId: `qr-${archivoId}`, file }]);
+      } catch {
+        setErrorArchivo('No se pudo importar una fotografía tomada por el celular.');
+      } finally {
+        eliminarArchivoApi(archivoId).catch(() => {
+          // Best-effort: si no se pudo borrar la copia transitoria no
+          // bloqueamos el flujo, mismo riesgo aceptado que en Examenes.tsx.
+        });
+      }
+    })();
   }, []);
 
   const quitarPendiente = (localId: string) => {
@@ -226,7 +258,18 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
     agregarPendientes(e.dataTransfer.files);
   };
 
+  /** Cierra el modal del QR y descarta la sesión: cualquier foto que llegó
+   *  pero no se alcanzó a bajar como pendiente (carrera con el polling) se
+   *  borra del servidor para que no quede huérfana. */
+  const cerrarModalQr = useCallback(() => {
+    const sid = qrSidActualRef.current;
+    qrSidActualRef.current = null;
+    setQrModalOpen(false);
+    if (sid) descartarSesionCaptura(sid).catch(() => {});
+  }, []);
+
   const cerrarModalAdjuntar = () => {
+    cerrarModalQr();
     setShowAdjuntar(false);
     setArchivosPendientes([]);
     setErrorArchivo(null);
@@ -424,6 +467,15 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
               />
             </div>
 
+            <button
+              type="button"
+              className={styles.btnCapturarQr}
+              onClick={() => setQrModalOpen(true)}
+              disabled={subiendo}
+            >
+              <FontAwesomeIcon icon={faCamera} /> Tomar fotografías con el celular
+            </button>
+
             {errorArchivo && <p className={styles.errorText}>{errorArchivo}</p>}
 
             {archivosPendientes.length > 0 && (
@@ -467,6 +519,23 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
           </div>
         </div>
       )}
+
+      {/* Portal a <body>: si no, el modal del QR queda atrapado dentro del
+          backdrop del modal de adjuntar en vez de cubrir toda la pantalla
+          (mismo patrón que Examenes.tsx y RegistroClinicoDetalle.tsx). */}
+      {qrModalOpen &&
+        createPortal(
+          <CapturaQrModal
+            destino={{ tipo: 'paciente', id: paciente.id }}
+            examenNombre={nombrePaciente}
+            onClose={cerrarModalQr}
+            onFotoNueva={handleFotoQrNueva}
+            onSesionIniciada={(sid) => {
+              qrSidActualRef.current = sid;
+            }}
+          />,
+          document.body,
+        )}
 
       {/* ================= DRAWER: VER ARCHIVO ================= */}
       {/* Igual patrón que el drawer de RegistroClinicoDetalle en VerPaciente:
