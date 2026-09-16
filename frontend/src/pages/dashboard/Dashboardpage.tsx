@@ -5,7 +5,7 @@ import { type DashboardTab } from '../../components/layout/Sidebar';
 import Modal from '../../components/ui/Modal';
 import { useAuth } from '../../components/AuthProvider';
 import { useCalendario } from '../../components/CalendarioProvider';
-import { type Paciente } from '../../api/pacientes';
+import { type Paciente, type OrigenPaciente } from '../../api/pacientes';
 import { usePacientes } from '../../components/PacientesProvider';
 import PacienteForm from '../../features/pacientes/PacienteForm';
 import EditarPacienteForm from '../../features/pacientes/EditarPacienteForm';
@@ -24,9 +24,6 @@ import ReportesTab from './tabs/Reportestab';
 import './Dashboardpage.css';
 import '../../components/CrearCita.module.css';
 
-// Mismo criterio que PacienteForm.tsx / usePacientes.ts.
-const ORIGEN_EXTERNO = 2;
-
 /**
  * Reemplaza CMODashboard.tsx. Solo coordina: qué tab está activo,
  * qué modal está abierto, y pasa los datos de los hooks hacia los
@@ -38,7 +35,7 @@ const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<DashboardTab>('inicio');
   const [showPacienteForm, setShowPacienteForm] = useState(false);
-  const [origenPacienteForm, setOrigenPacienteForm] = useState<number | undefined>(undefined);
+  const [origenPacienteForm, setOrigenPacienteForm] = useState<OrigenPaciente | undefined>(undefined);
   const [pacienteAEditar, setPacienteAEditar] = useState<Paciente | null>(null);
   const [pacienteExternoSeleccionado, setPacienteExternoSeleccionado] = useState<Paciente | null>(null);
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
@@ -77,9 +74,8 @@ const DashboardPage: React.FC = () => {
       (p.correo || '').toLowerCase().includes(q)
     );
   };
-  // Mismo criterio que ORIGEN_EXTERNO: origen_id === 1 es "propio".
-  const filteredMisPacientes = pacientes.filter((p) => p.origen_id === 1 && matchesSearch(p, filters.misPacientes));
-  const filteredExternos = pacientes.filter((p) => p.origen_id === ORIGEN_EXTERNO && matchesSearch(p, filters.externos));
+  const filteredMisPacientes = pacientes.filter((p) => p.origen === 'propio' && matchesSearch(p, filters.misPacientes));
+  const filteredExternos = pacientes.filter((p) => p.origen === 'externo' && matchesSearch(p, filters.externos));
 
   const { showError, showSuccess } = useErrorToast();
 
@@ -187,7 +183,7 @@ const DashboardPage: React.FC = () => {
           searchValue={filters.externos}
           onSearchChange={(v) => handleFilterChange('externos', v)}
           onAgregar={() => {
-            setOrigenPacienteForm(ORIGEN_EXTERNO);
+            setOrigenPacienteForm('externo');
             setShowPacienteForm(true);
           }}
           onVer={(p) => setPacienteExternoSeleccionado(p)}

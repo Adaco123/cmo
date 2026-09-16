@@ -87,9 +87,12 @@ export async function getArchivosPorPaciente(pacienteId: number): Promise<Archiv
 }
 
 /**
- * Sube UN archivo ligado directamente a un paciente (sin pasar por examen,
- * receta o registro clínico). Pensado para pacientes externos (origen_id=2)
- * que aún no tienen historia clínica abierta.
+ * Sube UN archivo para un paciente externo (origen='externo') que aún no
+ * tiene historia clínica abierta. El backend NO liga el archivo al
+ * paciente directamente: resuelve/crea una Consulta mínima de hoy para
+ * ese paciente (así cuenta en reportes como "Pacientes atendidos hoy") y
+ * liga el archivo a esa Consulta. Requiere que el usuario logueado tenga
+ * ficha de médico asociada, o el backend rechaza la subida (422).
  * tipoArchivoId depende de tu catálogo tipos_archivo (ej. 1 = imagen, 2 = pdf).
  */
 export async function subirArchivoPaciente(

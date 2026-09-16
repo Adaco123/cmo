@@ -50,11 +50,11 @@ export function usePacientes() {
   };
 
   const filteredMisPacientes = pacientes.filter(
-    (p) => p.origen_id === 1 && matchesSearch(p, filters.misPacientes)
+    (p) => p.origen === 'propio' && matchesSearch(p, filters.misPacientes)
   );
 
   const filteredExternos = pacientes.filter(
-    (p) => p.origen_id === 2 && matchesSearch(p, filters.externos)
+    (p) => p.origen === 'externo' && matchesSearch(p, filters.externos)
   );
 
   /**

@@ -48,7 +48,7 @@ const EXTENSIONES_VALIDAS = Object.keys(NOMBRE_TIPO_ARCHIVO_POR_EXT);
 const esPdf = (nombreArchivo: string) => nombreArchivo.toLowerCase().endsWith('.pdf');
 
 interface PacienteExternoProps {
-  /** Paciente externo (origen_id=2) ya seleccionado. La búsqueda y la
+  /** Paciente externo (origen='externo') ya seleccionado. La búsqueda y la
    *  creación de pacientes externos se hacen desde PacientesExternosTab
    *  y PacienteForm.tsx respectivamente; este componente solo muestra
    *  la ficha y sus archivos adjuntos. */
@@ -63,7 +63,7 @@ interface ArchivoPendiente {
 }
 
 /**
- * Modal de ficha para un paciente externo (origen_id=2) ya seleccionado:
+ * Modal de ficha para un paciente externo (origen='externo') ya seleccionado:
  * layout de dos columnas (ficha + acciones a la izquierda, archivos a la
  * derecha), con "Adjuntar archivo" como modal centrado, "Crear cita" como
  * modal autocontenido (trae su propio backdrop), y ver un archivo como

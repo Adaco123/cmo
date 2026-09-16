@@ -1,5 +1,11 @@
 import api from '../api';
 
+/** Antes era un id numérico contra una tabla catálogo (origenes_paciente).
+ *  Se cambió a un valor fijo porque son solo 2 categorías estructurales
+ *  del sistema (cada una con flujo de negocio distinto), no una lista
+ *  administrable por el usuario. */
+export type OrigenPaciente = 'propio' | 'externo';
+
 export interface PacientePayload {
   nombres: string;
   apellidos: string;
@@ -11,7 +17,7 @@ export interface PacientePayload {
   correo?: string | null;
   contacto_emergencia_nombre?: string | null;
   contacto_emergencia_telefono?: string | null;
-  origen_id: number;
+  origen: OrigenPaciente;
   medico_referente_id?: number | null;
   medico_referente_externo?: string | null;
   consultorio_id?: number | null;

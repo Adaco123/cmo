@@ -19,7 +19,17 @@ class Paciente(db.Model, BaseModelMixin):
     telefono = db.Column(db.String(30))
     correo = db.Column(db.String(150))
     
-    origen_id = db.Column(db.SmallInteger, db.ForeignKey('origenes_paciente.id'), nullable=False)
+    # Antes era origen_id (FK a la tabla origenes_paciente). Se cambió a un
+    # valor fijo porque nunca fue una lista administrable por el usuario:
+    # son 2 categorías estructurales del sistema (propio vs externo tienen
+    # flujos de negocio distintos — Registro Clínico vs solo archivos) que
+    # no van a crecer. CHECK en vez de ENUM nativo de Postgres para que
+    # agregar un valor futuro sea un ALTER simple, sin ALTER TYPE.
+    ORIGEN_PROPIO = "propio"
+    ORIGEN_EXTERNO = "externo"
+    ORIGENES_VALIDOS = (ORIGEN_PROPIO, ORIGEN_EXTERNO)
+
+    origen = db.Column(db.String(20), nullable=False)
     medico_referente_id = db.Column(db.BigInteger, db.ForeignKey('medicos.id'), nullable=True)
     medico_referente_externo = db.Column(db.String(150))
     consultorio_id = db.Column(db.SmallInteger, db.ForeignKey('consultorios.id'), nullable=True)
@@ -33,13 +43,15 @@ class Paciente(db.Model, BaseModelMixin):
         nullable=False,
     )
 
-    origen = db.relationship("OrigenPaciente", back_populates="pacientes")
+    __table_args__ = (
+        db.CheckConstraint("origen IN ('propio', 'externo')", name="ck_pacientes_origen"),
+    )
+
     medico_referente = db.relationship("Medico", back_populates="pacientes_referidos")
     consultorio = db.relationship("Consultorio", back_populates="pacientes")
     historia_clinica = db.relationship("HistoriaClinica", back_populates="paciente", uselist=False)
     citas = db.relationship("Cita", back_populates="paciente")
     consultas = db.relationship("Consulta", back_populates="paciente")
-    archivos = db.relationship("Archivo", back_populates="paciente")
 
     def obtener_alergias(self):
         """Retorna una lista con las alergias registradas para este paciente."""

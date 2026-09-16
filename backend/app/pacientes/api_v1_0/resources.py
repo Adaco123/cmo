@@ -143,7 +143,7 @@ class PacientesFrecuentes_Resource(Resource):
                 Paciente.id,
                 Paciente.nombres,
                 Paciente.apellidos,
-                Paciente.origen_id,
+                Paciente.origen,
                 func.count(Consulta.id).label("total_consultas"),
                 func.max(Consulta.fecha).label("ultima_visita"),
             )
@@ -156,7 +156,7 @@ class PacientesFrecuentes_Resource(Resource):
 
         data = []
         for row in resultados:
-            tipo = "Mis pacientes" if row.origen_id == 1 else "Externo" if row.origen_id == 2 else "Otro"
+            tipo = "Mis pacientes" if row.origen == Paciente.ORIGEN_PROPIO else "Externo" if row.origen == Paciente.ORIGEN_EXTERNO else "Otro"
             data.append({
                 "id": row.id,
                 "nombre": f"{row.nombres} {row.apellidos}",

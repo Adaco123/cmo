@@ -16,8 +16,13 @@ class Archivo(db.Model, BaseModelMixin):
     subido_por_usuario_id = db.Column(db.BigInteger, db.ForeignKey('usuarios.id'), nullable=False)
     receta_id = db.Column(db.BigInteger, db.ForeignKey('recetas.id'), nullable=True)
     receta = db.relationship("Receta",back_populates="archivos")
-    paciente_id = db.Column(db.BigInteger, db.ForeignKey('pacientes.id'), nullable=True)
-    paciente = db.relationship("Paciente", back_populates="archivos")
+    # Antes era paciente_id (archivo colgado directo del paciente, sin
+    # pasar por ninguna consulta/registro). Se cambió a consulta_id: un
+    # paciente ya no "tiene" archivos directamente, los archivos cuelgan
+    # de una Consulta (así los pacientes externos, que no tienen Registro
+    # Clínico, también quedan contados en reportes basados en Consulta).
+    consulta_id = db.Column(db.BigInteger, db.ForeignKey('consultas.id'), nullable=True)
+    consulta = db.relationship("Consulta", back_populates="archivos")
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now(), nullable=False)
     updated_at = db.Column(
         db.DateTime(timezone=True),

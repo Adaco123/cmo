@@ -23,6 +23,9 @@ from app.historial_clinico.models import RegistroClinico, HistoriaClinica
 from app.pacientes.models import Paciente
 from app.tipos_archivo.models import TipoArchivo
 from app.archivos import captura_qr
+from datetime import date, datetime
+from app.consultas.models import Consulta
+from app.usuarios.models import Usuario
 archivo_schema_list = ArchivoSchema(many=True)
 schema = ArchivoSchema()
 schema_list = ArchivoSchema(many=True)
@@ -34,8 +37,44 @@ DESTINOS_VALIDOS = {
     "examen_complementario_id": ExamenComplementario,
     "receta_id": Receta,
     "registro_clinico_id": RegistroClinico,
-    "paciente_id": Paciente,
 }
+
+
+def _consulta_hoy_para_paciente_externo(paciente_id, usuario_id):
+    """Pacientes externos no pasan por Registro Clínico ni tienen archivos
+    colgados directo de ellos: sus archivos cuelgan de una Consulta mínima
+    (sin motivo/diagnostico) del día de hoy — así también cuentan en
+    reportes basados en Consulta (ej. "Pacientes atendidos hoy"). Devuelve
+    esa Consulta (la crea la primera vez que se sube algo en el día; si ya
+    existe una para hoy, la reutiliza, no duplica).
+
+    El médico de esa Consulta es el usuario con sesión iniciada. Si ese
+    usuario no tiene un registro de médico asociado (ej. un rol
+    administrativo sin ficha de médico), no hay forma de crear la Consulta
+    ni de guardar el archivo — se devuelve None y el caller debe rechazar
+    la subida.
+    """
+    hoy = date.today()
+    existentes = Consulta.simple_filter(paciente_id=paciente_id, fecha=hoy)
+    if existentes:
+        return existentes[0]
+
+    usuario = Usuario.get_by_id(usuario_id)
+    medico = usuario.empleado.medico if usuario and usuario.empleado else None
+    if not medico:
+        return None
+
+    consulta = Consulta(
+        paciente_id=paciente_id,
+        medico_id=medico.id,
+        fecha=hoy,
+        hora=datetime.now().time(),
+        motivo=None,
+        diagnostico=None,
+    )
+    db.session.add(consulta)
+    db.session.commit()
+    return consulta
 
 
 class ArchivoUpload_Resource(Resource):
@@ -86,6 +125,31 @@ class ArchivoUpload_Resource(Resource):
                 destino_campo = campo
                 destino_id = valor_id
 
+        # Caso especial: paciente_id no es una columna real de Archivo (ver
+        # consulta_id en el modelo) — es la forma en que el frontend pide
+        # "sube esto para este paciente externo, sin examen/registro
+        # todavía". Se resuelve a la Consulta mínima de hoy de ese paciente.
+        usuario_id = get_jwt_identity()
+        paciente_id_externo = request.form.get("paciente_id")
+        if paciente_id_externo:
+            if destino_campo is not None:
+                return {"error": "Solo se puede vincular el archivo a un destino a la vez"}, 400
+            try:
+                paciente_id_externo = int(paciente_id_externo)
+            except (TypeError, ValueError):
+                return {"error": "El paciente_id debe ser un número entero"}, 400
+            if not Paciente.get_by_id(paciente_id_externo):
+                return {"error": "El paciente_id indicado no existe"}, 404
+
+            consulta = _consulta_hoy_para_paciente_externo(paciente_id_externo, usuario_id)
+            if consulta is None:
+                return {
+                    "error": "Tu usuario no tiene una ficha de médico asociada, así que no se "
+                             "puede registrar la atención de este paciente externo."
+                }, 422
+            destino_campo = "consulta_id"
+            destino_id = consulta.id
+
         if destino_campo is None:
             return {"error": "Debe indicar a qué se vincula el archivo (examen, receta o registro clínico)"}, 400
 
@@ -93,8 +157,6 @@ class ArchivoUpload_Resource(Resource):
             datos_archivo = guardar_archivo_en_disco(file_storage)
         except ValueError as err:
             return {"error": str(err)}, 400
-
-        usuario_id = get_jwt_identity()
 
         archivo = Archivo(
             tipo_archivo_id=tipo_archivo_id,
@@ -197,9 +259,14 @@ class ArchivosPorPaciente_Resource(Resource):
             .filter(HistoriaClinica.paciente_id == paciente_id)
             .all()
         )
-        # Archivos subidos directo al paciente (ej. pacientes externos, sin
-        # historia clínica todavía).
-        archivos_directos = Archivo.simple_filter(paciente_id=paciente_id)
+        # Archivos de pacientes externos: cuelgan de una Consulta (ya no
+        # directo del paciente), así que se llega a ellos vía join.
+        archivos_directos = (
+            Archivo.query
+            .join(Consulta, Consulta.id == Archivo.consulta_id)
+            .filter(Consulta.paciente_id == paciente_id)
+            .all()
+        )
 
         vistos = {}
         for archivo in [*archivos_examenes, *archivos_directos]:

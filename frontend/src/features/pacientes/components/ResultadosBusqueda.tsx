@@ -15,7 +15,7 @@ const ResultadosBusqueda: React.FC<ResultadosBusquedaProps> = ({ resultados, onS
     {resultados.map((p) => {
       const fullName = `${p.nombres} ${p.apellidos}`.trim();
       const iniciales = `${p.nombres?.[0] || ''}${p.apellidos?.[0] || ''}`.toUpperCase();
-      const origenClass = p.origen_id === 2 ? 'patient-result-card-blue' : 'patient-result-card-red';
+      const origenClass = p.origen === 'externo' ? 'patient-result-card-blue' : 'patient-result-card-red';
 
       return (
         <div

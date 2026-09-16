@@ -60,7 +60,7 @@ class PacienteSchema(ma.Schema):
     )
     correo = fields.Email(allow_none=True, validate=validate.Length(max=255))
 
-    origen_id = fields.Int(required=True, validate=validate.OneOf([1, 2]))
+    origen = fields.Str(required=True, validate=validate.OneOf(['propio', 'externo']))
     medico_referente_id = fields.Int(allow_none=True)
     medico_referente_externo = fields.Str(allow_none=True, validate=validate.Length(max=255))
     consultorio_id = fields.Int(allow_none=True)

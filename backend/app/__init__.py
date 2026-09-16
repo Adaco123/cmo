@@ -21,7 +21,7 @@ from app.informes_ecografia.api_v1_0 import informes_ecografia_bp
 from app.medicos.api_v1_0 import medicos_bp
 from app.metodos_pago.api_v1_0 import metodos_pago_bp
 from app.modelos_informe.api_v1_0 import modelos_informe_bp
-from app.origenes_paciente.api_v1_0 import origenes_paciente_bp
+
 from app.pacientes.api_v1_0 import pacientes_bp
 from app.pagos.api_v1_0 import pagos_bp
 from app.historial_clinico.api_v1_0 import historial_clinico_bp
@@ -52,7 +52,7 @@ BLUEPRINTS = (
     (medicos_bp, "/api/medicos"),
     (metodos_pago_bp, "/api/metodos_pago"),
     (modelos_informe_bp, "/api/modelos_informe"),
-    (origenes_paciente_bp, "/api/origenes_paciente"),
+    #(origenes_paciente_bp, "/api/origenes_paciente"),
     (pacientes_bp, "/api/pacientes"),
     (pagos_bp, "/api/pagos"),
     (roles_bp, "/api/roles"),

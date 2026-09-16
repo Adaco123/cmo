@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { updatePaciente, type Paciente, type PacientePayload } from '../../api/pacientes';
-import { getOrigenesPaciente, type OrigenPaciente } from '../../api/origenesPaciente';
+import React, { useState } from 'react';
+import { updatePaciente, type Paciente, type PacientePayload, type OrigenPaciente } from '../../api/pacientes';
 import styles from './PacienteForm.module.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -31,23 +30,10 @@ interface EditarPacienteFormData {
   telefono: string;
   correo: string;
 
-  origen_id: string;
+  origen: OrigenPaciente;
   medico_referente_externo: string;
   consultorio_id: string;
   estado: boolean;
-}
-
-// Fallback solo para el primer render, antes de que el catálogo
-// origenes_paciente responda — una vez cargado, el id real se resuelve
-// por nombre (ver idOrigenPorNombre), nunca hardcodeado. Mismo criterio
-// que idEstadoPorDefecto en CrearCita.tsx.
-const ORIGEN_EXTERNO = 2;
-const ORIGEN_MIS_PACIENTES = 1;
-const NOMBRE_ORIGEN_PROPIO = 'Propio';
-const NOMBRE_ORIGEN_EXTERNO = 'Externo';
-
-function idOrigenPorNombre(lista: OrigenPaciente[], nombre: string): number | undefined {
-  return lista.find((o) => o.nombre === nombre)?.id;
 }
 
 /** 'M' | 'F' | 'O' -> valor de <select> del formulario */
@@ -74,7 +60,7 @@ function pacienteToFormData(paciente: Paciente): EditarPacienteFormData {
     direccion: paciente.direccion || '',
     telefono: paciente.telefono || '',
     correo: paciente.correo || '',
-    origen_id: String(paciente.origen_id ?? ORIGEN_MIS_PACIENTES),
+    origen: paciente.origen ?? 'propio',
     medico_referente_externo: paciente.medico_referente_externo || '',
     consultorio_id: paciente.consultorio_id != null ? String(paciente.consultorio_id) : '',
     estado: paciente.estado ?? true,
@@ -92,17 +78,6 @@ const EditarPacienteForm: React.FC<EditarPacienteFormProps> = ({ paciente, onSuc
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState<EditarPacienteFormData>(() => pacienteToFormData(paciente));
   const { showError, showSuccess } = useErrorToast();
-
-  // Catálogo de orígenes de paciente (para resolver el id por nombre)
-  const [origenesPaciente, setOrigenesPaciente] = useState<OrigenPaciente[]>([]);
-  useEffect(() => {
-    getOrigenesPaciente()
-      .then(setOrigenesPaciente)
-      .catch((err) => console.error('No se pudo cargar el catálogo de orígenes de paciente', err));
-  }, []);
-
-  const origenPropioId = idOrigenPorNombre(origenesPaciente, NOMBRE_ORIGEN_PROPIO) ?? ORIGEN_MIS_PACIENTES;
-  const origenExternoId = idOrigenPorNombre(origenesPaciente, NOMBRE_ORIGEN_EXTERNO) ?? ORIGEN_EXTERNO;
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -137,7 +112,7 @@ const EditarPacienteForm: React.FC<EditarPacienteFormProps> = ({ paciente, onSuc
       telefono: normalizeOptional(formData.telefono),
       correo: normalizeOptional(formData.correo),
 
-      origen_id: Number(formData.origen_id || origenPropioId),
+      origen: formData.origen,
       medico_referente_externo: normalizeOptional(formData.medico_referente_externo),
       consultorio_id: formData.consultorio_id ? Number(formData.consultorio_id) : null,
       estado: formData.estado,
@@ -291,10 +266,10 @@ const EditarPacienteForm: React.FC<EditarPacienteFormProps> = ({ paciente, onSuc
             </div>
             <div className={`${styles.row} ${styles.rowThree}`}>
               <div className={styles.fieldGroup}>
-                <label htmlFor="origen_id"><FontAwesomeIcon icon={faHospital} /> Origen</label>
-                <select id="origen_id" name="origen_id" value={formData.origen_id} onChange={handleChange}>
-                  <option value={String(origenPropioId)}>Mis pacientes</option>
-                  <option value={String(origenExternoId)}>Externo</option>
+                <label htmlFor="origen"><FontAwesomeIcon icon={faHospital} /> Origen</label>
+                <select id="origen" name="origen" value={formData.origen} onChange={handleChange}>
+                  <option value="propio">Mis pacientes</option>
+                  <option value="externo">Externo</option>
                 </select>
               </div>
               <div className={styles.fieldGroup}>
