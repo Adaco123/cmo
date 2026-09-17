@@ -1,4 +1,5 @@
 import api from '../api';
+import type { Paciente } from './pacientes';
 import type { ConsultaPayload, Consulta } from './consultas';
 import type {
   ExamenComplementarioItemPayload,
@@ -221,8 +222,14 @@ export async function getRegistrosPorHistoria(historiaId: number): Promise<Regis
   return data;
 }
 
-export async function getExpedientePaciente(pacienteId: number): Promise<any> {
-  const { data } = await api.get(`/api/historial_clinico/paciente/${pacienteId}`);
+export interface ExpedientePacienteResponse {
+  paciente?: Paciente;
+  historia_clinica?: { id: number; fecha_apertura?: string | null; estado?: boolean };
+  registros_clinicos?: RegistroClinico[];
+}
+
+export async function getExpedientePaciente(pacienteId: number): Promise<ExpedientePacienteResponse> {
+  const { data } = await api.get<ExpedientePacienteResponse>(`/api/historial_clinico/paciente/${pacienteId}`);
   return data;
 }
 

@@ -1,4 +1,9 @@
+import axios from 'axios';
 import api from '../api';
+
+interface CitaErrorBody {
+  error?: string;
+}
 
 export interface CitaPayload {
   paciente_id: number;
@@ -39,10 +44,12 @@ export async function createCita(payload: CitaPayload): Promise<Cita> {
   try {
     const { data } = await api.post<Cita>('/api/citas/', payload);
     return data;
-  } catch (error: any) {
-    const backendMessage = error?.response?.data?.error;
+  } catch (error: unknown) {
+    const backendMessage = axios.isAxiosError<CitaErrorBody>(error)
+      ? error.response?.data?.error
+      : undefined;
     if (backendMessage) {
-      throw new Error(backendMessage);
+      throw new Error(backendMessage, { cause: error });
     }
     throw error;
   }

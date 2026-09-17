@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { createCita, type CitaPayload } from '../api/citas';
+import { createCita, type CitaPayload, type Cita } from '../api/citas';
 import { type EstadoCita } from '../api/estadosCita';
 import Calendario from '../features/citas/Calendario';
 import { useCalendario } from './CalendarioProvider';
@@ -16,7 +16,7 @@ interface CrearCitaProps {
   /** Cierra el modal. Se usa tanto para el botón "x" como para el click
    *  en el fondo (backdrop). */
   onClose?: () => void;
-  onSuccess?: (data: any) => void;
+  onSuccess?: (data: Cita) => void;
 }
 
 // Fallback solo por si el Provider todavía no resolvió el usuario

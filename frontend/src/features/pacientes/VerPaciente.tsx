@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Paciente as ApiPaciente } from '../../api/pacientes';
 import { downloadRegistroClinicoPdf, downloadConsentimientoPdf, getExpedientePaciente, deleteRegistroCompleto } from '../../api/historialClinico';
-import type { RegistroClinico, RegistroCompletoResponse } from '../../api/historialClinico';
+import type { RegistroClinico, RegistroCompletoResponse, ExpedientePacienteResponse } from '../../api/historialClinico';
 import type { SeguimientoControlResponse } from '../../api/seguimientoControl';
 import HistoriaClinica from './RegistroClinico';
 import EditarRegistroClinico from './EditarRegistroClinico';
@@ -31,12 +31,6 @@ import {
   faFileSignature,
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
-
-interface ExpedientePacienteResponse {
-  paciente?: ApiPaciente;
-  historia_clinica?: { id: number; fecha_apertura?: string | null; estado?: boolean };
-  registros_clinicos?: RegistroClinico[];
-}
 
 interface VerPacienteProps {
   paciente?: ApiPaciente | null;

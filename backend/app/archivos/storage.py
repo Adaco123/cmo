@@ -2,12 +2,28 @@
 import os
 import uuid
 from datetime import datetime
+from flask import current_app
 from werkzeug.utils import secure_filename
 
-# En Windows: D:\archivos
-# Si algún día despliegas en Linux, cambia esto a algo como "/archivos"
-# o mejor, usa la variable de entorno de abajo sin tocar código.
-BASE_UPLOAD_DIR = os.environ.get("ARCHIVOS_UPLOAD_DIR", r"D:\archivos")
+# Antes esto era una constante fija leída una sola vez al importar el
+# módulo (os.environ.get(...) a nivel de módulo), lo que la hacía
+# depender del orden de imports y no dejaba configurarla por entorno
+# (Docker) vía config/default.py, solo vía variable de entorno.
+# Ahora se resuelve en cada uso desde app.config, que ya carga
+# config/default.py en create_app() — así en Docker basta con setear
+# ARCHIVOS_UPLOAD_DIR en ese archivo (o seguir sobreescribiéndolo con
+# la variable de entorno del mismo nombre, ambos caminos siguen
+# funcionando).
+DEFAULT_UPLOAD_DIR = r"D:\archivos"
+
+
+def get_upload_dir() -> str:
+    """Ruta raíz de almacenamiento de archivos, leída de app.config
+    (ARCHIVOS_UPLOAD_DIR, definida en config/default.py). Requiere
+    contexto de aplicación Flask activo (siempre el caso dentro de
+    una request)."""
+    return current_app.config.get("ARCHIVOS_UPLOAD_DIR", DEFAULT_UPLOAD_DIR)
+
 
 EXTENSIONES_PERMITIDAS = {"pdf", "jpg", "jpeg", "png"}
 
@@ -30,7 +46,7 @@ def guardar_archivo_en_disco(file_storage) -> dict:
 
     ahora = datetime.utcnow()
     subcarpeta = os.path.join(str(ahora.year), f"{ahora.month:02d}")
-    carpeta_destino = os.path.join(BASE_UPLOAD_DIR, subcarpeta)
+    carpeta_destino = os.path.join(get_upload_dir(), subcarpeta)
     os.makedirs(carpeta_destino, exist_ok=True)
 
     extension = nombre_original.rsplit(".", 1)[1].lower()

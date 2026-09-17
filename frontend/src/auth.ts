@@ -40,12 +40,18 @@ export interface ActionResult {
   message?: string;
 }
 
+interface ApiErrorBody {
+  detail?: string;
+  error?: string;
+  message?: string;
+}
+
 function getErrorMessage(err: unknown): string {
-  if (axios.isAxiosError(err)) {
+  if (axios.isAxiosError<ApiErrorBody>(err)) {
     return (
-      (err.response?.data as any)?.detail ??
-      (err.response?.data as any)?.error ??
-      (err.response?.data as any)?.message ??
+      err.response?.data?.detail ??
+      err.response?.data?.error ??
+      err.response?.data?.message ??
       err.message ??
       ''
     );

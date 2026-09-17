@@ -861,6 +861,148 @@
   object-fit: contain;
 }
 
+/* ---- Miniatura de imagen en la lista de archivos ---- */
+.archivoRowBtn .archivoThumbWrap {
+  flex: 0 0 auto;
+}
+
+.archivoThumbWrap {
+  position: relative;
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.archivoThumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.archivoThumbExpand {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--text-main) 45%, transparent);
+  color: #fff;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.archivoRowBtn:hover .archivoThumbExpand,
+.archivoRowBtn:focus-visible .archivoThumbExpand {
+  opacity: 1;
+}
+
+/* ---- Lightbox a pantalla completa con lupa de zoom (mismo patrón que
+   RegistroClinicoDetalle.module.css): al hacer clic en la miniatura de
+   arriba se abre esto, y solo acá el mouse/dedo activa la lupa. ---- */
+.lightboxOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: color-mix(in srgb, var(--text-main) 75%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  animation: lightboxIn 0.18s ease;
+}
+
+@keyframes lightboxIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.lightboxImgWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: min(94vw, 1400px);
+  max-height: 88vh;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-card);
+  cursor: none;
+}
+
+.lightboxImg {
+  max-width: 100%;
+  max-height: 88vh;
+  object-fit: contain;
+  user-select: none;
+  touch-action: none;
+}
+
+.lightboxLupa {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid var(--primary-light);
+  box-shadow: 0 0 0 3px var(--bg-card), var(--shadow-hover);
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+.lightboxCaption {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--text-on-dark);
+  font-size: var(--fs-sm);
+}
+
+.lightboxCaption span:first-child {
+  font-family: var(--mono);
+  font-weight: 600;
+}
+
+.lightboxDownload {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary-light);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+.lightboxDownload:hover {
+  text-decoration: underline;
+}
+
+.lightboxClose {
+  position: absolute;
+  top: 22px;
+  right: 26px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transition: background var(--transition-fast);
+}
+
+.lightboxClose:hover {
+  background: var(--bg-card-hover);
+}
+
 .visorDescargar {
   display: inline-flex;
   align-items: center;

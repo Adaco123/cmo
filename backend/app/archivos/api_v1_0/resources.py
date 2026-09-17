@@ -5,7 +5,7 @@ from flask_restful import Api, Resource
 from marshmallow import ValidationError
 import os
 from flask import send_from_directory, abort
-from app.archivos.storage import BASE_UPLOAD_DIR
+from app.archivos.storage import get_upload_dir
 
 
 from app.db import db
@@ -184,7 +184,7 @@ class Archivo_Resource(Resource):
         if not archivo:
             return {"error": "Archivo no encontrado"}, 404
 
-        ruta_en_disco = os.path.join(BASE_UPLOAD_DIR, archivo.ruta_almacenamiento)
+        ruta_en_disco = os.path.join(get_upload_dir(), archivo.ruta_almacenamiento)
         archivo.delete()
 
         try:
@@ -224,7 +224,7 @@ class ArchivoDescarga_Resource(Resource):
             return {"error": "Archivo no encontrado"}, 404
 
         # archivo.ruta_almacenamiento es algo como "2026/08/abc123.jpg"
-        carpeta = os.path.dirname(os.path.join(BASE_UPLOAD_DIR, archivo.ruta_almacenamiento))
+        carpeta = os.path.dirname(os.path.join(get_upload_dir(), archivo.ruta_almacenamiento))
         nombre_archivo_en_disco = os.path.basename(archivo.ruta_almacenamiento)
 
         if not os.path.isfile(os.path.join(carpeta, nombre_archivo_en_disco)):
@@ -474,7 +474,7 @@ class QrCapturaFoto_Resource(Resource):
 
         archivo = Archivo.get_by_id(archivo_id)
         if archivo:
-            ruta_en_disco = os.path.join(BASE_UPLOAD_DIR, archivo.ruta_almacenamiento)
+            ruta_en_disco = os.path.join(get_upload_dir(), archivo.ruta_almacenamiento)
             archivo.delete()
             try:
                 if os.path.isfile(ruta_en_disco):
@@ -520,7 +520,7 @@ class QrCapturaSesionDescartar_Resource(Resource):
         for archivo_id in list(sesion["fotos"]):
             archivo = Archivo.get_by_id(archivo_id)
             if archivo:
-                ruta_en_disco = os.path.join(BASE_UPLOAD_DIR, archivo.ruta_almacenamiento)
+                ruta_en_disco = os.path.join(get_upload_dir(), archivo.ruta_almacenamiento)
                 archivo.delete()
                 try:
                     if os.path.isfile(ruta_en_disco):

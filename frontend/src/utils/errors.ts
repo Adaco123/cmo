@@ -10,19 +10,29 @@
  * para que cualquier componente obtenga el mismo mensaje sin importar
  * qué forma tenga el error del backend.
  */
-export function extractErrorMessage(err: unknown, fallback: string): string {
-  const data =
-    err && typeof err === 'object' && 'response' in err
-      ? (err as any).response?.data
-      : undefined;
+interface RespuestaConData {
+  response?: { data?: unknown };
+}
 
-  const primerErrorMarshmallow =
-    data && typeof data === 'object'
-      ? Object.values(data).flat().find((v) => typeof v === 'string')
-      : undefined;
+function tieneResponseData(err: unknown): err is RespuestaConData {
+  return typeof err === 'object' && err !== null && 'response' in err;
+}
+
+export function extractErrorMessage(err: unknown, fallback: string): string {
+  const data = tieneResponseData(err) ? err.response?.data : undefined;
+  const dataObj = data && typeof data === 'object' ? (data as Record<string, unknown>) : undefined;
+
+  const primerErrorMarshmallow = dataObj
+    ? Object.values(dataObj).flat().find((v) => typeof v === 'string')
+    : undefined;
+
+  const mensajeDelError = err instanceof Error ? err.message : undefined;
 
   const backendMessage =
-    data?.error || data?.msg || primerErrorMarshmallow || (err as any)?.message;
+    (typeof dataObj?.error === 'string' ? dataObj.error : undefined) ??
+    (typeof dataObj?.msg === 'string' ? dataObj.msg : undefined) ??
+    primerErrorMarshmallow ??
+    mensajeDelError;
 
   return backendMessage || fallback;
 }

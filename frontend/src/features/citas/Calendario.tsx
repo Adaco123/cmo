@@ -76,7 +76,7 @@ const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes,
   const citasPorFecha = useMemo(() => {
     const map = new Map<string, Cita[]>();
     citas.forEach((cita) => {
-      const fecha = (cita as any).fecha;
+      const fecha = cita.fecha;
       if (!fecha) return;
       const key = toDateKey(fecha);
       const arr = map.get(key) ?? [];

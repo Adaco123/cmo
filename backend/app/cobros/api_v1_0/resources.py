@@ -96,6 +96,18 @@ class Cobro_Resource(Resource):
         data.pop("usuario_id", None)
 
         if "monto" in data or "descuento" in data:
+            # Igual que en delete: si el cobro ya tiene pagos registrados,
+            # no se permite tocar monto/descuento. Antes esto sí se dejaba
+            # editar, monto_final cambiaba pero estado_id nunca se
+            # recalculaba (ese recálculo solo vive en pagos/resources.py),
+            # así que un cobro ya "Pagado" podía quedar con saldo pendiente
+            # imposible de cobrar (PagosList_Resource.post rechaza pagos
+            # nuevos sobre un cobro "Pagado").
+            if Pago.simple_filter(cobro_id=item.id):
+                return {
+                    "error": "Este cobro ya tiene pagos registrados; no se puede modificar el monto o descuento"
+                }, 409
+
             monto = data.get("monto", item.monto)
             descuento = data.get("descuento", item.descuento)
             nuevo_monto_final = monto - descuento

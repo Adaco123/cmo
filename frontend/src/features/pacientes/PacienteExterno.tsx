@@ -11,6 +11,7 @@ import {
 } from '../../api/archivos';
 import CapturaQrModal from './CapturaQrModal';
 import { getTiposArchivo, type TipoArchivo } from '../../api/tiposarchivo';
+import { extractErrorMessage } from '../../utils/errors';
 import CrearCita from '../../components/CrearCita';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -29,6 +30,7 @@ import {
   faEllipsisVertical,
   faTrash,
   faCamera,
+  faExpand,
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './PacienteExterno.module.css';
 
@@ -66,18 +68,26 @@ interface ArchivoPendiente {
   file: File;
 }
 
+interface ImagenActiva {
+  archivo: ArchivoResponse;
+  url: string;
+}
+
 /**
  * Modal de ficha para un paciente externo (origen='externo') ya seleccionado:
  * layout de dos columnas (ficha + acciones a la izquierda, archivos a la
  * derecha), con "Adjuntar archivo" como modal centrado, "Crear cita" como
- * modal autocontenido (trae su propio backdrop), y ver un archivo como
+ * modal autocontenido (trae su propio backdrop). Los PDF se ven en un
  * drawer lateral que entra deslizando de derecha a izquierda (mismo patrón
- * que RegistroClinicoDetalle en VerPaciente). La lista de archivos usa el
- * mismo patrón de menú "..." (3 puntos) que el timeline de VerPaciente.tsx
- * en vez de un botón de eliminar directo.
+ * que RegistroClinicoDetalle en VerPaciente); las imágenes se muestran
+ * como miniatura ya cargada en la lista y, al hacer clic, abren el mismo
+ * lightbox a pantalla completa con lupa de zoom que usa RegistroClinicoDetalle.
+ * La lista de archivos usa el mismo patrón de menú "..." (3 puntos) que el
+ * timeline de VerPaciente.tsx en vez de un botón de eliminar directo.
  */
 const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) => {
   const [archivosSubidos, setArchivosSubidos] = useState<ArchivoResponse[]>([]);
+  const [cargandoArchivos, setCargandoArchivos] = useState(true);
   const [archivosPendientes, setArchivosPendientes] = useState<ArchivoPendiente[]>([]);
   const [subiendo, setSubiendo] = useState(false);
   const [errorArchivo, setErrorArchivo] = useState<string | null>(null);
@@ -97,7 +107,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
   // el menú de 3 puntos de las tarjetas del timeline en VerPaciente.tsx.
   const [menuAbiertoId, setMenuAbiertoId] = useState<number | null>(null);
 
-  // ---- Visor de archivo (drawer lateral) ----
+  // ---- Visor de PDF (drawer lateral) ----
   const [archivoEnVisor, setArchivoEnVisor] = useState<ArchivoResponse | null>(null);
   const [visorUrl, setVisorUrl] = useState<string | null>(null);
   const [cargandoVisor, setCargandoVisor] = useState(false);
@@ -105,6 +115,23 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
   // Igual que en VerPaciente: primero se dispara la animación de salida
   // (cerrandoVisor = true) y solo al terminar se desmonta el drawer.
   const [cerrandoVisor, setCerrandoVisor] = useState(false);
+
+  // ---- Galería de imágenes + lightbox (mismo patrón que RegistroClinicoDetalle.tsx) ----
+  // Las imágenes (a diferencia de los PDF) se descargan todas de una vez al
+  // cargar el paciente, para poder mostrar la miniatura ya lista en la lista
+  // de archivos; recién al hacer clic sobre esa miniatura se abre el
+  // lightbox a pantalla completa, y solo ahí funciona la lupa de zoom.
+  const [galeria, setGaleria] = useState<Record<number, string>>({});
+  const [imagenActiva, setImagenActiva] = useState<ImagenActiva | null>(null);
+  const urlsGaleriaRef = useRef<string[]>([]);
+
+  // Lupa dentro del lightbox: mover el mouse (o el dedo) sobre la imagen
+  // amplía la zona bajo el cursor, sin perder de vista la foto completa.
+  const [lupaPos, setLupaPos] = useState({ x: 0, y: 0, wrapW: 0, wrapH: 0 });
+  const [lupaVisible, setLupaVisible] = useState(false);
+  const LUPA_ZOOM = 2.6;
+  const LUPA_DIAMETRO = 180;
+  const imgWrapRef = useRef<HTMLDivElement | null>(null);
 
   const inputFileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -118,23 +145,45 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
   }, []);
 
   // Carga los archivos ya subidos del paciente al montar (y de nuevo si
-  // el modal se reutilizara para otro paciente sin desmontarse).
+  // el modal se reutilizara para otro paciente sin desmontarse). Las
+  // imágenes se descargan todas de una vez acá mismo (mismo patrón que la
+  // galería de RegistroClinicoDetalle.tsx) para poder mostrar la miniatura
+  // ya lista en la lista de archivos; mientras tanto se muestra "Cargando".
   useEffect(() => {
     let cancelado = false;
+    const urlsCreadas: string[] = [];
     setArchivosSubidos([]);
     setArchivosPendientes([]);
     setErrorArchivo(null);
     setMenuAbiertoId(null);
+    setGaleria({});
+    setCargandoArchivos(true);
     (async () => {
       try {
         const archivos = await getArchivosPorPaciente(paciente.id);
-        if (!cancelado) setArchivosSubidos(archivos);
+        if (cancelado) return;
+        setArchivosSubidos(archivos);
+
+        const nuevaGaleria: Record<number, string> = {};
+        for (const archivo of archivos) {
+          if (esPdf(archivo.nombre_archivo)) continue;
+          const blob = await descargarArchivoBlob(archivo.id);
+          if (cancelado) return;
+          const url = URL.createObjectURL(blob);
+          urlsCreadas.push(url);
+          nuevaGaleria[archivo.id] = url;
+        }
+        if (!cancelado) setGaleria(nuevaGaleria);
       } catch {
         // Si falla la carga de archivos previos igual se puede seguir subiendo.
+      } finally {
+        if (!cancelado) setCargandoArchivos(false);
       }
     })();
+    urlsGaleriaRef.current = urlsCreadas;
     return () => {
       cancelado = true;
+      urlsCreadas.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [paciente.id]);
 
@@ -196,12 +245,16 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
         const tipoArchivoId = idTipoArchivoPorExt(ext, tiposArchivo);
         const subido = await subirArchivoPaciente(paciente.id, pendiente.file, tipoArchivoId);
         setArchivosSubidos((prev) => [subido, ...prev]);
+        if (!esPdf(pendiente.file.name)) {
+          const url = URL.createObjectURL(pendiente.file);
+          urlsGaleriaRef.current.push(url);
+          setGaleria((prev) => ({ ...prev, [subido.id]: url }));
+        }
       }
       setArchivosPendientes([]);
       setShowAdjuntar(false);
-    } catch (error: any) {
-      const backendMessage = error?.response?.data?.error || error?.message;
-      setErrorArchivo(backendMessage || 'No se pudo subir el archivo.');
+    } catch (error: unknown) {
+      setErrorArchivo(extractErrorMessage(error, 'No se pudo subir el archivo.'));
     } finally {
       setSubiendo(false);
     }
@@ -218,6 +271,13 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
     try {
       await eliminarArchivoApi(archivoId);
       setArchivosSubidos((prev) => prev.filter((a) => a.id !== archivoId));
+      setGaleria((prev) => {
+        if (!(archivoId in prev)) return prev;
+        const resto = { ...prev };
+        delete resto[archivoId];
+        return resto;
+      });
+      setImagenActiva((prev) => (prev?.archivo.id === archivoId ? null : prev));
     } catch {
       setErrorArchivo('No se pudo eliminar el archivo.');
     } finally {
@@ -275,7 +335,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
     setErrorArchivo(null);
   };
 
-  // ---- Abrir/cerrar el visor de archivo (drawer derecho) ----
+  // ---- Abrir/cerrar el visor de PDF (drawer derecho) ----
   const abrirVisorArchivo = useCallback(async (archivo: ArchivoResponse) => {
     setArchivoEnVisor(archivo);
     setCerrandoVisor(false);
@@ -305,11 +365,52 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
     }, 280);
   }, []);
 
-  // Libera la URL del blob cada vez que cambia o se desmonta el componente.
+  // Libera la URL del blob del PDF cada vez que cambia o se desmonta el componente.
   useEffect(() => {
     if (!visorUrl) return;
     return () => URL.revokeObjectURL(visorUrl);
   }, [visorUrl]);
+
+  // Al hacer clic en un archivo: los PDF abren el drawer lateral, las
+  // imágenes abren el lightbox a pantalla completa (mismo criterio que
+  // RegistroClinicoDetalle.tsx). La miniatura ya está precargada en
+  // `galeria`, así que el lightbox abre al instante.
+  const handleAbrirArchivo = useCallback(
+    (archivo: ArchivoResponse) => {
+      if (esPdf(archivo.nombre_archivo)) {
+        void abrirVisorArchivo(archivo);
+        return;
+      }
+      const url = galeria[archivo.id];
+      if (!url) return;
+      setLupaVisible(false);
+      setImagenActiva({ archivo, url });
+    },
+    [abrirVisorArchivo, galeria],
+  );
+
+  // Cerrar el lightbox con Escape, como se espera de cualquier visor
+  // (mismo patrón que RegistroClinicoDetalle.tsx).
+  useEffect(() => {
+    if (!imagenActiva) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setImagenActiva(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [imagenActiva]);
+
+  // Sigue el cursor (o el dedo) dentro del recuadro de la imagen y calcula
+  // dónde debe apuntar la lupa, igual que en RegistroClinicoDetalle.tsx.
+  const moverLupa = (clientX: number, clientY: number) => {
+    const wrap = imgWrapRef.current;
+    if (!wrap) return;
+    const r = wrap.getBoundingClientRect();
+    const x = Math.max(0, Math.min(clientX - r.left, r.width));
+    const y = Math.max(0, Math.min(clientY - r.top, r.height));
+    setLupaPos({ x, y, wrapW: r.width, wrapH: r.height });
+    setLupaVisible(true);
+  };
 
   const nombrePaciente = `${paciente.nombres} ${paciente.apellidos}`.trim();
 
@@ -372,7 +473,12 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
 
           {errorArchivo && !showAdjuntar && <p className={styles.errorText}>{errorArchivo}</p>}
 
-          {archivosSubidos.length === 0 ? (
+          {cargandoArchivos ? (
+            <div className={styles.emptyState}>
+              <FontAwesomeIcon icon={faSpinner} spin />
+              <p>Cargando archivos...</p>
+            </div>
+          ) : archivosSubidos.length === 0 ? (
             <div className={styles.emptyState}>
               <FontAwesomeIcon icon={faFileMedicalAlt} />
               <p>No hay archivos adjuntos para este paciente todavía.</p>
@@ -384,9 +490,25 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
                   <button
                     type="button"
                     className={styles.archivoRowBtn}
-                    onClick={() => void abrirVisorArchivo(a)}
+                    onClick={() => handleAbrirArchivo(a)}
                   >
-                    <FontAwesomeIcon icon={esPdf(a.nombre_archivo) ? faFilePdf : faFileImage} />
+                    {esPdf(a.nombre_archivo) ? (
+                      <FontAwesomeIcon icon={faFilePdf} />
+                    ) : galeria[a.id] ? (
+                      <span className={styles.archivoThumbWrap}>
+                        <img
+                          src={galeria[a.id]}
+                          alt={a.nombre_archivo}
+                          className={styles.archivoThumb}
+                          loading="lazy"
+                        />
+                        <span className={styles.archivoThumbExpand}>
+                          <FontAwesomeIcon icon={faExpand} />
+                        </span>
+                      </span>
+                    ) : (
+                      <FontAwesomeIcon icon={faFileImage} />
+                    )}
                     <span>{a.nombre_archivo}</span>
                   </button>
 
@@ -537,10 +659,11 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
           document.body,
         )}
 
-      {/* ================= DRAWER: VER ARCHIVO ================= */}
+      {/* ================= DRAWER: VER PDF ================= */}
       {/* Igual patrón que el drawer de RegistroClinicoDetalle en VerPaciente:
           entra deslizando de derecha a izquierda y sale deslizando de vuelta
-          hacia la derecha antes de desmontarse. */}
+          hacia la derecha antes de desmontarse. Las imágenes ya no pasan por
+          acá: abren directo el lightbox de abajo. */}
       {archivoEnVisor && (
         <div className={styles.backdrop} onClick={cerrarVisorArchivo}>
           <div
@@ -552,7 +675,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
             </button>
 
             <div className={styles.visorHead}>
-              <FontAwesomeIcon icon={esPdf(archivoEnVisor.nombre_archivo) ? faFilePdf : faFileImage} />
+              <FontAwesomeIcon icon={faFilePdf} />
               <span>{archivoEnVisor.nombre_archivo}</span>
             </div>
 
@@ -573,11 +696,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
             {!cargandoVisor && !errorVisor && visorUrl && (
               <>
                 <div className={styles.visorBody}>
-                  {esPdf(archivoEnVisor.nombre_archivo) ? (
-                    <iframe src={visorUrl} title={archivoEnVisor.nombre_archivo} className={styles.visorFrame} />
-                  ) : (
-                    <img src={visorUrl} alt={archivoEnVisor.nombre_archivo} className={styles.visorImg} />
-                  )}
+                  <iframe src={visorUrl} title={archivoEnVisor.nombre_archivo} className={styles.visorFrame} />
                 </div>
                 <a href={visorUrl} download={archivoEnVisor.nombre_archivo} className={styles.visorDescargar}>
                   <FontAwesomeIcon icon={faDownload} /> Descargar
@@ -587,6 +706,76 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
           </div>
         </div>
       )}
+
+      {/* ================= LIGHTBOX: IMAGEN A PANTALLA COMPLETA ================= */}
+      {/* Mismo patrón que RegistroClinicoDetalle.tsx: portal a <body> para que
+          "position: fixed" tome el viewport real como referencia (si se
+          renderizara dentro del backdrop del modal quedaría recortado), y la
+          lupa de zoom solo vive acá — nunca sobre la miniatura de la lista. */}
+      {imagenActiva &&
+        createPortal(
+          <div
+            className={styles.lightboxOverlay}
+            onClick={() => setImagenActiva(null)}
+            role="dialog"
+            aria-modal="true"
+          >
+            <button
+              type="button"
+              className={styles.lightboxClose}
+              onClick={() => setImagenActiva(null)}
+              aria-label="Cerrar"
+            >
+              <FontAwesomeIcon icon={faXmark} />
+            </button>
+            <div
+              ref={imgWrapRef}
+              className={styles.lightboxImgWrap}
+              onClick={(e) => e.stopPropagation()}
+              onMouseMove={(e) => moverLupa(e.clientX, e.clientY)}
+              onMouseLeave={() => setLupaVisible(false)}
+              onTouchStart={(e) => {
+                if (e.touches.length === 1) moverLupa(e.touches[0].clientX, e.touches[0].clientY);
+              }}
+              onTouchMove={(e) => {
+                if (e.touches.length === 1) moverLupa(e.touches[0].clientX, e.touches[0].clientY);
+              }}
+              onTouchEnd={() => setLupaVisible(false)}
+            >
+              <img
+                src={imagenActiva.url}
+                alt={imagenActiva.archivo.nombre_archivo}
+                className={styles.lightboxImg}
+                draggable={false}
+              />
+              {lupaVisible && (
+                <div
+                  className={styles.lightboxLupa}
+                  style={{
+                    width: LUPA_DIAMETRO,
+                    height: LUPA_DIAMETRO,
+                    left: lupaPos.x - LUPA_DIAMETRO / 2,
+                    top: lupaPos.y - LUPA_DIAMETRO / 2,
+                    backgroundImage: `url(${imagenActiva.url})`,
+                    backgroundSize: `${lupaPos.wrapW * LUPA_ZOOM}px ${lupaPos.wrapH * LUPA_ZOOM}px`,
+                    backgroundPosition: `${-(lupaPos.x * LUPA_ZOOM - LUPA_DIAMETRO / 2)}px ${-(lupaPos.y * LUPA_ZOOM - LUPA_DIAMETRO / 2)}px`,
+                  }}
+                />
+              )}
+            </div>
+            <div className={styles.lightboxCaption} onClick={(e) => e.stopPropagation()}>
+              <span>{imagenActiva.archivo.nombre_archivo}</span>
+              <a
+                href={imagenActiva.url}
+                download={imagenActiva.archivo.nombre_archivo}
+                className={styles.lightboxDownload}
+              >
+                <FontAwesomeIcon icon={faDownload} /> Descargar
+              </a>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 };

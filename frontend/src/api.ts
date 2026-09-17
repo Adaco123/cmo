@@ -1,8 +1,15 @@
-import axios from 'axios';
+import axios, { AxiosError, type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 
-const rawBaseURL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000/';
+// AxiosRequestConfig no trae un campo `_retry`: lo agregamos nosotros para
+// marcar que una request ya pasó por el flujo de refresh y no debe
+// reintentarse de nuevo si vuelve a fallar.
+interface RetryableRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+}
+
+const rawBaseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/';
 const baseURL = rawBaseURL.replace(/\/+$/, '');
-const isDebugApi = import.meta.env.DEV || (import.meta as any).env?.VITE_DEBUG_API === 'true';
+const isDebugApi = import.meta.env.DEV || import.meta.env.VITE_DEBUG_API === 'true';
 
 if (isDebugApi) {
   console.debug('[API] baseURL', baseURL);
@@ -21,8 +28,7 @@ api.interceptors.request.use(
 
     const token = localStorage.getItem('token');
     if (token) {
-      if (!config.headers) (config as any).headers = {};
-      (config as any).headers['Authorization'] = `Bearer ${token}`;
+      config.headers.set('Authorization', `Bearer ${token}`);
     }
 
     return config;
@@ -74,8 +80,8 @@ async function refrescarAccessToken(): Promise<string> {
 
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+  async (error: AxiosError) => {
+    const originalRequest = error.config as RetryableRequestConfig | undefined;
 
     if (error.response?.status !== 401) {
       return Promise.reject(error);
@@ -85,14 +91,14 @@ api.interceptors.response.use(
     // Provider global disparado antes de terminar el login), este 401
     // no dice nada sobre la sesión actual — solo que ese pedido en
     // particular no estaba autenticado.
-    const teniaToken = !!(originalRequest?.headers as any)?.['Authorization'];
-    if (!teniaToken) {
+    const teniaToken = !!originalRequest?.headers?.get('Authorization');
+    if (!teniaToken || !originalRequest) {
       return Promise.reject(error);
     }
 
     // El propio intento de refresh falló (refresh token vencido o
     // inválido) — ahí sí no queda otra que mandar a login.
-    if (originalRequest?.url?.includes('/usuarios/refresh')) {
+    if (originalRequest.url?.includes('/usuarios/refresh')) {
       forzarLogout();
       return Promise.reject(error);
     }
@@ -111,7 +117,7 @@ api.interceptors.response.use(
       return new Promise((resolve, reject) => {
         pendingQueue.push({
           resolve: (token: string) => {
-            originalRequest.headers['Authorization'] = `Bearer ${token}`;
+            originalRequest.headers.set('Authorization', `Bearer ${token}`);
             resolve(api(originalRequest));
           },
           reject,
@@ -123,7 +129,7 @@ api.interceptors.response.use(
     try {
       const nuevoToken = await refrescarAccessToken();
       resolvePendingQueue(null, nuevoToken);
-      originalRequest.headers['Authorization'] = `Bearer ${nuevoToken}`;
+      originalRequest.headers.set('Authorization', `Bearer ${nuevoToken}`);
       return api(originalRequest);
     } catch (refreshError) {
       resolvePendingQueue(refreshError, null);
@@ -142,17 +148,25 @@ const defaultRetryConfig = {
   backoff: 500,
 };
 
-export async function getWithRetry(url: string, config: any = {}, retries = defaultRetryConfig.retries, backoff = defaultRetryConfig.backoff) {
+function esErrorReintentable(err: unknown): boolean {
+  if (!axios.isAxiosError(err)) return false;
+  const isTimeout = err.code === 'ECONNABORTED' || !!err.message?.toLowerCase().includes('timeout');
+  return !err.response || err.response.status >= 500 || isTimeout;
+}
+
+export async function getWithRetry<T = unknown>(
+  url: string,
+  config: AxiosRequestConfig = {},
+  retries = defaultRetryConfig.retries,
+  backoff = defaultRetryConfig.backoff,
+): Promise<AxiosResponse<T>> {
   let attempt = 0;
   while (true) {
     try {
-      const res = await api.get(url, config);
-      return res;
-    } catch (err: any) {
+      return await api.get<T>(url, config);
+    } catch (err: unknown) {
       attempt++;
-      const isTimeout = err?.code === 'ECONNABORTED' || (err?.message && err.message.toLowerCase().includes('timeout'));
-      const shouldRetry = attempt <= retries && (!err.response || err.response.status >= 500 || isTimeout);
-      if (!shouldRetry) {
+      if (attempt > retries || !esErrorReintentable(err)) {
         throw err;
       }
       const delay = backoff * Math.pow(2, attempt - 1);
@@ -161,17 +175,22 @@ export async function getWithRetry(url: string, config: any = {}, retries = defa
   }
 }
 
-export async function postWithRetry(url: string, data: any = {}, config: any = {}, retries = 1, backoff = 300) {
+export async function postWithRetry<T = unknown>(
+  url: string,
+  data: unknown = {},
+  config: AxiosRequestConfig = {},
+  retries = 1,
+  backoff = 300,
+): Promise<AxiosResponse<T>> {
   let attempt = 0;
   while (true) {
     try {
-      const res = await api.post(url, data, config);
-      return res;
-    } catch (err: any) {
+      return await api.post<T>(url, data, config);
+    } catch (err: unknown) {
       attempt++;
-      const isTimeout = err?.code === 'ECONNABORTED' || (err?.message && err.message.toLowerCase().includes('timeout'));
-      const shouldRetry = attempt <= retries && (!err.response || err.response.status >= 500 || isTimeout);
-      if (!shouldRetry) throw err;
+      if (attempt > retries || !esErrorReintentable(err)) {
+        throw err;
+      }
       const delay = backoff * Math.pow(2, attempt - 1);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
