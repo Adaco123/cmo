@@ -6,6 +6,7 @@ from marshmallow import ValidationError
 from app.empleados.models import Empleado
 from app.empleados.schemas import EmpleadoSchema
 from app.empleados.api_v1_0 import empleados_bp
+from app.medicos.models import Medico
 
 schema = EmpleadoSchema()
 schema_list = EmpleadoSchema(many=True)
@@ -64,6 +65,11 @@ def eliminar_empleados(item_id):
     item = Empleado.get_by_id(item_id)
     if item is None:
         return jsonify({"error": "Empleado no encontrado"}), 404
+
+    if Medico.simple_filter(empleado_id=item.id):
+        return jsonify({
+            "error": "Este empleado tiene una ficha de médico asociada y no se puede eliminar"
+        }), 409
 
     item.delete()
     return "", 204

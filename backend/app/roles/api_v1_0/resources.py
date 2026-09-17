@@ -7,6 +7,7 @@ from app.db import db
 from app.roles.models import Rol
 from app.roles.schemas import RolSchema
 from app.roles.api_v1_0 import roles_bp
+from app.usuarios.models import Usuario
 
 schema = RolSchema()
 schema_list = RolSchema(many=True)
@@ -86,6 +87,11 @@ def eliminar_roles(item_id):
     item = Rol.get_by_id(item_id)
     if item is None:
         return jsonify({"error": "Rol no encontrado"}), 404
+
+    if Usuario.simple_filter(rol_id=item.id):
+        return jsonify({
+            "error": "Este rol tiene usuarios registrados y no se puede eliminar"
+        }), 409
 
     item.delete()
     return "", 204

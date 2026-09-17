@@ -19,6 +19,8 @@ from app.recetas.schemas import (
 from app.recetas.api_v1_0 import recetas_bp
 from app.historial_clinico.models import RegistroClinico
 from app.medicos.models import Medico
+from app.examenes_complementarios.models import ExamenComplementario
+from app.archivos.models import Archivo
 
 receta_schema = RecetaSchema()
 receta_schema_list = RecetaSchema(many=True)
@@ -89,6 +91,24 @@ class Receta_Resource(Resource):
         receta = Receta.get_by_id(receta_id)
         if not receta:
             return {"error": "Receta no encontrada"}, 404
+
+        # Archivo.receta_id no tiene ondelete: si hay algo adjunto a esta
+        # receta, el DELETE choca con un IntegrityError sin capturar.
+        if Archivo.simple_filter(receta_id=receta.id):
+            return {"error": "Esta receta tiene archivos adjuntos y no se puede eliminar"}, 409
+
+        # RecetaExamen se borra en cascada (cascade="all, delete-orphan" en
+        # Receta.examenes), pero si alguno de esos exámenes ya generó su
+        # ExamenComplementario espejo (ver _crear_recetas_desde_bloques en
+        # historial_clinico), esa fila lo bloquea igual, a mitad del cascade.
+        examen_ids = [e.id for e in receta.examenes]
+        if examen_ids and ExamenComplementario.query.filter(
+            ExamenComplementario.receta_examen_id.in_(examen_ids)
+        ).first():
+            return {
+                "error": "Esta receta tiene exámenes complementarios generados y no se puede eliminar"
+            }, 409
+
         receta.delete()
         return "", 204
 
@@ -216,6 +236,12 @@ class RecetaExamen_Resource(Resource):
         examen = RecetaExamen.get_by_id(examen_id)
         if not examen:
             return {"error": "Examen no encontrado"}, 404
+
+        if ExamenComplementario.simple_filter(receta_examen_id=examen.id):
+            return {
+                "error": "Este examen ya generó un examen complementario y no se puede eliminar"
+            }, 409
+
         examen.delete()
         return "", 204
 

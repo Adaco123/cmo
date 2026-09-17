@@ -7,6 +7,7 @@ from app.db import db
 from app.tipos_archivo.models import TipoArchivo
 from app.tipos_archivo.schemas import TipoArchivoSchema
 from app.tipos_archivo.api_v1_0 import tipos_archivo_bp
+from app.archivos.models import Archivo
 
 schema = TipoArchivoSchema()
 schema_list = TipoArchivoSchema(many=True)
@@ -83,6 +84,11 @@ def eliminar_tipos_archivo(item_id):
     item = TipoArchivo.get_by_id(item_id)
     if item is None:
         return jsonify({"error": "TipoArchivo no encontrado"}), 404
+
+    if Archivo.simple_filter(tipo_archivo_id=item.id):
+        return jsonify({
+            "error": "Este tipo de archivo tiene archivos registrados y no se puede eliminar"
+        }), 409
 
     item.delete()
     return "", 204

@@ -7,6 +7,7 @@ from app.db import db
 from app.estados_cobro.models import EstadoCobro
 from app.estados_cobro.schemas import EstadoCobroSchema
 from app.estados_cobro.api_v1_0 import estados_cobro_bp
+from app.cobros.models import Cobro
 
 schema = EstadoCobroSchema()
 schema_list = EstadoCobroSchema(many=True)
@@ -84,6 +85,11 @@ def eliminar_estados_cobro(item_id):
     item = EstadoCobro.get_by_id(item_id)
     if item is None:
         return jsonify({"error": "EstadoCobro no encontrado"}), 404
+
+    if Cobro.simple_filter(estado_id=item.id):
+        return jsonify({
+            "error": "Este estado de cobro tiene cobros registrados y no se puede eliminar"
+        }), 409
 
     item.delete()
     return "", 204

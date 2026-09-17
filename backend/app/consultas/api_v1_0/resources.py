@@ -10,11 +10,22 @@ from app.consultas.api_v1_0 import consultas_bp
 from app.pacientes.models import Paciente
 from app.medicos.models import Medico
 from app.citas.models import Cita
+from app.cobros.models import Cobro
+from app.historial_clinico.models import RegistroClinico
+from app.archivos.models import Archivo
 
 schema = ConsultaSchema()
 schema_list = ConsultaSchema(many=True)
 
 api = Api(consultas_bp)
+
+# Mismo patrón que en pacientes/medicos/etc.: chequear las FK reales antes
+# de borrar, en vez de dejar que el IntegrityError salga sin capturar.
+_DEPENDENCIAS_CONSULTA = [
+    (Cobro, "consulta_id", "un cobro registrado"),
+    (RegistroClinico, "consulta_id", "un registro clínico asociado"),
+    (Archivo, "consulta_id", "archivos adjuntos"),
+]
 
 
 class ConsultasList_Resource(Resource):
@@ -79,6 +90,13 @@ class Consulta_Resource(Resource):
         item = Consulta.get_by_id(item_id)
         if not item:
             return {"error": "Consulta no encontrada"}, 404
+
+        for Modelo, campo, descripcion in _DEPENDENCIAS_CONSULTA:
+            if Modelo.simple_filter(**{campo: item.id}):
+                return {
+                    "error": f"Esta consulta tiene {descripcion} y no se puede eliminar"
+                }, 409
+
         item.delete()
         return "", 204
 

@@ -6,6 +6,7 @@ from marshmallow import ValidationError
 from app.categorias_modelo.models import CategoriaModelo
 from app.categorias_modelo.schemas import CategoriaModeloSchema
 from app.categorias_modelo.api_v1_0 import categorias_modelo_bp
+from app.modelos_informe.models import ModeloInforme
 
 schema = CategoriaModeloSchema()
 schema_list = CategoriaModeloSchema(many=True)
@@ -64,6 +65,11 @@ def eliminar_categorias_modelo(item_id):
     item = CategoriaModelo.get_by_id(item_id)
     if item is None:
         return jsonify({"error": "CategoriaModelo no encontrado"}), 404
+
+    if ModeloInforme.simple_filter(categoria_id=item.id):
+        return jsonify({
+            "error": "Esta categoría tiene plantillas asociadas y no se puede eliminar"
+        }), 409
 
     item.delete()
     return "", 204

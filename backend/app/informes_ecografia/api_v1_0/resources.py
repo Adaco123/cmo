@@ -6,6 +6,7 @@ from marshmallow import ValidationError
 from app.informes_ecografia.models import InformeEcografia
 from app.informes_ecografia.schemas import InformeEcografiaSchema
 from app.informes_ecografia.api_v1_0 import informes_ecografia_bp
+from app.archivos.models import Archivo
 
 schema = InformeEcografiaSchema()
 schema_list = InformeEcografiaSchema(many=True)
@@ -64,6 +65,11 @@ def eliminar_informes_ecografia(item_id):
     item = InformeEcografia.get_by_id(item_id)
     if item is None:
         return jsonify({"error": "InformeEcografia no encontrado"}), 404
+
+    if Archivo.simple_filter(informe_id=item.id):
+        return jsonify({
+            "error": "Este informe tiene un archivo adjunto y no se puede eliminar"
+        }), 409
 
     item.delete()
     return "", 204

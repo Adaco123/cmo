@@ -6,9 +6,20 @@ from marshmallow import ValidationError
 from app.consultorios.models import Consultorio
 from app.consultorios.schemas import ConsultorioSchema
 from app.consultorios.api_v1_0 import consultorios_bp
+from app.empleados.models import Empleado
+from app.pacientes.models import Paciente
+from app.citas.models import Cita
 
 schema = ConsultorioSchema()
 schema_list = ConsultorioSchema(many=True)
+
+# Estas 3 FK son nullable, así que no siempre bloquean, pero cuando sí hay
+# datos cargados, el DELETE choca igual con un IntegrityError sin capturar.
+_DEPENDENCIAS_CONSULTORIO = [
+    (Empleado, "consultorio_id", "empleados asignados"),
+    (Paciente, "consultorio_id", "pacientes asignados"),
+    (Cita, "consultorio_id", "citas registradas"),
+]
 
 
 @consultorios_bp.route("/", methods=["GET"])
@@ -64,6 +75,12 @@ def eliminar_consultorios(item_id):
     item = Consultorio.get_by_id(item_id)
     if item is None:
         return jsonify({"error": "Consultorio no encontrado"}), 404
+
+    for Modelo, campo, descripcion in _DEPENDENCIAS_CONSULTORIO:
+        if Modelo.simple_filter(**{campo: item.id}):
+            return jsonify({
+                "error": f"Este consultorio tiene {descripcion} y no se puede eliminar"
+            }), 409
 
     item.delete()
     return "", 204

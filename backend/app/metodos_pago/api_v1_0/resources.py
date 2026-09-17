@@ -7,6 +7,7 @@ from app.db import db
 from app.metodos_pago.models import MetodoPago
 from app.metodos_pago.schemas import MetodoPagoSchema
 from app.metodos_pago.api_v1_0 import metodos_pago_bp
+from app.pagos.models import Pago
 
 schema = MetodoPagoSchema()
 schema_list = MetodoPagoSchema(many=True)
@@ -88,6 +89,11 @@ def eliminar_metodos_pago(item_id):
     item = MetodoPago.get_by_id(item_id)
     if item is None:
         return jsonify({"error": "MetodoPago no encontrado"}), 404
+
+    if Pago.simple_filter(metodo_pago_id=item.id):
+        return jsonify({
+            "error": "Este método de pago tiene pagos registrados y no se puede eliminar"
+        }), 409
 
     item.delete()
     return "", 204

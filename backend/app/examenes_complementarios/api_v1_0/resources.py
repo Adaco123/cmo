@@ -1,10 +1,14 @@
 """Rutas del módulo examenes_complementarios."""
+import os
+
 from flask import request
 from flask_restful import Api, Resource
 from flask_jwt_extended import jwt_required
+from app.db import db
 from app.examenes_complementarios.models import CategoriaExamen, ExamenComplementario
 from app.examenes_complementarios.schemas import CategoriaExamenSchema, ExamenComplementarioSchema
 from app.examenes_complementarios.api_v1_0 import examenes_complementarios_bp
+from app.archivos.storage import get_upload_dir
 
 categoria_schema_list = CategoriaExamenSchema(many=True)
 examen_schema = ExamenComplementarioSchema()
@@ -45,5 +49,37 @@ class ExamenComplementarioObservaciones_Resource(Resource):
         return examen_schema.dump(examen), 200
 
 
+class ExamenComplementario_Resource(Resource):
+    """DELETE /api/examenes/<int:examen_id>
+
+    Antes esta ruta no existía aunque el frontend (deleteExamenComplementario
+    en api/examenesComplementarios.ts) ya la llamaba — daba 404. Se agrega
+    acá. ExamenComplementario.archivos tiene cascade="all, delete-orphan",
+    así que SQLAlchemy borra solo las filas de Archivo asociadas; hay que
+    borrar los archivos físicos en disco ANTES de que eso pase (si se hace
+    después, ya no queda cómo encontrar su ruta_almacenamiento). Nada más
+    referencia examenes_complementarios.id, así que no hace falta chequeo
+    de dependencias adicional.
+    """
+
+    @jwt_required()
+    def delete(self, examen_id):
+        examen = ExamenComplementario.get_by_id(examen_id)
+        if not examen:
+            return {"error": "El examen complementario indicado no existe"}, 404
+
+        for archivo in list(examen.archivos):
+            ruta_en_disco = os.path.join(get_upload_dir(), archivo.ruta_almacenamiento)
+            try:
+                if os.path.isfile(ruta_en_disco):
+                    os.remove(ruta_en_disco)
+            except OSError:
+                pass
+
+        examen.delete()
+        return "", 204
+
+
 api.add_resource(CategoriaExamenList_Resource, "/categorias")
 api.add_resource(ExamenComplementarioObservaciones_Resource, "/<int:examen_id>/observaciones")
+api.add_resource(ExamenComplementario_Resource, "/<int:examen_id>")

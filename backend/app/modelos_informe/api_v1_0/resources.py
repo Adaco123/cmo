@@ -6,6 +6,7 @@ from marshmallow import ValidationError
 from app.modelos_informe.models import ModeloInforme
 from app.modelos_informe.schemas import ModeloInformeSchema
 from app.modelos_informe.api_v1_0 import modelos_informe_bp
+from app.informes_ecografia.models import InformeEcografia
 
 schema = ModeloInformeSchema()
 schema_list = ModeloInformeSchema(many=True)
@@ -64,6 +65,11 @@ def eliminar_modelos_informe(item_id):
     item = ModeloInforme.get_by_id(item_id)
     if item is None:
         return jsonify({"error": "ModeloInforme no encontrado"}), 404
+
+    if InformeEcografia.simple_filter(modelo_id=item.id):
+        return jsonify({
+            "error": "Esta plantilla ya generó informes y no se puede eliminar"
+        }), 409
 
     item.delete()
     return "", 204

@@ -85,6 +85,18 @@ class Paciente_Resource(Resource):
         if item is None:
             return {"error": "Paciente no encontrado"}, 404
 
+        # A todo paciente se le crea una HistoriaClinica automáticamente al
+        # registrarlo (ver PacientesList_Resource.post), y esa relación
+        # tiene ondelete="RESTRICT" a nivel de base de datos — en la
+        # práctica esto significa que un paciente NUNCA se puede eliminar
+        # de verdad una vez creado. Antes esto no se chequeaba acá y el
+        # intento de borrar terminaba en un IntegrityError sin capturar
+        # (500 crudo) en vez de un mensaje claro.
+        if HistoriaClinica.simple_filter(paciente_id=item.id):
+            return {
+                "error": "Este paciente tiene una historia clínica asociada y no se puede eliminar"
+            }, 409
+
         item.delete()
         return "", 204
 

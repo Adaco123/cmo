@@ -7,6 +7,7 @@ from app.db import db
 from app.estados_cita.models import EstadoCita
 from app.estados_cita.schemas import EstadoCitaSchema
 from app.estados_cita.api_v1_0 import estados_cita_bp
+from app.citas.models import Cita
 
 schema = EstadoCitaSchema()
 schema_list = EstadoCitaSchema(many=True)
@@ -91,6 +92,11 @@ def eliminar_estados_cita(item_id):
     item = EstadoCita.get_by_id(item_id)
     if item is None:
         return jsonify({"error": "EstadoCita no encontrado"}), 404
+
+    if Cita.simple_filter(estado_id=item.id):
+        return jsonify({
+            "error": "Este estado de cita tiene citas registradas y no se puede eliminar"
+        }), 409
 
     item.delete()
     return "", 204
