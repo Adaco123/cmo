@@ -13,10 +13,26 @@ from app.pacientes.schemas import PacienteSchema
 from app.pacientes.api_v1_0 import pacientes_bp
 from app.historial_clinico.models import HistoriaClinica
 from app.consultas.models import Consulta
+from app.medicos.models import Medico
+from app.consultorios.models import Consultorio
 
 schema = PacienteSchema()
 schema_list = PacienteSchema(many=True)
 api = Api(pacientes_bp)
+
+
+def _error_fk_inexistente(data):
+    """medico_referente_id y consultorio_id no se validaban contra la BD:
+    un id inexistente pasaba el schema (fields.Int) y recién explotaba al
+    guardar, con un IntegrityError sin capturar (500 crudo). Devuelve un
+    dict de error si alguno de los dos no existe, o None si está todo bien."""
+    medico_referente_id = data.get("medico_referente_id")
+    if medico_referente_id is not None and not Medico.get_by_id(medico_referente_id):
+        return {"error": "El medico_referente_id indicado no existe"}
+    consultorio_id = data.get("consultorio_id")
+    if consultorio_id is not None and not Consultorio.get_by_id(consultorio_id):
+        return {"error": "El consultorio_id indicado no existe"}
+    return None
 
 
 class PacientesList_Resource(Resource):
@@ -35,6 +51,10 @@ class PacientesList_Resource(Resource):
         existente = Paciente.query.filter_by(documento=data.get("documento")).first()
         if existente is not None:
             return {"error": "Ya existe un paciente registrado con ese número de documento (CI)."}, 409
+
+        error_fk = _error_fk_inexistente(data)
+        if error_fk:
+            return error_fk, 404
 
         item = Paciente(**data)
         item.save()
@@ -73,6 +93,10 @@ class Paciente_Resource(Resource):
             )
             if existente is not None:
                 return {"error": "Ya existe otro paciente registrado con ese número de documento (CI)."}, 409
+
+        error_fk = _error_fk_inexistente(data)
+        if error_fk:
+            return error_fk, 404
 
         for key, value in data.items():
             setattr(item, key, value)

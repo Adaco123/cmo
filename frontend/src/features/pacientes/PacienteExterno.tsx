@@ -6,7 +6,8 @@ import {
   descartarSesionCaptura,
   eliminarArchivo as eliminarArchivoApi,
   getArchivosPorPaciente,
-  subirArchivoPaciente,
+  crearAtencionExterna,
+  subirArchivoAtencion,
   type ArchivoResponse,
 } from '../../api/archivos';
 import CapturaQrModal from './CapturaQrModal';
@@ -16,7 +17,6 @@ import CrearCita from '../../components/CrearCita';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faXmark,
-  faPaperclip,
   faCloudUploadAlt,
   faFilePdf,
   faFileImage,
@@ -53,6 +53,40 @@ const EXTENSIONES_VALIDAS = Object.keys(NOMBRE_TIPO_ARCHIVO_POR_EXT);
 
 const esPdf = (nombreArchivo: string) => nombreArchivo.toLowerCase().endsWith('.pdf');
 
+// Mismo helper que RegistroClinicoDetalle.tsx, para que la fecha de cada
+// atención se vea igual en toda la app.
+function formatFechaLabel(fecha: string): string {
+  const soloFecha = fecha.match(/^(\d{4})-(\d{2})-(\d{2})/)?.[0] ?? fecha;
+  return new Intl.DateTimeFormat('es-BO', { day: 'numeric', month: 'long', year: 'numeric' }).format(
+    new Date(`${soloFecha}T00:00:00`),
+  );
+}
+
+interface GrupoAtencion {
+  /** Clave de React; agrupa por consulta_id (cada "Nueva atención" es una
+   *  fila propia y nunca se reutiliza, así que un consulta_id = una visita). */
+  key: string;
+  fecha: string;
+  archivos: ArchivoResponse[];
+}
+
+/** Agrupa la lista plana de archivos por atención (consulta_id), ordenada
+ *  de la más reciente a la más antigua — cada grupo es una visita real. */
+function agruparPorAtencion(archivos: ArchivoResponse[]): GrupoAtencion[] {
+  const mapa = new Map<string, GrupoAtencion>();
+  for (const archivo of archivos) {
+    const key = archivo.consulta_id != null ? `atencion-${archivo.consulta_id}` : 'sin-atencion';
+    let grupo = mapa.get(key);
+    if (!grupo) {
+      grupo = { key, fecha: archivo.created_at ?? '', archivos: [] };
+      mapa.set(key, grupo);
+    }
+    grupo.archivos.push(archivo);
+    if (archivo.created_at && archivo.created_at > grupo.fecha) grupo.fecha = archivo.created_at;
+  }
+  return Array.from(mapa.values()).sort((a, b) => b.fecha.localeCompare(a.fecha));
+}
+
 interface PacienteExternoProps {
   /** Paciente externo (origen='externo') ya seleccionado. La búsqueda y la
    *  creación de pacientes externos se hacen desde PacientesExternosTab
@@ -76,14 +110,19 @@ interface ImagenActiva {
 /**
  * Modal de ficha para un paciente externo (origen='externo') ya seleccionado:
  * layout de dos columnas (ficha + acciones a la izquierda, archivos a la
- * derecha), con "Adjuntar archivo" como modal centrado, "Crear cita" como
- * modal autocontenido (trae su propio backdrop). Los PDF se ven en un
- * drawer lateral que entra deslizando de derecha a izquierda (mismo patrón
- * que RegistroClinicoDetalle en VerPaciente); las imágenes se muestran
- * como miniatura ya cargada en la lista y, al hacer clic, abren el mismo
+ * derecha), con "Nueva atención" como modal centrado (crea explícitamente
+ * una Consulta mínima —sin signos vitales ni observaciones— y sube los
+ * archivos de esa tanda ligados a ella; nunca reutiliza una atención
+ * anterior, ni siquiera del mismo día), "Crear cita" como modal
+ * autocontenido (trae su propio backdrop). Los PDF se ven en un drawer
+ * lateral que entra deslizando de derecha a izquierda (mismo patrón que
+ * RegistroClinicoDetalle en VerPaciente); las imágenes se muestran como
+ * miniatura ya cargada en la lista y, al hacer clic, abren el mismo
  * lightbox a pantalla completa con lupa de zoom que usa RegistroClinicoDetalle.
- * La lista de archivos usa el mismo patrón de menú "..." (3 puntos) que el
- * timeline de VerPaciente.tsx en vez de un botón de eliminar directo.
+ * La lista de archivos se agrupa por atención (consulta_id) y se ordena de
+ * la más reciente a la más antigua, cada grupo con su fecha como encabezado.
+ * El menú "..." de cada archivo usa el mismo patrón que el timeline de
+ * VerPaciente.tsx en vez de un botón de eliminar directo.
  */
 const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) => {
   const [archivosSubidos, setArchivosSubidos] = useState<ArchivoResponse[]>([]);
@@ -99,7 +138,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
   // mismo patrón que Examenes.tsx. Cada foto se descarga en cuanto llega y
   // entra a archivosPendientes como un File más — no queda ligada a nada en
   // el backend, se sube recién con "Guardar", igual que un archivo arrastrado
-  // a mano (y así pasa por subirArchivoPaciente, que crea la Consulta de hoy).
+  // a mano (y así pasa por guardarPendientes, que crea la atención explícita).
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const qrSidActualRef = useRef<string | null>(null);
 
@@ -234,16 +273,20 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
     setArchivosPendientes((prev) => prev.filter((p) => p.localId !== localId));
   };
 
-  /** Sube al backend todos los archivos pendientes (botón "Guardar"). */
+  /** Crea la atención (una sola vez) y sube todos los archivos pendientes
+   *  ligados a ella (botón "Guardar"). A propósito NUNCA reutiliza una
+   *  atención anterior, ni siquiera del mismo día — cada "Guardar" es una
+   *  atención nueva y distinta. */
   const guardarPendientes = useCallback(async () => {
     if (archivosPendientes.length === 0) return;
     setErrorArchivo(null);
     setSubiendo(true);
     try {
+      const atencion = await crearAtencionExterna(paciente.id);
       for (const pendiente of archivosPendientes) {
         const ext = pendiente.file.name.split('.').pop()?.toLowerCase() ?? '';
         const tipoArchivoId = idTipoArchivoPorExt(ext, tiposArchivo);
-        const subido = await subirArchivoPaciente(paciente.id, pendiente.file, tipoArchivoId);
+        const subido = await subirArchivoAtencion(atencion.id, pendiente.file, tipoArchivoId);
         setArchivosSubidos((prev) => [subido, ...prev]);
         if (!esPdf(pendiente.file.name)) {
           const url = URL.createObjectURL(pendiente.file);
@@ -254,11 +297,11 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
       setArchivosPendientes([]);
       setShowAdjuntar(false);
     } catch (error: unknown) {
-      setErrorArchivo(extractErrorMessage(error, 'No se pudo subir el archivo.'));
+      setErrorArchivo(extractErrorMessage(error, 'No se pudo registrar la atención.'));
     } finally {
       setSubiendo(false);
     }
-  }, [paciente, archivosPendientes]);
+  }, [paciente, archivosPendientes, tiposArchivo]);
 
   // Abre/cierra el menú "..." de un archivo puntual (mismo patrón que
   // toggleMenu en VerPaciente.tsx: stopPropagation + toggle por id).
@@ -454,10 +497,10 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
               type="button"
               className={styles.accionBtn}
               onClick={() => setShowAdjuntar(true)}
-              title="Adjuntar archivo"
+              title="Nueva atención"
             >
-              <FontAwesomeIcon icon={faPaperclip} />
-              <span>Adjuntar archivo</span>
+              <FontAwesomeIcon icon={faFileMedicalAlt} />
+              <span>Nueva atención</span>
             </button>
           </div>
         </aside>
@@ -484,61 +527,70 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
               <p>No hay archivos adjuntos para este paciente todavía.</p>
             </div>
           ) : (
-            <ul className={styles.listaArchivos}>
-              {archivosSubidos.map((a) => (
-                <li key={a.id}>
-                  <button
-                    type="button"
-                    className={styles.archivoRowBtn}
-                    onClick={() => handleAbrirArchivo(a)}
-                  >
-                    {esPdf(a.nombre_archivo) ? (
-                      <FontAwesomeIcon icon={faFilePdf} />
-                    ) : galeria[a.id] ? (
-                      <span className={styles.archivoThumbWrap}>
-                        <img
-                          src={galeria[a.id]}
-                          alt={a.nombre_archivo}
-                          className={styles.archivoThumb}
-                          loading="lazy"
-                        />
-                        <span className={styles.archivoThumbExpand}>
-                          <FontAwesomeIcon icon={faExpand} />
-                        </span>
-                      </span>
-                    ) : (
-                      <FontAwesomeIcon icon={faFileImage} />
-                    )}
-                    <span>{a.nombre_archivo}</span>
-                  </button>
-
-                  <div className={styles.archivoAcciones}>
-                    <button
-                      type="button"
-                      className={styles.menuBtn}
-                      onClick={(e) => toggleMenuArchivo(a.id, e)}
-                      aria-label="Más acciones"
-                    >
-                      <FontAwesomeIcon icon={faEllipsisVertical} />
-                    </button>
-                    {menuAbiertoId === a.id && (
-                      <div className={styles.menuDropdown} onClick={(e) => e.stopPropagation()}>
-                        <button type="button" onClick={() => void handleDescargarArchivo(a)}>
-                          <FontAwesomeIcon icon={faDownload} /> Descargar
-                        </button>
+            <div className={styles.listaAtenciones}>
+              {agruparPorAtencion(archivosSubidos).map((grupo) => (
+                <section key={grupo.key} className={styles.grupoAtencion}>
+                  <h3 className={styles.grupoAtencionFecha}>
+                    {grupo.fecha ? `Atención — ${formatFechaLabel(grupo.fecha)}` : 'Atención'}
+                  </h3>
+                  <ul className={styles.listaArchivos}>
+                    {grupo.archivos.map((a) => (
+                      <li key={a.id}>
                         <button
                           type="button"
-                          className={styles.menuDanger}
-                          onClick={() => handleEliminarArchivo(a.id)}
+                          className={styles.archivoRowBtn}
+                          onClick={() => handleAbrirArchivo(a)}
                         >
-                          <FontAwesomeIcon icon={faTrash} /> Eliminar
+                          {esPdf(a.nombre_archivo) ? (
+                            <FontAwesomeIcon icon={faFilePdf} />
+                          ) : galeria[a.id] ? (
+                            <span className={styles.archivoThumbWrap}>
+                              <img
+                                src={galeria[a.id]}
+                                alt={a.nombre_archivo}
+                                className={styles.archivoThumb}
+                                loading="lazy"
+                              />
+                              <span className={styles.archivoThumbExpand}>
+                                <FontAwesomeIcon icon={faExpand} />
+                              </span>
+                            </span>
+                          ) : (
+                            <FontAwesomeIcon icon={faFileImage} />
+                          )}
+                          <span>{a.nombre_archivo}</span>
                         </button>
-                      </div>
-                    )}
-                  </div>
-                </li>
+
+                        <div className={styles.archivoAcciones}>
+                          <button
+                            type="button"
+                            className={styles.menuBtn}
+                            onClick={(e) => toggleMenuArchivo(a.id, e)}
+                            aria-label="Más acciones"
+                          >
+                            <FontAwesomeIcon icon={faEllipsisVertical} />
+                          </button>
+                          {menuAbiertoId === a.id && (
+                            <div className={styles.menuDropdown} onClick={(e) => e.stopPropagation()}>
+                              <button type="button" onClick={() => void handleDescargarArchivo(a)}>
+                                <FontAwesomeIcon icon={faDownload} /> Descargar
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.menuDanger}
+                                onClick={() => handleEliminarArchivo(a.id)}
+                              >
+                                <FontAwesomeIcon icon={faTrash} /> Eliminar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               ))}
-            </ul>
+            </div>
           )}
         </main>
       </div>
@@ -562,7 +614,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
             </button>
 
             <div className={styles.sectionTitle}>
-              <FontAwesomeIcon icon={faPaperclip} /> Adjuntar archivos
+              <FontAwesomeIcon icon={faFileMedicalAlt} /> Nueva atención
             </div>
 
             <div
@@ -635,7 +687,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
                 disabled={subiendo || archivosPendientes.length === 0}
               >
                 <FontAwesomeIcon icon={faFloppyDisk} />{' '}
-                {subiendo ? 'Guardando...' : `Guardar (${archivosPendientes.length})`}
+                {subiendo ? 'Guardando...' : `Registrar atención (${archivosPendientes.length})`}
               </button>
             </div>
           </div>

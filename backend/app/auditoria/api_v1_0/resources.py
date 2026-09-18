@@ -1,4 +1,10 @@
-"""Rutas CRUD del módulo auditoria."""
+"""Rutas CRUD del módulo auditoria.
+
+Se sacaron PUT y DELETE a propósito: un log de auditoría solo sirve si es
+inmutable una vez creado — si cualquiera puede editar o borrar un registro
+después, deja de ser evidencia de nada. Queda GET (para consultar) y POST
+(para dejar constancia de algo puntual), append-only.
+"""
 from flask import request, jsonify
 from flask_jwt_extended import jwt_required
 from marshmallow import ValidationError
@@ -38,32 +44,3 @@ def crear_auditoria():
     item = Auditoria(**data)
     item.save()
     return jsonify(schema.dump(item)), 201
-
-
-@auditoria_bp.route("/<int:item_id>", methods=["PUT"])
-@jwt_required()
-def actualizar_auditoria(item_id):
-    item = Auditoria.get_by_id(item_id)
-    if item is None:
-        return jsonify({"error": "Auditoria no encontrado"}), 404
-
-    try:
-        data = schema.load(request.get_json(force=True) or {}, partial=True)
-    except ValidationError as err:
-        return jsonify(err.messages), 400
-
-    for key, value in data.items():
-        setattr(item, key, value)
-    item.save()
-    return jsonify(schema.dump(item)), 200
-
-
-@auditoria_bp.route("/<int:item_id>", methods=["DELETE"])
-@jwt_required()
-def eliminar_auditoria(item_id):
-    item = Auditoria.get_by_id(item_id)
-    if item is None:
-        return jsonify({"error": "Auditoria no encontrado"}), 404
-
-    item.delete()
-    return "", 204

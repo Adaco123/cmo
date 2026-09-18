@@ -8,7 +8,8 @@ módulos consumen, no algo que le pertenezca a citas ni a historial_clinico.
 """
 from app.citas.models import Cita
 from app.estados_cita.models import EstadoCita
-from app.historial_clinico.models import SeguimientoControl
+from app.historial_clinico.models import SeguimientoControl, RegistroClinico
+from app.consultas.models import Consulta
 
 
 def _estado_cancelada_id():
@@ -35,14 +36,28 @@ def existe_choque_con_cita(medico_id, fecha, hora_inicio, hora_fin, excluir_id=N
 
 
 def existe_choque_con_seguimiento(medico_id, fecha, hora_inicio, hora_fin, excluir_id=None):
-    """True si el médico ya tiene un control de seguimiento que se solapa con ese rango horario."""
-    query = SeguimientoControl.query.filter(
-        SeguimientoControl.medico_id == medico_id,
-        SeguimientoControl.proxima_fecha_control == fecha,
-        SeguimientoControl.hora_inicio.isnot(None),
-        SeguimientoControl.hora_fin.isnot(None),
-        SeguimientoControl.hora_inicio < hora_fin,
-        SeguimientoControl.hora_fin > hora_inicio,
+    """True si el médico ya tiene un control de seguimiento que se solapa con ese rango horario.
+
+    Excluye los seguimientos cuyo registro clínico padre ya está inactivo
+    (RegistroClinicoCompleto_Resource.delete hace soft-delete marcando
+    Consulta.estado=False, pero a propósito no toca SeguimientoControl por
+    conservación legal de la historia clínica). Sin este join, el horario
+    de un control agendado quedaba bloqueado para siempre aunque el
+    registro clínico ya estuviera "eliminado".
+    """
+    query = (
+        SeguimientoControl.query
+        .join(RegistroClinico, RegistroClinico.id == SeguimientoControl.registro_clinico_id)
+        .join(Consulta, Consulta.id == RegistroClinico.consulta_id)
+        .filter(
+            SeguimientoControl.medico_id == medico_id,
+            SeguimientoControl.proxima_fecha_control == fecha,
+            SeguimientoControl.hora_inicio.isnot(None),
+            SeguimientoControl.hora_fin.isnot(None),
+            SeguimientoControl.hora_inicio < hora_fin,
+            SeguimientoControl.hora_fin > hora_inicio,
+            Consulta.estado.is_(True),
+        )
     )
     if excluir_id is not None:
         query = query.filter(SeguimientoControl.id != excluir_id)

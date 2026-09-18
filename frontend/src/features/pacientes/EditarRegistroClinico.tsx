@@ -124,6 +124,15 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
     setSaving(true);
     try {
       const num = (v: string) => (v.trim() !== '' ? parseFloat(v.replace(',', '.')) : 0);
+      // frecuencia_respiratoria, glicemia y talla son opcionales en el
+      // backend — igual que en RegistroClinico.tsx, no hay que mandar 0
+      // cuando el campo está vacío (0 ni siquiera pasa el rango de talla,
+      // y en fr/glicemia se guardaría como un dato falso).
+      const numOpcional = (v: string) => (v.trim() !== '' ? parseFloat(v.replace(',', '.')) : null);
+      const intOpcional = (v: string) => {
+        const parsed = parseInt(v, 10);
+        return Number.isNaN(parsed) ? null : parsed;
+      };
       const pa = vitales.pa_sys && vitales.pa_dia ? `${vitales.pa_sys}/${vitales.pa_dia}` : '';
 
       const resultado = await updateRegistroCompleto(registroId, {
@@ -134,12 +143,12 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
         registro: {
           presion_arterial: pa,
           frecuencia_cardiaca: parseInt(vitales.fc, 10) || 0,
-          frecuencia_respiratoria: parseInt(vitales.fr, 10) || 0,
+          frecuencia_respiratoria: intOpcional(vitales.fr),
           saturacion_oxigeno: parseInt(vitales.sat, 10) || 0,
-          glicemia: num(vitales.glu),
+          glicemia: numOpcional(vitales.glu),
           temperatura: num(vitales.temp),
           peso: num(vitales.peso),
-          talla: num(vitales.talla),
+          talla: numOpcional(vitales.talla),
           hallazgos_ecograficos: secciones.hallazgos_ecograficos.trim() || '',
           enfermedad_actual: secciones.enfermedad_actual.trim() || null,
           examen_fisico: secciones.examen_fisico.trim() || null,

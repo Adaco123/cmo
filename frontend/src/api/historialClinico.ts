@@ -44,15 +44,17 @@ export interface HistoriaClinica {
 export interface RegistroClinicoPayload {
   consulta_id: number;
 
-  // Signos vitales — todos obligatorios en el backend (nullable=False)
+  // Signos vitales — presión, FC, SpO2, temperatura y peso son
+  // obligatorios en el backend (nullable=False). frecuencia_respiratoria,
+  // glicemia y talla son opcionales (nullable=True) desde septiembre 2026.
   presion_arterial: string;
   frecuencia_cardiaca: number;
-  frecuencia_respiratoria: number;
+  frecuencia_respiratoria: number | null;
   saturacion_oxigeno: number;
-  glicemia: number | string;
+  glicemia: number | string | null;
   temperatura: number | string;
   peso: number | string;
-  talla: number | string;
+  talla: number | string | null;
   hallazgos_ecograficos: string;
 
   // Información clínica — opcional en el backend (allow_none=True)
@@ -78,12 +80,12 @@ export interface RegistroClinico {
   // Signos vitales
   presion_arterial: string;
   frecuencia_cardiaca: number;
-  frecuencia_respiratoria: number;
+  frecuencia_respiratoria: number | null;
   saturacion_oxigeno: number;
-  glicemia: string;
+  glicemia: string | null;
   temperatura: string;
   peso: string;
-  talla: string;
+  talla: string | null;
   hallazgos_ecograficos: string;
 
   // Información clínica

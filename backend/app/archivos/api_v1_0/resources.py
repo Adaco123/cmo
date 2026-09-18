@@ -25,10 +25,12 @@ from app.tipos_archivo.models import TipoArchivo
 from app.archivos import captura_qr
 from datetime import date, datetime
 from app.consultas.models import Consulta
+from app.consultas.schemas import ConsultaSchema
 from app.usuarios.models import Usuario
 archivo_schema_list = ArchivoSchema(many=True)
 schema = ArchivoSchema()
 schema_list = ArchivoSchema(many=True)
+consulta_schema = ConsultaSchema()
 
 api = Api(archivos_bp)
 
@@ -37,28 +39,25 @@ DESTINOS_VALIDOS = {
     "examen_complementario_id": ExamenComplementario,
     "receta_id": Receta,
     "registro_clinico_id": RegistroClinico,
+    "consulta_id": Consulta,
 }
 
 
-def _consulta_hoy_para_paciente_externo(paciente_id, usuario_id):
-    """Pacientes externos no pasan por Registro Clínico ni tienen archivos
-    colgados directo de ellos: sus archivos cuelgan de una Consulta mínima
-    (sin motivo/diagnostico) del día de hoy — así también cuentan en
-    reportes basados en Consulta (ej. "Pacientes atendidos hoy"). Devuelve
-    esa Consulta (la crea la primera vez que se sube algo en el día; si ya
-    existe una para hoy, la reutiliza, no duplica).
+def _crear_atencion_externa(paciente_id, usuario_id):
+    """Crea una nueva 'atención' (Consulta mínima, sin motivo/diagnóstico)
+    para un paciente externo — pacientes que no pasan por Registro Clínico.
+    A diferencia de un registro clínico con seguimientos, acá NO se
+    reutiliza nada: cada llamada crea una fila nueva, sin importar si ya
+    existe una del mismo día (mismo criterio que un nuevo SeguimientoControl
+    en RegistroClinico.tsx). Así cada "Nueva atención" que el usuario pide
+    explícitamente en PacienteExterno.tsx queda como una fila propia, y el
+    reporte de "Pacientes atendidos" cuenta atenciones reales, no días.
 
     El médico de esa Consulta es el usuario con sesión iniciada. Si ese
     usuario no tiene un registro de médico asociado (ej. un rol
     administrativo sin ficha de médico), no hay forma de crear la Consulta
-    ni de guardar el archivo — se devuelve None y el caller debe rechazar
-    la subida.
+    — se devuelve None y el caller debe rechazar la operación.
     """
-    hoy = date.today()
-    existentes = Consulta.simple_filter(paciente_id=paciente_id, fecha=hoy)
-    if existentes:
-        return existentes[0]
-
     usuario = Usuario.get_by_id(usuario_id)
     medico = usuario.empleado.medico if usuario and usuario.empleado else None
     if not medico:
@@ -67,7 +66,7 @@ def _consulta_hoy_para_paciente_externo(paciente_id, usuario_id):
     consulta = Consulta(
         paciente_id=paciente_id,
         medico_id=medico.id,
-        fecha=hoy,
+        fecha=date.today(),
         hora=datetime.now().time(),
         motivo=None,
         diagnostico=None,
@@ -91,6 +90,8 @@ class ArchivoUpload_Resource(Resource):
 
     @jwt_required()
     def post(self):
+        usuario_id = get_jwt_identity()
+
         if "archivo" not in request.files:
             return {"error": "No se envió ningún archivo"}, 400
 
@@ -125,33 +126,8 @@ class ArchivoUpload_Resource(Resource):
                 destino_campo = campo
                 destino_id = valor_id
 
-        # Caso especial: paciente_id no es una columna real de Archivo (ver
-        # consulta_id en el modelo) — es la forma en que el frontend pide
-        # "sube esto para este paciente externo, sin examen/registro
-        # todavía". Se resuelve a la Consulta mínima de hoy de ese paciente.
-        usuario_id = get_jwt_identity()
-        paciente_id_externo = request.form.get("paciente_id")
-        if paciente_id_externo:
-            if destino_campo is not None:
-                return {"error": "Solo se puede vincular el archivo a un destino a la vez"}, 400
-            try:
-                paciente_id_externo = int(paciente_id_externo)
-            except (TypeError, ValueError):
-                return {"error": "El paciente_id debe ser un número entero"}, 400
-            if not Paciente.get_by_id(paciente_id_externo):
-                return {"error": "El paciente_id indicado no existe"}, 404
-
-            consulta = _consulta_hoy_para_paciente_externo(paciente_id_externo, usuario_id)
-            if consulta is None:
-                return {
-                    "error": "Tu usuario no tiene una ficha de médico asociada, así que no se "
-                             "puede registrar la atención de este paciente externo."
-                }, 422
-            destino_campo = "consulta_id"
-            destino_id = consulta.id
-
         if destino_campo is None:
-            return {"error": "Debe indicar a qué se vincula el archivo (examen, receta o registro clínico)"}, 400
+            return {"error": "Debe indicar a qué se vincula el archivo (examen, receta, registro clínico o consulta)"}, 400
 
         try:
             datos_archivo = guardar_archivo_en_disco(file_storage)
@@ -274,6 +250,34 @@ class ArchivosPorPaciente_Resource(Resource):
 
         archivos = sorted(vistos.values(), key=lambda a: a.created_at, reverse=True)
         return archivo_schema_list.dump(archivos), 200
+
+
+class AtencionExternaCrear_Resource(Resource):
+    """
+    POST /api/archivos/paciente/<int:paciente_id>/atencion
+
+    Crea una nueva "atención" (Consulta mínima, sin motivo/diagnóstico)
+    para un paciente externo. A propósito NO reutiliza ninguna existente
+    del mismo día — cada llamada es una atención real y distinta, elegida
+    a propósito por el usuario con el botón "Nueva atención" en
+    PacienteExterno.tsx (mismo criterio que un nuevo SeguimientoControl en
+    RegistroClinico.tsx). Los archivos de esa atención se suben después,
+    uno por uno, mandando el consulta_id devuelto acá.
+    """
+
+    @jwt_required()
+    def post(self, paciente_id):
+        if not Paciente.get_by_id(paciente_id):
+            return {"error": "Paciente no encontrado"}, 404
+
+        usuario_id = get_jwt_identity()
+        consulta = _crear_atencion_externa(paciente_id, usuario_id)
+        if consulta is None:
+            return {
+                "error": "Tu usuario no tiene una ficha de médico asociada, así que no se "
+                         "puede registrar la atención de este paciente externo."
+            }, 422
+        return consulta_schema.dump(consulta), 201
 
 
 # ---------------------------------------------------------------------------
@@ -537,6 +541,7 @@ api.add_resource(ArchivoUpload_Resource, "/")
 api.add_resource(Archivo_Resource, "/<int:archivo_id>")
 api.add_resource(ArchivosPorExamen_Resource, "/examen/<int:examen_id>")
 api.add_resource(ArchivosPorPaciente_Resource, "/<int:paciente_id>/archivos")
+api.add_resource(AtencionExternaCrear_Resource, "/paciente/<int:paciente_id>/atencion")
 api.add_resource(QrCapturaIniciar_Resource, "/examen/<int:examen_id>/qr-captura")
 api.add_resource(QrCapturaEstado_Resource, "/examen/<int:examen_id>/qr-captura/<string:sid>/estado")
 api.add_resource(QrCapturaPacienteIniciar_Resource, "/paciente/<int:paciente_id>/qr-captura")

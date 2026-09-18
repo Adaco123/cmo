@@ -433,6 +433,30 @@
 }
 
 /* ----- Lista de archivos ----- */
+/* ---- Lista de archivos agrupada por atención (consulta_id), cada grupo
+   con su fecha como encabezado — mismo criterio visual que las tarjetas de
+   seguimiento en VerPaciente.tsx. ---- */
+.listaAtenciones {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+.grupoAtencion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.grupoAtencionFecha {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
 .listaArchivos {
   list-style: none;
   margin: 0;

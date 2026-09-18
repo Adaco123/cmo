@@ -10,6 +10,7 @@ from app.citas.api_v1_0 import citas_bp
 from app.pacientes.models import Paciente
 from app.medicos.models import Medico
 from app.estados_cita.models import EstadoCita
+from app.consultorios.models import Consultorio
 from app.shared.disponibilidad_medico import (
     existe_choque_con_cita,
     existe_choque_con_seguimiento,
@@ -28,6 +29,10 @@ def _validar_referencias(data):
         return {"error": "El médico indicado no existe"}, 404
     if not EstadoCita.get_by_id(data["estado_id"]):
         return {"error": "El estado de cita indicado no existe"}, 404
+    # consultorio_id es opcional y no se validaba: un id inexistente pasaba
+    # el schema y recién explotaba al guardar (IntegrityError sin capturar).
+    if data.get("consultorio_id") is not None and not Consultorio.get_by_id(data["consultorio_id"]):
+        return {"error": "El consultorio indicado no existe"}, 404
 
     return None
 
@@ -85,6 +90,8 @@ class Cita_Resource(Resource):
             return {"error": "El médico indicado no existe"}, 404
         if "estado_id" in data and not EstadoCita.get_by_id(data["estado_id"]):
             return {"error": "El estado de cita indicado no existe"}, 404
+        if "consultorio_id" in data and data["consultorio_id"] is not None and not Consultorio.get_by_id(data["consultorio_id"]):
+            return {"error": "El consultorio indicado no existe"}, 404
 
         hora_inicio = data.get("hora_inicio", item.hora_inicio)
         hora_fin = data.get("hora_fin", item.hora_fin)

@@ -53,12 +53,12 @@ class RegistroClinico(db.Model, BaseModelMixin):
     # --- Signos vitales ------------------------------------------------
     presion_arterial = db.Column(db.String(15), nullable=False)
     frecuencia_cardiaca = db.Column(db.SmallInteger, nullable=False)
-    frecuencia_respiratoria = db.Column(db.SmallInteger, nullable=False)
+    frecuencia_respiratoria = db.Column(db.SmallInteger, nullable=True)
     saturacion_oxigeno = db.Column(db.SmallInteger, nullable=False)   # SpO2, en % (ej. 98)
-    glicemia = db.Column(db.Numeric(5, 1), nullable=False) 
+    glicemia = db.Column(db.Numeric(5, 1), nullable=True)
     temperatura = db.Column(db.Numeric(4, 1), nullable=False)
     peso = db.Column(db.Numeric(5, 2), nullable=False)
-    talla = db.Column(db.Numeric(4, 2), nullable=False)
+    talla = db.Column(db.Numeric(4, 2), nullable=True)
     hallazgos_ecograficos=db.Column(db.Text,nullable=False)
     # --- Lo exclusivo del registro clínico (no de la consulta) -----------
     enfermedad_actual = db.Column(db.Text)

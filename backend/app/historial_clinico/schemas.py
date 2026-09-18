@@ -30,7 +30,11 @@ class RegistroClinicoSchema(Schema):
     consulta_id = fields.Integer(required=True)
 
     # ============================================================
-    # SIGNOS VITALES - TODOS OBLIGATORIOS
+    # SIGNOS VITALES — presión, FC, SpO2, temperatura y peso son
+    # obligatorios (mismo criterio que ya usa el frontend en
+    # vitalesObligatorios de RegistroClinico.tsx); frecuencia
+    # respiratoria, glicemia y talla son opcionales pero, si vienen,
+    # se validan igual.
     # ============================================================
 
     presion_arterial = fields.String(
@@ -39,39 +43,52 @@ class RegistroClinicoSchema(Schema):
     )
 
     frecuencia_cardiaca = fields.Integer(
-        required=True
+        required=True,
+        validate=validate.Range(min=0, max=300, error="Debe estar entre 0 y 300 lpm")
     )
 
     frecuencia_respiratoria = fields.Integer(
-        required=True
+        required=False,
+        allow_none=True,
+        load_default=None,
+        validate=validate.Range(min=0, max=100, error="Debe estar entre 0 y 100 rpm")
     )
 
     saturacion_oxigeno = fields.Integer(
-        required=True
+        required=True,
+        validate=validate.Range(min=0, max=100, error="Debe estar entre 0 y 100 %")
     )
 
     glicemia = fields.Decimal(
-        required=True,
+        required=False,
+        allow_none=True,
+        load_default=None,
         as_string=True,
-        places=1
+        places=1,
+        validate=validate.Range(min=0, max=1000, error="Debe estar entre 0 y 1000 mg/dL")
     )
 
     temperatura = fields.Decimal(
         required=True,
         as_string=True,
-        places=1
+        places=1,
+        validate=validate.Range(min=25, max=45, error="Debe estar entre 25 y 45 °C")
     )
 
     peso = fields.Decimal(
         required=True,
         as_string=True,
-        places=2
+        places=2,
+        validate=validate.Range(min=0, max=300, error="Debe estar entre 0 y 300 kg")
     )
 
     talla = fields.Decimal(
-        required=True,
+        required=False,
+        allow_none=True,
+        load_default=None,
         as_string=True,
-        places=2
+        places=2,
+        validate=validate.Range(min=0.3, max=2.5, error="Debe estar entre 0.3 y 2.5 m")
     )
 
     # ============================================================

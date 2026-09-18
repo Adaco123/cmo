@@ -6,6 +6,7 @@ export interface ArchivoResponse {
   informe_id?: number | null;
   receta_id?: number | null;
   examen_complementario_id?: number | null;
+  consulta_id?: number | null;
   tipo_archivo_id: number;
   nombre_archivo: string;
   ruta_almacenamiento: string;
@@ -86,25 +87,45 @@ export async function getArchivosPorPaciente(pacienteId: number): Promise<Archiv
   return data;
 }
 
+export interface AtencionExterna {
+  id: number;
+  paciente_id: number;
+  medico_id: number;
+  fecha: string;
+  hora: string;
+  motivo?: string | null;
+  diagnostico?: string | null;
+}
+
 /**
- * Sube UN archivo para un paciente externo (origen='externo') que aún no
- * tiene historia clínica abierta. El backend NO liga el archivo al
- * paciente directamente: resuelve/crea una Consulta mínima de hoy para
- * ese paciente (así cuenta en reportes como "Pacientes atendidos hoy") y
- * liga el archivo a esa Consulta. Requiere que el usuario logueado tenga
- * ficha de médico asociada, o el backend rechaza la subida (422).
+ * Crea una "atención" nueva (Consulta mínima, sin motivo/diagnóstico) para
+ * un paciente externo (origen='externo') que aún no tiene historia clínica
+ * abierta. A propósito NO reutiliza ninguna existente del mismo día: cada
+ * llamada es una fila nueva — mismo criterio que un nuevo SeguimientoControl
+ * en RegistroClinico.tsx. Llamar UNA vez por "Nueva atención", no una vez
+ * por archivo. Requiere que el usuario logueado tenga ficha de médico
+ * asociada, o el backend rechaza la creación (422).
+ */
+export async function crearAtencionExterna(pacienteId: number): Promise<AtencionExterna> {
+  const { data } = await api.post<AtencionExterna>(`/api/archivos/paciente/${pacienteId}/atencion`);
+  return data;
+}
+
+/**
+ * Sube UN archivo ligado a una atención (Consulta) de paciente externo ya
+ * creada con crearAtencionExterna. Todos los archivos de una misma "Nueva
+ * atención" deben mandar el mismo consultaId, para quedar agrupados juntos.
  * tipoArchivoId depende de tu catálogo tipos_archivo (ej. 1 = imagen, 2 = pdf).
  */
-export async function subirArchivoPaciente(
-  pacienteId: number,
+export async function subirArchivoAtencion(
+  consultaId: number,
   archivo: File,
   tipoArchivoId: number,
-
 ): Promise<ArchivoResponse> {
   const formData = new FormData();
   formData.append('archivo', archivo);
   formData.append('tipo_archivo_id', String(tipoArchivoId));
-  formData.append('paciente_id', String(pacienteId));
+  formData.append('consulta_id', String(consultaId));
 
   const { data } = await api.post<ArchivoResponse>('/api/archivos', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
