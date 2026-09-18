@@ -581,6 +581,26 @@
   transition: transform 0.4s ease;
 }
 
+.visorPdfIco {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 2rem;
+}
+
+.visorPdfIco span {
+  font-size: var(--fs-xs);
+  font-family: var(--mono);
+  padding: 0 12px;
+  text-align: center;
+  word-break: break-all;
+}
+
 .visorMain:hover img {
   transform: scale(1.035);
 }
@@ -652,6 +672,16 @@
   display: block;
 }
 
+.visorThumbPdfIco {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+}
+
 .visorThumb:hover {
   opacity: 1;
 }
@@ -701,6 +731,24 @@
   object-fit: contain;
   user-select: none;
   touch-action: none;
+}
+
+.lightboxPdfWrap {
+  position: relative;
+  width: min(94vw, 1000px);
+  height: 88vh;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
+.lightboxPdfFrame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
 }
 
 .lightboxLupa {

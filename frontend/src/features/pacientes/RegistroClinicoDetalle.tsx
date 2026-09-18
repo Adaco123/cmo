@@ -12,7 +12,7 @@ import {
   faSpinner, faExclamationCircle, faFlaskVial, faPills,
   faCalendarCheck, faDownload, faXmark, faExpand, faWaveSquare,
   faNotesMedical, faTriangleExclamation, faStethoscope, faPen,
-  faCapsules, faCamera,
+  faCapsules, faCamera, faFilePdf,
 } from '@fortawesome/free-solid-svg-icons';
 import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import CapturaQrModal from './CapturaQrModal';
@@ -32,6 +32,11 @@ interface ImagenActiva {
   url: string;
   examenNombre: string;
 }
+
+// Mismo criterio que PacienteExterno.tsx: por extensión del nombre de
+// archivo, no por mimetype (los blobs descargados no siempre lo traen
+// confiable). Un PDF nunca se renderiza dentro de un <img>.
+const esPdf = (nombreArchivo: string) => nombreArchivo.toLowerCase().endsWith('.pdf');
 
 // ---- Geometría del gauge SVG (radio 34 → mismo valor que el viewBox 0 0 80 80) ----
 const GAUGE_R = 34;
@@ -534,7 +539,14 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
                 })
               }
             >
-              <img src={activa.url} alt={activa.archivo.nombre_archivo} />
+              {esPdf(activa.archivo.nombre_archivo) ? (
+                <div className={styles.visorPdfIco}>
+                  <FontAwesomeIcon icon={faFilePdf} />
+                  <span>{activa.archivo.nombre_archivo}</span>
+                </div>
+              ) : (
+                <img src={activa.url} alt={activa.archivo.nombre_archivo} />
+              )}
               {imagenes.length > 1 && (
                 <span className={styles.visorBadge}>{idxActivo + 1} / {imagenes.length}</span>
               )}
@@ -565,7 +577,13 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
                     className={`${styles.visorThumb} ${idx === idxActivo ? styles.active : ''}`}
                     onClick={() => cambiarVisor(examen.id, idx)}
                   >
-                    <img src={url} alt={archivo.nombre_archivo} loading="lazy" />
+                    {esPdf(archivo.nombre_archivo) ? (
+                      <span className={styles.visorThumbPdfIco}>
+                        <FontAwesomeIcon icon={faFilePdf} />
+                      </span>
+                    ) : (
+                      <img src={url} alt={archivo.nombre_archivo} loading="lazy" />
+                    )}
                   </button>
                 ))}
               </div>
@@ -756,43 +774,56 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
             >
               <FontAwesomeIcon icon={faXmark} />
             </button>
-            <div
-              ref={imgWrapRef}
-              className={styles.lightboxImgWrap}
-              onClick={(e) => e.stopPropagation()}
-              onMouseMove={(e) => moverLupa(e.clientX, e.clientY)}
-              onMouseLeave={() => setLupaVisible(false)}
-              onTouchStart={(e) => {
-                if (e.touches.length === 1) moverLupa(e.touches[0].clientX, e.touches[0].clientY);
-              }}
-              onTouchMove={(e) => {
-                if (e.touches.length === 1) moverLupa(e.touches[0].clientX, e.touches[0].clientY);
-              }}
-              onTouchEnd={() => setLupaVisible(false)}
-            >
-              <img
-                src={imagenActiva.url}
-                alt={imagenActiva.archivo.nombre_archivo}
-                className={styles.lightboxImg}
-                draggable={false}
-              />
-              {lupaVisible && (
-                <div
-                  className={styles.lightboxLupa}
-                  style={{
-                    width: LUPA_DIAMETRO,
-                    height: LUPA_DIAMETRO,
-                    left: lupaPos.x - LUPA_DIAMETRO / 2,
-                    top: lupaPos.y - LUPA_DIAMETRO / 2,
-                    backgroundImage: `url(${imagenActiva.url})`,
-                    backgroundSize: imgWrapRef.current
-                      ? `${imgWrapRef.current.clientWidth * LUPA_ZOOM}px ${imgWrapRef.current.clientHeight * LUPA_ZOOM}px`
-                      : undefined,
-                    backgroundPosition: `${-(lupaPos.x * LUPA_ZOOM - LUPA_DIAMETRO / 2)}px ${-(lupaPos.y * LUPA_ZOOM - LUPA_DIAMETRO / 2)}px`,
-                  }}
+            {esPdf(imagenActiva.archivo.nombre_archivo) ? (
+              <div
+                className={styles.lightboxPdfWrap}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <iframe
+                  src={imagenActiva.url}
+                  title={imagenActiva.archivo.nombre_archivo}
+                  className={styles.lightboxPdfFrame}
                 />
-              )}
-            </div>
+              </div>
+            ) : (
+              <div
+                ref={imgWrapRef}
+                className={styles.lightboxImgWrap}
+                onClick={(e) => e.stopPropagation()}
+                onMouseMove={(e) => moverLupa(e.clientX, e.clientY)}
+                onMouseLeave={() => setLupaVisible(false)}
+                onTouchStart={(e) => {
+                  if (e.touches.length === 1) moverLupa(e.touches[0].clientX, e.touches[0].clientY);
+                }}
+                onTouchMove={(e) => {
+                  if (e.touches.length === 1) moverLupa(e.touches[0].clientX, e.touches[0].clientY);
+                }}
+                onTouchEnd={() => setLupaVisible(false)}
+              >
+                <img
+                  src={imagenActiva.url}
+                  alt={imagenActiva.archivo.nombre_archivo}
+                  className={styles.lightboxImg}
+                  draggable={false}
+                />
+                {lupaVisible && (
+                  <div
+                    className={styles.lightboxLupa}
+                    style={{
+                      width: LUPA_DIAMETRO,
+                      height: LUPA_DIAMETRO,
+                      left: lupaPos.x - LUPA_DIAMETRO / 2,
+                      top: lupaPos.y - LUPA_DIAMETRO / 2,
+                      backgroundImage: `url(${imagenActiva.url})`,
+                      backgroundSize: imgWrapRef.current
+                        ? `${imgWrapRef.current.clientWidth * LUPA_ZOOM}px ${imgWrapRef.current.clientHeight * LUPA_ZOOM}px`
+                        : undefined,
+                      backgroundPosition: `${-(lupaPos.x * LUPA_ZOOM - LUPA_DIAMETRO / 2)}px ${-(lupaPos.y * LUPA_ZOOM - LUPA_DIAMETRO / 2)}px`,
+                    }}
+                  />
+                )}
+              </div>
+            )}
             <div className={styles.lightboxCaption} onClick={(e) => e.stopPropagation()}>
               <span>{imagenActiva.examenNombre}</span>
               <a

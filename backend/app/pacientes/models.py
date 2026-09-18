@@ -98,5 +98,23 @@ class Paciente(db.Model, BaseModelMixin):
         )
         return str(consulta_mas_reciente.diagnostico).strip()
 
+    def obtener_ultima_atencion(self):
+        """Retorna fecha+hora de la Consulta más reciente del paciente
+        (fecha/hora de la atención en sí, no created_at) o None si nunca
+        fue atendido. Sirve tanto para "Mis Pacientes" (Consulta creada
+        junto con el Registro Clínico) como para "Pacientes Externos"
+        (Consulta mínima creada al registrar una atención con archivos),
+        porque ambos flujos crean una fila en `consultas`. Se ignoran las
+        consultas con estado=False (dadas de baja / soft-deleted)."""
+        consultas = [c for c in self.consultas or [] if c.estado and c.fecha and c.hora]
+        if not consultas:
+            return None
+
+        consulta_mas_reciente = max(
+            consultas,
+            key=lambda c: (c.fecha, c.hora, c.id or 0),
+        )
+        return datetime.combine(consulta_mas_reciente.fecha, consulta_mas_reciente.hora).isoformat()
+
     def __repr__(self):
         return f"<Paciente id={self.id}>"

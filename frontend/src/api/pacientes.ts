@@ -29,6 +29,10 @@ export interface Paciente extends PacientePayload {
   edad?: number;
   alergias?: string[];
   diagnostico?: string | null;
+  /** Fecha+hora ISO de la última vez que se le atendió (última Consulta,
+   *  tanto de "Mis Pacientes" como de "Pacientes Externos"). null si
+   *  nunca fue atendido. */
+  ultima_atencion?: string | null;
   created_at?: string;
   updated_at?: string;
 }

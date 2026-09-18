@@ -572,6 +572,16 @@ body {
   text-overflow: ellipsis;
 }
 
+.table-card td.ultima-atencion-cell {
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
+.table-card td.ultima-atencion-cell.sin-atencion {
+  font-style: italic;
+  opacity: 0.7;
+}
+
 .table-card tr:hover td { color: var(--text-main); }
 
 .table-card tr:last-child td { border-bottom: none; }

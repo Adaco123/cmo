@@ -95,21 +95,21 @@ const DashboardPage: React.FC = () => {
 
   const [finalizandoId, setFinalizandoId] = useState<number | null>(null);
 
-  const formatDateKey = (date: Date) => {
-    const year = date.getFullYear();
-    const month = `${date.getMonth() + 1}`.padStart(2, '0');
-    const day = `${date.getDate()}`.padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
+  // "Hoy" siempre en horario boliviano (America/La_Paz, GMT-4), sin
+  // importar en qué zona horaria esté configurado el navegador o el
+  // servidor donde corra la app — evita que "citas de hoy" se corra un
+  // día si alguien la abre desde una máquina con otro huso horario.
+  const hoyBoliviaKey = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/La_Paz',
+  }).format(new Date());
 
   // "Citas de hoy" pendientes de atender: de la fecha de hoy, y sin contar
   // las que ya están Canceladas o Atendidas (buscadas por NOMBRE sobre
   // estadosCita, nunca por id — ver comentario en CalendarioProvider).
   const estadosOcultos = new Set(['cancelada', 'atendida']);
   const nombreEstadoPorId = new Map(estadosCita.map((e) => [e.id, e.nombre.trim().toLowerCase()]));
-  const hoyKey = formatDateKey(new Date());
   const citasHoy = citas
-    .filter((cita) => String(cita.fecha || '').slice(0, 10) === hoyKey)
+    .filter((cita) => String(cita.fecha || '').slice(0, 10) === hoyBoliviaKey)
     .filter((cita) => !estadosOcultos.has(nombreEstadoPorId.get(cita.estado_id) || ''))
     .sort((a, b) => (a.hora_inicio || '').localeCompare(b.hora_inicio || ''));
 
@@ -141,6 +141,7 @@ const DashboardPage: React.FC = () => {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onLogout={handleLogout}
+        citasHoyCount={citasHoy.length}
       >
         <PagosHoyWidget />
         <InicioTab

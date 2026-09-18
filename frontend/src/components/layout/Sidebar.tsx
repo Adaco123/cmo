@@ -12,6 +12,8 @@ interface SidebarProps {
   activeTab: DashboardTab;
   onTabChange: (tab: DashboardTab) => void;
   onLogout: () => void;
+  /** Cantidad de citas de hoy (horario boliviano). Sin badge si es 0/undefined. */
+  citasHoyCount?: number;
 }
 
 /**
@@ -20,7 +22,7 @@ interface SidebarProps {
  * del dashboard). Agrega la clase "collapsed" al <aside>, que se controla
  * por CSS (ver Dashboardpage.css).
  */
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, onLogout, citasHoyCount }) => {
   const [collapsed, setCollapsed] = useState(false);
 
   const navItem = (
@@ -40,7 +42,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, onLogout }) =
     >
       {icon}
       <span className="sidebar-nav-label">{label}</span>
-      {tab === 'inicio' && <span className="badge">3</span>}
+      {tab === 'inicio' && !!citasHoyCount && (
+        <span className="badge">{citasHoyCount}</span>
+      )}
     </a>
   );
 

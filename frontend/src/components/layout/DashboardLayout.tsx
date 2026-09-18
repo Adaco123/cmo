@@ -7,6 +7,8 @@ interface DashboardLayoutProps {
   activeTab: DashboardTab;
   onTabChange: (tab: DashboardTab) => void;
   onLogout: () => void;
+  /** Cantidad de citas de hoy (horario boliviano), para el badge de "Inicio". */
+  citasHoyCount?: number;
   children: React.ReactNode;
 }
 
@@ -22,6 +24,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   activeTab,
   onTabChange,
   onLogout,
+  citasHoyCount,
   children,
 }) => {
   const mainContentRef = useRef<HTMLDivElement>(null);
@@ -30,7 +33,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   return (
     <div className="app-layout">
       <AmbientBackground />
-      <Sidebar activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} />
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        onLogout={onLogout}
+        citasHoyCount={citasHoyCount}
+      />
       <main className="main-content" ref={mainContentRef}>
         {children}
       </main>

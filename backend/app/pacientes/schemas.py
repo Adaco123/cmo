@@ -48,6 +48,10 @@ class PacienteSchema(ma.Schema):
     edad = fields.Method("calcular_edad", dump_only=True)
     alergias = fields.Method("obtener_alergias", dump_only=True)
     diagnostico = fields.Method("obtener_diagnostico", dump_only=True)
+    # Fecha+hora de la última vez que se le atendió (última Consulta,
+    # sea "Mis Pacientes" o "Pacientes Externos") — null si nunca fue
+    # atendido. Usado para ordenar las tablas por atención más reciente.
+    ultima_atencion = fields.Method("obtener_ultima_atencion", dump_only=True, allow_none=True)
     sexo = fields.Str(required=True, validate=validate.OneOf(['M', 'F', 'O']))
 
     direccion = fields.Str(allow_none=True, validate=validate.Length(max=255))
@@ -84,3 +88,6 @@ class PacienteSchema(ma.Schema):
 
     def obtener_diagnostico(self, paciente):
         return paciente.obtener_ultimo_diagnostico()
+
+    def obtener_ultima_atencion(self, paciente):
+        return paciente.obtener_ultima_atencion()

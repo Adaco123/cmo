@@ -76,15 +76,39 @@ const PacienteTable: React.FC<PacienteTableProps> = ({
   };
 
   const pacientesOrdenados = useMemo(() => {
-    if (!ordenEstado) return pacientes;
-    const signo = ordenEstado === 'activos_primero' ? -1 : 1;
-    return [...pacientes].sort((a, b) => signo * (Number(a.estado) - Number(b.estado)));
+    if (ordenEstado) {
+      const signo = ordenEstado === 'activos_primero' ? -1 : 1;
+      return [...pacientes].sort((a, b) => signo * (Number(a.estado) - Number(b.estado)));
+    }
+    // Orden por defecto: el paciente atendido más recientemente primero.
+    // Los que nunca fueron atendidos (ultima_atencion null) quedan al final.
+    return [...pacientes].sort((a, b) => {
+      const tA = a.ultima_atencion ? new Date(a.ultima_atencion).getTime() : -Infinity;
+      const tB = b.ultima_atencion ? new Date(b.ultima_atencion).getTime() : -Infinity;
+      return tB - tA;
+    });
   }, [pacientes, ordenEstado]);
 
   const iconoOrden =
     ordenEstado === 'activos_primero' ? faSortDown : ordenEstado === 'inactivos_primero' ? faSortUp : faSort;
 
-  const columnas = mostrarDiagnostico ? 5 : 4;
+  const columnas = mostrarDiagnostico ? 6 : 5;
+
+  // "17 sept, 14:30" — corto para caber en la columna, sin año (los
+  // registros son recientes) y en huso horario boliviano explícito para
+  // que no varíe según dónde esté configurado el navegador.
+  const formatUltimaAtencion = (iso: string | null | undefined) => {
+    if (!iso) return 'Nunca atendido';
+    const fecha = new Date(iso);
+    if (Number.isNaN(fecha.getTime())) return '—';
+    return new Intl.DateTimeFormat('es-BO', {
+      timeZone: 'America/La_Paz',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(fecha);
+  };
 
   return (
     <div className="table-card scroll-animated">
@@ -114,6 +138,7 @@ const PacienteTable: React.FC<PacienteTableProps> = ({
             <th>Nombre</th>
             <th>Teléfono</th>
             {mostrarDiagnostico && <th>Último diagnóstico</th>}
+            <th>Última atención</th>
             <th>
               <button
                 type="button"
@@ -163,6 +188,9 @@ const PacienteTable: React.FC<PacienteTableProps> = ({
                       {p.diagnostico || '—'}
                     </td>
                   )}
+                  <td className={`ultima-atencion-cell${p.ultima_atencion ? '' : ' sin-atencion'}`}>
+                    {formatUltimaAtencion(p.ultima_atencion)}
+                  </td>
                   <td><StatusBadge activo={activo} /></td>
                   <td>
                     <div className="row-actions">
