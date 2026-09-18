@@ -19,6 +19,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { useErrorToast } from '../../components/ErrorToastProvider';
 import { extractErrorMessage } from '../../utils/errors';
+import { validarDatosPaciente } from '../../utils/validarPaciente';
 
 interface PacienteFormData {
   nombres: string;
@@ -63,7 +64,6 @@ const initialFormData: PacienteFormData = {
 const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose, origenInicial }) => {
   const [currentDate, setCurrentDate] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const { showError, showSuccess } = useErrorToast();
 
   const [formData, setFormData] = useState<PacienteFormData>({
@@ -96,10 +96,10 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose, origenI
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitError(null);
 
-    if (!formData.nombres.trim() || !formData.apellidos.trim() || !formData.documento.trim() || !formData.fecha_nacimiento || !formData.sexo) {
-      setSubmitError('Completa los campos obligatorios antes de guardar.');
+    const errorValidacion = validarDatosPaciente(formData);
+    if (errorValidacion) {
+      showError(errorValidacion);
       return;
     }
 
@@ -139,7 +139,6 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose, origenI
       showSuccess('Paciente guardado correctamente');
     } catch (error: unknown) {
       const mensaje = extractErrorMessage(error, 'No se pudo guardar el paciente.');
-      setSubmitError(mensaje);
       showError(mensaje);
     } finally {
       setIsSubmitting(false);
@@ -167,7 +166,7 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose, origenI
         )}
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
         <div className={styles.sectionsGrid}>
           {/* 1. Datos Personales */}
           <div className={styles.section}>
@@ -320,7 +319,6 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose, origenI
           </div>
         </div>
 
-        {submitError && <p className={styles.errorText}>{submitError}</p>}
         <button type="submit" className={styles.btnSaveModern} disabled={isSubmitting}>
           <FontAwesomeIcon icon={faSave} /> {isSubmitting ? 'Guardando...' : 'Guardar Paciente'}
         </button>

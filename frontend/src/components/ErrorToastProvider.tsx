@@ -5,6 +5,16 @@ import { extractErrorMessage } from '../utils/errors';
 interface ToastState {
   mensaje: string;
   tipo: 'error' | 'success' | 'confirm';
+  /** Solo para tipo 'confirm': textos de los botones (opcionales). */
+  textoAceptar?: string;
+  textoCancelar?: string;
+}
+
+interface ConfirmOpciones {
+  /** Texto del botón de aceptar. Por defecto: "Sí, cerrar". */
+  textoAceptar?: string;
+  /** Texto del botón de cancelar. Por defecto: "Cancelar". */
+  textoCancelar?: string;
 }
 
 interface ErrorToastContextValue {
@@ -15,11 +25,12 @@ interface ErrorToastContextValue {
   /** Muestra un mensaje de éxito (ej. tras un 200/201) como texto plano. */
   showSuccess: (msg: string) => void;
   /**
-   * Pregunta algo con botones "Sí, cerrar" / "Cancelar" en vez del
-   * window.confirm nativo del navegador. No se autocierra: espera a que
-   * el usuario elija. Devuelve una promesa que resuelve `true` si aceptó.
+   * Pregunta algo con botones "Sí, cerrar" / "Cancelar" (o los textos que
+   * se pasen en `opciones`) en vez del window.confirm nativo del navegador.
+   * No se autocierra: espera a que el usuario elija. Devuelve una promesa
+   * que resuelve `true` si aceptó.
    */
-  confirm: (mensaje: string) => Promise<boolean>;
+  confirm: (mensaje: string, opciones?: ConfirmOpciones) => Promise<boolean>;
 }
 
 const ErrorToastContext = createContext<ErrorToastContextValue | null>(null);
@@ -36,11 +47,20 @@ export const ErrorToastProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const confirmResolverRef = useRef<((valor: boolean) => void) | null>(null);
 
+  // Si había una confirmación abierta y sale otro toast (o se abre otra
+  // confirmación) encima, la pendiente se resuelve como "cancelada" en vez de
+  // quedar colgada para siempre (el usuario ya no vería sus botones).
+  const cancelarConfirmPendiente = useCallback(() => {
+    confirmResolverRef.current?.(false);
+    confirmResolverRef.current = null;
+  }, []);
+
   const mostrar = useCallback((mensaje: string, tipo: ToastState['tipo'], duracion: number) => {
+    cancelarConfirmPendiente();
     setToast({ mensaje, tipo });
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => setToast(null), duracion);
-  }, []);
+  }, [cancelarConfirmPendiente]);
 
   const showError = useCallback((msg: string) => mostrar(msg, 'error', 6000), [mostrar]);
 
@@ -59,13 +79,19 @@ export const ErrorToastProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setToast(null);
   }, []);
 
-  const confirm = useCallback((mensaje: string) => {
+  const confirm = useCallback((mensaje: string, opciones?: ConfirmOpciones) => {
     return new Promise<boolean>((resolve) => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      cancelarConfirmPendiente();
       confirmResolverRef.current = resolve;
-      setToast({ mensaje, tipo: 'confirm' });
+      setToast({
+        mensaje,
+        tipo: 'confirm',
+        textoAceptar: opciones?.textoAceptar,
+        textoCancelar: opciones?.textoCancelar,
+      });
     });
-  }, []);
+  }, [cancelarConfirmPendiente]);
 
   return (
     <ErrorToastContext.Provider value={{ showError, showErrorFrom, showSuccess, confirm }}>
@@ -79,10 +105,10 @@ export const ErrorToastProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           {toast.tipo === 'confirm' ? (
             <div className={styles.confirmActions}>
               <button type="button" className={styles.btnConfirmCancelar} onClick={() => resolverConfirm(false)}>
-                Cancelar
+                {toast.textoCancelar ?? 'Cancelar'}
               </button>
               <button type="button" className={styles.btnConfirmAceptar} onClick={() => resolverConfirm(true)}>
-                Sí, cerrar
+                {toast.textoAceptar ?? 'Sí, cerrar'}
               </button>
             </div>
           ) : (

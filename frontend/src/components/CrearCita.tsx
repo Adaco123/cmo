@@ -25,15 +25,6 @@ interface CrearCitaProps {
 const DEFAULT_MEDICO_ID = 1;
 const DEFAULT_CONSULTORIO_ID = 1;
 
-/** "YYYY-MM-DD" en fecha LOCAL, a diferencia de toISOString() que usa UTC
- *  y puede adelantar un día en horas de la noche (Bolivia es UTC-4). */
-function toLocalDateString(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 /** "YYYY-MM-DD" -> "DD/MM/AAAA" (mismo formato que usa Control.tsx). */
 function formatFechaLegible(fechaYmd: string): string {
   return new Date(fechaYmd + 'T00:00:00').toLocaleDateString('es-BO', {
@@ -79,8 +70,8 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
     paciente_id: paciente?.id ?? 0,
     medico_id: medicoId,
     consultorio_id: DEFAULT_CONSULTORIO_ID,
-    fecha: toLocalDateString(new Date()),
-    hora_inicio: new Date().toTimeString().slice(0, 5),
+    fecha: '',
+    hora_inicio: '',
     hora_fin: '',
     motivo: '',
     estado_id: 0,
@@ -109,7 +100,6 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
   }, [estados]);
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const { showError, showSuccess } = useErrorToast();
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -124,29 +114,50 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
     }));
   };
 
+  // hora_fin se calcula sola: hora de inicio + 45 min (igual que Control.tsx).
+  const horaFin = (() => {
+    if (!formData.hora_inicio) return '';
+    const calculada = sumarMinutos(formData.hora_inicio, 45);
+    // Si cruza medianoche, no hay hora_fin automática válida — se manda null.
+    return calculada > formData.hora_inicio ? calculada : '';
+  })();
+
   const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
   const motivo = formData.motivo?.trim() ?? '';
 
-  if (!formData.paciente_id || !formData.fecha || !formData.hora_inicio || !motivo) {
-    alert('Por favor completa todos los campos obligatorios (*)');
+  // Validación propia (el <form> lleva noValidate): así ningún aviso sale
+  // como tooltip nativo del navegador, todo pasa por el toast.
+  if (!formData.paciente_id) {
+    showError('No hay un paciente seleccionado.');
+    return;
+  }
+  if (!formData.estado_id) {
+    showError('Selecciona el estado de la cita.');
+    return;
+  }
+  if (!formData.fecha) {
+    showError('Elige la fecha de la cita.');
+    return;
+  }
+  if (!formData.hora_inicio) {
+    showError('Indica la hora de la cita.');
+    return;
+  }
+  if (!motivo) {
+    showError('Escribe el motivo de la cita.');
     return;
   }
 
   setLoading(true);
-  setError(null);
   try {
     const payload: CitaPayload = {
       ...formData,
       motivo: motivo,
       medico_id: medicoId,
       consultorio_id: DEFAULT_CONSULTORIO_ID,
-      hora_fin: (() => {
-        const calculada = sumarMinutos(formData.hora_inicio, 45);
-        // Si cruza medianoche, no hay hora_fin automática válida.
-        return calculada > formData.hora_inicio ? calculada : null;
-      })(),
+      hora_fin: horaFin || null,
     };
 
     const data = await createCita(payload);
@@ -160,20 +171,18 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
 
     if (onSuccess) onSuccess(data);
 
-    const now = new Date();
     setFormData({
       paciente_id: paciente?.id ?? 0,
       medico_id: medicoId,
       consultorio_id: DEFAULT_CONSULTORIO_ID,
-      fecha: toLocalDateString(now),
-      hora_inicio: now.toTimeString().slice(0, 5),
+      fecha: '',
+      hora_inicio: '',
       hora_fin: '',
       motivo: '',
       estado_id: idEstadoPorDefecto(estados),
     });
   } catch (err) {
     const mensaje = extractErrorMessage(err, 'No se pudo guardar la cita.');
-    setError(mensaje);
     showError(mensaje);
   } finally {
     setLoading(false);
@@ -193,7 +202,7 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
           <h1>Agendar Cita</h1>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div className={styles.section}>
             <div className={styles.sectionTitle}>
               <FontAwesomeIcon icon={faUser} />
@@ -220,29 +229,34 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
               </div>
             </div>
 
-            <div className={`${styles.row} ${styles.rowTwo}`}>
+            <div className={styles.row}>
               <div className={styles.fieldGroup}>
-                <label htmlFor="fecha">Fecha *</label>
-                <button
-                  type="button"
-                  id="fecha"
-                  className={styles.fechaBtn}
-                  onClick={calendarioControl.abrir}
-                >
-                  <FontAwesomeIcon icon={faCalendarDays} />
-                  {formData.fecha ? formatFechaLegible(formData.fecha) : 'Elegir fecha'}
-                </button>
-              </div>
-              <div className={styles.fieldGroup}>
-                <label htmlFor="hora_inicio">Hora inicio *</label>
-                <input
-                  type="time"
-                  id="hora_inicio"
-                  name="hora_inicio"
-                  value={formData.hora_inicio}
-                  onChange={handleChange}
-                  required
-                />
+                <label htmlFor="fecha">Fecha y hora *</label>
+                <div className={styles.chips}>
+                  <button
+                    type="button"
+                    id="fecha"
+                    className={styles.chip}
+                    onClick={calendarioControl.abrir}
+                  >
+                    <FontAwesomeIcon icon={faCalendarDays} /> {formData.fecha ? formatFechaLegible(formData.fecha) : 'Elegir fecha'}
+                  </button>
+                </div>
+                {formData.fecha && (
+                  <div className={styles.horaRow}>
+                    <span>Hora</span>
+                    <input
+                      type="time"
+                      name="hora_inicio"
+                      value={formData.hora_inicio}
+                      onChange={handleChange}
+                      required
+                    />
+                    <span>a</span>
+                    <input type="time" value={horaFin} disabled title="Se calcula sola: hora de inicio + 45 min" style={{ opacity: 0.75, cursor: 'not-allowed' }} />
+                    <span className={styles.subhint}>(+45 min automático)</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -259,7 +273,6 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
               />
             </div>
           </div>
-          {error && <p className={styles.errorText}>{error}</p>}
           <button type="submit" className={styles.btnGuardar} disabled={loading}>
             {loading ? (
               <>

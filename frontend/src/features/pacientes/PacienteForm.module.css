@@ -280,12 +280,6 @@
   transform: translateX(20px);
 }
 
-.errorText {
-  color: var(--status-inactive);
-  font-size: 0.75rem;
-  margin-bottom: 0.5rem;
-}
-
 .btnSaveModern {
   padding: 0.65rem 1.4rem;
   border: 1px solid var(--accent-border);

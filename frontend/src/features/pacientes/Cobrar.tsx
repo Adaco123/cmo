@@ -52,7 +52,6 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado, onClose }) => {
 
   // Estados de la petición al backend
   const [enviando, setEnviando] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
   const { showError, showSuccess } = useErrorToast();
 
   // Cálculos derivados
@@ -66,11 +65,8 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado, onClose }) => {
 
   // Manejadores
   const handleConfirmar = async () => {
-    setError(null);
-
     if (totalPagar <= 0) {
       const mensaje = 'El total a pagar debe ser mayor a 0.';
-      setError(mensaje);
       showError(mensaje);
       return;
     }
@@ -78,7 +74,6 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado, onClose }) => {
     if (metodoPago === 'Efectivo') {
       if (isNaN(recibidoNum) || recibidoNum < totalPagar) {
         const mensaje = 'El monto recibido debe ser igual o mayor al total.';
-        setError(mensaje);
         showError(mensaje);
         return;
       }
@@ -87,7 +82,6 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado, onClose }) => {
     const metodoPagoId = idMetodoPagoPorNombre(metodosPago, metodoPago);
     if (!metodoPagoId) {
       const mensaje = 'No se pudo determinar el método de pago. Intenta nuevamente.';
-      setError(mensaje);
       showError(mensaje);
       return;
     }
@@ -111,7 +105,6 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado, onClose }) => {
       onCobrado?.();
     } catch (err: unknown) {
       const mensaje = extractErrorMessage(err, 'Ocurrió un error al registrar el pago.');
-      setError(mensaje);
       showError(mensaje);
     } finally {
       setEnviando(false);
@@ -149,12 +142,6 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado, onClose }) => {
             <div className={styles['cb-section-title']}>
               <i className="fas fa-hand-holding-usd"></i> Datos del pago
             </div>
-
-            {error && (
-              <div className={`${styles['cb-cambio-info']} ${styles['cb-text-danger']}`} style={{ marginBottom: '1rem' }}>
-                <i className="fas fa-exclamation-circle"></i> {error}
-              </div>
-            )}
 
             <form onSubmit={(e) => e.preventDefault()}>
               {/* Monto Base */}

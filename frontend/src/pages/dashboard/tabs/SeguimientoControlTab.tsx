@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRefresh, faPen, faSave, faSpinner, faXmark, faCalendarCheck } from '@fortawesome/free-solid-svg-icons';
+import { faRefresh, faPen, faSave, faSpinner, faXmark, faCalendarCheck, faCalendarDays } from '@fortawesome/free-solid-svg-icons';
 import { type Paciente } from '../../../api/pacientes';
 import { type SeguimientoControl } from '../../../api/seguimientoControl';
 import { type Cita } from '../../../api/citas';
 import { useCalendario } from '../../../components/CalendarioProvider';
+import Calendario from '../../../features/citas/Calendario';
 import ViewButton from '../../../components/ui/ViewButton';
 import { useErrorToast } from '../../../components/ErrorToastProvider';
-import { extractErrorMessage } from '../../../utils/errors';
 import styles from './Seguimientocontroltab.module.css';
 
 interface SeguimientoControlTabProps {
@@ -44,6 +45,14 @@ function toLocalDateString(d: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/** "HH:MM" + minutos -> "HH:MM" (misma lógica que Control.tsx y CrearCita.tsx). */
+function sumarMinutos(hora: string, minutos: number): string {
+  const [h, m] = hora.split(':').map(Number);
+  const fecha = new Date();
+  fecha.setHours(h, m + minutos, 0, 0);
+  return fecha.toTimeString().slice(0, 5);
+}
+
 /** Nombre del estado -> clase de color del badge (ver .badge-estado en
  * Dashboardpage.css). Por nombre, nunca por id — los ids del catálogo
  * pueden variar entre instalaciones. */
@@ -73,7 +82,7 @@ function claseEstado(nombre: string): string {
  * su propia fecha como respaldo solo para no desaparecer de la lista.
  */
 const SeguimientoControlTab: React.FC<SeguimientoControlTabProps> = ({ active, pacientes, searchValue, onSearchChange, onVer }) => {
-  const { showErrorFrom, showSuccess } = useErrorToast();
+  const { showSuccess } = useErrorToast();
 
   const {
     citas,
@@ -248,7 +257,6 @@ const SeguimientoControlTab: React.FC<SeguimientoControlTabProps> = ({ active, p
             setEditando(null);
             showSuccess(filaActualizada.tipo === 'cita' ? 'Cita actualizada.' : 'Seguimiento de control actualizado.');
           }}
-          showErrorFrom={showErrorFrom}
         />
       )}
     </div>
@@ -259,45 +267,87 @@ interface EditarFilaModalProps {
   fila: FilaAgenda;
   onClose: () => void;
   onGuardada: (fila: FilaAgenda) => void;
-  showErrorFrom: (err: unknown, fallback: string) => void;
 }
 
 /**
  * Un solo modal para los dos tipos: cambia los campos que muestra según
  * fila.tipo, pero comparte backdrop/estructura/botones (Seguimientocontroltab.module.css).
+ *
+ * Fecha y hora se eligen igual que en Control.tsx / CrearCita.tsx: chip que
+ * abre el calendario compartido + hora de inicio editable + hora de fin
+ * automática (inicio + 45 min). Todos los avisos van por el toast.
  */
-const EditarFilaModal: React.FC<EditarFilaModalProps> = ({ fila, onClose, onGuardada, showErrorFrom }) => {
+const EditarFilaModal: React.FC<EditarFilaModalProps> = ({ fila, onClose, onGuardada }) => {
   const esCita = fila.tipo === 'cita';
-  const { estadosCita: estados, actualizarCita, actualizarSeguimiento } = useCalendario();
+  const { showError, showErrorFrom } = useErrorToast();
+  const calendarioControl = useCalendario();
+  const { estadosCita: estados, actualizarCita, actualizarSeguimiento } = calendarioControl;
 
-  const [fecha, setFecha] = useState(esCita ? fila.cita.fecha : (fila.seguimiento.proxima_fecha_control || ''));
-  const [horaInicio, setHoraInicio] = useState((esCita ? fila.cita.hora_inicio : fila.seguimiento.hora_inicio) || '');
-  const [horaFin, setHoraFin] = useState((esCita ? fila.cita.hora_fin : fila.seguimiento.hora_fin) || '');
+  const horaInicioOriginal = ((esCita ? fila.cita.hora_inicio : fila.seguimiento.hora_inicio) || '').slice(0, 5);
+  const horaFinOriginal = ((esCita ? fila.cita.hora_fin : fila.seguimiento.hora_fin) || '').slice(0, 5);
+
+  const [fecha, setFecha] = useState<string | null>(
+    esCita ? fila.cita.fecha : (fila.seguimiento.proxima_fecha_control || null),
+  );
+  const [horaInicio, setHoraInicio] = useState(horaInicioOriginal);
   const [motivo, setMotivo] = useState(esCita ? (fila.cita.motivo || '') : '');
   const [estadoId, setEstadoId] = useState<number>(esCita ? fila.cita.estado_id : 0);
   const [evolucion, setEvolucion] = useState(esCita ? '' : fila.seguimiento.evolucion);
   const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  // hora_fin se calcula sola (inicio + 45 min), igual que en Control/CrearCita.
+  // Si no se tocó la hora de inicio, se respeta la hora de fin que ya tenía
+  // el registro para no cambiarla sin querer al editar solo otro campo.
+  const horaFinCalculada = (() => {
+    if (!horaInicio) return '';
+    const calculada = sumarMinutos(horaInicio, 45);
+    // Si cruza medianoche, no hay hora_fin automática válida.
+    return calculada > horaInicio ? calculada : '';
+  })();
+  const conservaHoraOriginal = !!horaFinOriginal && horaInicio === horaInicioOriginal;
+  const horaFin = conservaHoraOriginal ? horaFinOriginal : horaFinCalculada;
 
   const guardar = async () => {
+    if (esCita) {
+      if (!motivo.trim()) {
+        showError('Escribe el motivo de la cita.');
+        return;
+      }
+      if (!estadoId) {
+        showError('Selecciona el estado de la cita.');
+        return;
+      }
+      if (!fecha) {
+        showError('Elige la fecha de la cita.');
+        return;
+      }
+      if (!horaInicio) {
+        showError('Indica la hora de la cita.');
+        return;
+      }
+    } else if (!evolucion.trim()) {
+      showError('Escribe cómo sigue el paciente antes de guardar.');
+      return;
+    }
+
     setGuardando(true);
-    setError(null);
     try {
       if (esCita) {
         const citaActualizada = await actualizarCita(fila.cita.id, {
-          fecha,
-          hora_inicio: horaInicio || fila.cita.hora_inicio,
+          fecha: fecha as string,
+          hora_inicio: horaInicio,
           hora_fin: horaFin || null,
-          motivo,
+          motivo: motivo.trim(),
           estado_id: estadoId,
         });
         onGuardada({ tipo: 'cita', fechaAgenda: citaActualizada.fecha, cita: citaActualizada, paciente: fila.paciente });
       } else {
         const seguimientoActualizado = await actualizarSeguimiento(fila.seguimiento.id, {
-          evolucion,
-          proxima_fecha_control: fecha || null,
-          hora_inicio: horaInicio || null,
-          hora_fin: horaFin || null,
+          evolucion: evolucion.trim(),
+          proxima_fecha_control: fecha,
+          // Sin próxima fecha (alta / sin control) no hay hora que guardar.
+          hora_inicio: fecha ? (horaInicio || null) : null,
+          hora_fin: fecha ? (horaFin || null) : null,
         });
         onGuardada({
           tipo: 'seguimiento',
@@ -307,8 +357,6 @@ const EditarFilaModal: React.FC<EditarFilaModalProps> = ({ fila, onClose, onGuar
         });
       }
     } catch (err) {
-      const mensaje = extractErrorMessage(err, 'No se pudo guardar el cambio.');
-      setError(mensaje);
       showErrorFrom(err, 'No se pudo guardar el cambio.');
     } finally {
       setGuardando(false);
@@ -316,69 +364,130 @@ const EditarFilaModal: React.FC<EditarFilaModalProps> = ({ fila, onClose, onGuar
   };
 
   return (
-    <div className={styles.backdrop} onClick={onClose}>
-      <div className={styles.page} onClick={(e) => e.stopPropagation()}>
-        <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Cerrar">
-          <FontAwesomeIcon icon={faXmark} />
-        </button>
-
-        <div className={styles.header}>
-          <FontAwesomeIcon icon={faCalendarCheck} />
-          <h2>{esCita ? 'Editar cita' : 'Editar seguimiento de control'}</h2>
-        </div>
-
-        {error && <div className={styles.error}>{error}</div>}
-
-        {esCita ? (
-          <div className={styles.field}>
-            <label>Motivo</label>
-            <input type="text" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Motivo de la cita" />
-          </div>
-        ) : (
-          <div className={styles.field}>
-            <label>Evolución</label>
-            <textarea value={evolucion} onChange={(e) => setEvolucion(e.target.value)} placeholder="Evolución del paciente" />
-          </div>
-        )}
-
-        {esCita && (
-          <div className={styles.field}>
-            <label>Estado</label>
-            <select
-              className={styles.select}
-              value={estadoId}
-              onChange={(e) => setEstadoId(Number(e.target.value))}
-            >
-              {estados.length === 0 && <option value={estadoId}>Estado actual (#{estadoId})</option>}
-              {estados.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <div className={styles.field}>
-          <label>{esCita ? 'Fecha de la cita' : 'Próxima fecha de control'}</label>
-          <div className={styles.horaRow}>
-            <input type="date" value={fecha || ''} onChange={(e) => setFecha(e.target.value)} />
-            <input type="time" value={horaInicio ? horaInicio.slice(0, 5) : ''} onChange={(e) => setHoraInicio(e.target.value)} />
-            <input type="time" value={horaFin ? horaFin.slice(0, 5) : ''} onChange={(e) => setHoraFin(e.target.value)} />
-          </div>
-        </div>
-
-        <div className={styles.actions}>
-          <button type="button" className={styles.btnGhost} onClick={onClose} disabled={guardando}>
-            Cancelar
+    <>
+      <div className={styles.backdrop} onClick={onClose}>
+        <div className={styles.page} onClick={(e) => e.stopPropagation()}>
+          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Cerrar">
+            <FontAwesomeIcon icon={faXmark} />
           </button>
-          <button type="button" className={styles.btnSave} onClick={guardar} disabled={guardando}>
-            <FontAwesomeIcon icon={guardando ? faSpinner : faSave} className={guardando ? 'spin' : ''} />
-            {guardando ? 'Guardando...' : 'Guardar'}
-          </button>
+
+          <div className={styles.header}>
+            <FontAwesomeIcon icon={faCalendarCheck} />
+            <h2>{esCita ? 'Editar cita' : 'Editar seguimiento de control'}</h2>
+          </div>
+
+          {esCita ? (
+            <div className={styles.field}>
+              <label>Motivo</label>
+              <input type="text" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Motivo de la cita" />
+            </div>
+          ) : (
+            <div className={styles.field}>
+              <label>Evolución</label>
+              <textarea value={evolucion} onChange={(e) => setEvolucion(e.target.value)} placeholder="Evolución del paciente" />
+            </div>
+          )}
+
+          {esCita && (
+            <div className={styles.field}>
+              <label>Estado</label>
+              <select
+                className={styles.select}
+                value={estadoId}
+                onChange={(e) => setEstadoId(Number(e.target.value))}
+              >
+                {estados.length === 0 && <option value={estadoId}>Estado actual (#{estadoId})</option>}
+                {estados.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className={styles.field}>
+            <label>{esCita ? 'Fecha de la cita' : 'Próxima fecha de control'}</label>
+            <div className={styles.chips}>
+              {!esCita && (
+                <button
+                  type="button"
+                  className={`${styles.chip} ${fecha === null ? styles.active : ''}`}
+                  onClick={() => {
+                    setFecha(null);
+                    setHoraInicio('');
+                  }}
+                >
+                  Alta / sin control
+                </button>
+              )}
+              <button type="button" className={styles.chip} onClick={calendarioControl.abrir}>
+                <FontAwesomeIcon icon={faCalendarDays} /> {fecha ? formatFecha(fecha) : 'Elegir fecha'}
+              </button>
+            </div>
+            {fecha && (
+              <div className={styles.horaRow}>
+                <span>Hora</span>
+                <input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
+                <span>a</span>
+                <input
+                  type="time"
+                  value={horaFin}
+                  disabled
+                  title="Se calcula sola: hora de inicio + 45 min"
+                  style={{ opacity: 0.75, cursor: 'not-allowed' }}
+                />
+                <span className={styles.subhint}>
+                  {conservaHoraOriginal ? '(hora fin original)' : '(+45 min automático)'}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className={styles.actions}>
+            <button type="button" className={styles.btnGhost} onClick={onClose} disabled={guardando}>
+              Cancelar
+            </button>
+            <button type="button" className={styles.btnSave} onClick={guardar} disabled={guardando}>
+              <FontAwesomeIcon icon={guardando ? faSpinner : faSave} className={guardando ? 'spin' : ''} />
+              {guardando ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Fuera del backdrop del modal: los eventos de un portal suben por el
+          árbol de React, y así un click en el fondo del calendario no cierra
+          también este modal. */}
+      {calendarioControl.abierto &&
+        createPortal(
+          <Calendario
+            citas={calendarioControl.citas}
+            seguimientos={calendarioControl.seguimientos}
+            pacientes={calendarioControl.pacientes}
+            onClose={calendarioControl.cerrar}
+            onConfirmarFecha={(nuevaFecha) => {
+              setFecha(nuevaFecha);
+              calendarioControl.cerrar();
+            }}
+          />,
+          document.body,
+        )}
+      {calendarioControl.abierto && calendarioControl.loading &&
+        createPortal(
+          <div className="today-appointments-empty" style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 200 }}>
+            Cargando datos del calendario...
+          </div>,
+          document.body,
+        )}
+      {calendarioControl.abierto && calendarioControl.error &&
+        createPortal(
+          <div className="today-appointments-empty" style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 200 }}>
+            {calendarioControl.error}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 };
 

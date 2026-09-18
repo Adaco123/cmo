@@ -267,13 +267,6 @@
   transform: none;
 }
 
-.errorText {
-  color: var(--status-inactive);
-  font-size: 0.82rem;
-  font-weight: 600;
-  margin-top: 0.7rem;
-}
-
 /* ============================================================
    LAYOUT DE PACIENTE SELECCIONADO — idéntico al de VerPaciente:
    sidebar (ficha + acciones) + main (contenido).

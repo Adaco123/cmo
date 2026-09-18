@@ -386,7 +386,6 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
     return payload;
   };
 
-  const [saveError, setSaveError] = useState<string | null>(null);
   const { showError, showSuccess, confirm } = useErrorToast();
 
   const handleGuardar = async () => {
@@ -406,11 +405,10 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
       return;
     }
     if (!pacienteIdFinal) {
-      setSaveError('No hay un paciente seleccionado.');
+      showError('No hay un paciente seleccionado.');
       return;
     }
 
-    setSaveError(null);
     setSaving(true);
     try {
       const examenesFlat = getExamenesFlat();
@@ -476,23 +474,32 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
         err,
         'No se pudo guardar el registro clínico. Revisa los datos e intenta de nuevo.',
       );
-      setSaveError(mensaje);
       showError(mensaje);
     } finally {
       setSaving(false);
     }
   };
 
+  // Siempre apunta a la versión más reciente de handleGuardar (con el estado
+  // actual). Así el atajo Ctrl+Enter no depende de una lista manual de
+  // dependencias que se pueda desactualizar y guardar con datos viejos.
+  const handleGuardarRef = useRef(handleGuardar);
+  useEffect(() => {
+    handleGuardarRef.current = handleGuardar;
+  });
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
-        handleGuardar();
+        void handleGuardarRef.current();
       }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [vitales, secciones, alergiasRegistro, controlNota, controlFecha, controlHoraInicio, controlHoraFin, examCount, saving]);
+  }, []);
+
+  const [drawerRxOpen, setDrawerRxOpen] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -503,8 +510,6 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
-
-  const [drawerRxOpen, setDrawerRxOpen] = useState(false);
 
   // Cerrar/cancelar TODO el registro clínico (no solo un drawer interno)
   // descarta las sesiones de captura QR abiertas ligadas al paciente:
@@ -764,12 +769,6 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
               </div>
             </div>
           </div>
-
-          {saveError && (
-            <div style={{ color: 'var(--status-inactive)', marginBottom: 8, fontSize: 'var(--fs-sm)' }}>
-              {saveError}
-            </div>
-          )}
 
           <div className={styles.savebar} ref={editorRef}>
             <div className={`${styles.status} ${listoParaGuardar ? styles.ok : ''}`}>

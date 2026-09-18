@@ -216,7 +216,7 @@ const RegistroCard: React.FC<RegistroCardProps> = React.memo(function RegistroCa
 
 const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
   const [expediente, setExpediente] = useState<ExpedientePacienteResponse | null>(null);
-  const { showError, showSuccess } = useErrorToast();
+  const { showError, showSuccess, confirm } = useErrorToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -313,28 +313,29 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
     setRegistroIdEditando(null);
   }, []);
 
-  const handleEliminarRegistro = useCallback((registroId: number) => {
+  const handleEliminarRegistro = useCallback(async (registroId: number) => {
     setMenuAbiertoId(null);
-    if (!window.confirm(`¿Eliminar el registro clínico #${registroId}? Esta acción no se puede deshacer desde aquí.`)) {
-      return;
+    const aceptar = await confirm(
+      `¿Eliminar el registro clínico #${registroId}? Esta acción no se puede deshacer desde aquí.`,
+      { textoAceptar: 'Aceptar', textoCancelar: 'Cancelar' },
+    );
+    if (!aceptar) return;
+
+    try {
+      await deleteRegistroCompleto(registroId);
+      setExpediente((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          registros_clinicos: (prev.registros_clinicos || []).filter((r) => r.id !== registroId),
+        };
+      });
+      setRegistroIdDetalle((prev) => (prev === registroId ? null : prev));
+      showSuccess('Registro clínico eliminado correctamente');
+    } catch (err: unknown) {
+      showError(extractErrorMessage(err, 'No se pudo eliminar el registro clínico.'));
     }
-    (async () => {
-      try {
-        await deleteRegistroCompleto(registroId);
-        setExpediente((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            registros_clinicos: (prev.registros_clinicos || []).filter((r) => r.id !== registroId),
-          };
-        });
-        setRegistroIdDetalle((prev) => (prev === registroId ? null : prev));
-        showSuccess('Registro clínico eliminado correctamente');
-      } catch (err: unknown) {
-        showError(extractErrorMessage(err, 'No se pudo eliminar el registro clínico.'));
-      }
-    })();
-  }, []);
+  }, [confirm, showError, showSuccess]);
 
   const handleDescargarPdf = useCallback((registroId: number) => {
     setMenuAbiertoId(null);
@@ -342,7 +343,7 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
       .replace(/\s+/g, '')
       .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]/g, '');
     void downloadRegistroClinicoPdf(registroId, `${nombreArchivo}Reg.pdf`);
-  }, []);
+  }, [paciente?.nombres, paciente?.apellidos, paciente?.documento]);
 
   const handleDescargarConsentimiento = useCallback((registroId: number) => {
     setMenuAbiertoId(null);
@@ -350,7 +351,7 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
       .replace(/\s+/g, '')
       .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]/g, '')
     void downloadConsentimientoPdf(registroId, `${nombreArchivo}Consentimiento.pdf`);
-  }, []);
+  }, [paciente?.nombres, paciente?.apellidos, paciente?.documento]);
 
   const handleRegistroGuardado = useCallback((resultado: RegistroCompletoResponse) => {
     setExpediente((prev) => {

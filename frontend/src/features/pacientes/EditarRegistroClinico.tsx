@@ -7,6 +7,8 @@ import {
 } from '../../api/historialClinico';
 import type { RegistroCompletoUpdateResponse } from '../../api/historialClinico';
 import styles from './EditarRegistroClinico.module.css';
+import { useErrorToast } from '../../components/ErrorToastProvider';
+import { extractErrorMessage } from '../../utils/errors';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUser, faSpinner } from '@fortawesome/free-solid-svg-icons';
 
@@ -68,7 +70,7 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
   });
 
   const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const { showError } = useErrorToast();
 
   // --- Carga inicial: trae el registro ya existente y precarga todo ---
   useEffect(() => {
@@ -119,8 +121,6 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
   };
 
   const handleGuardar = async () => {
-    setSaveError(null);
-
     setSaving(true);
     try {
       const num = (v: string) => (v.trim() !== '' ? parseFloat(v.replace(',', '.')) : 0);
@@ -172,8 +172,8 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
       }
 
       await onSaved?.(resultado);
-    } catch {
-      setSaveError('No se pudo guardar la edición. Revisa los datos e intenta de nuevo.');
+    } catch (err) {
+      showError(extractErrorMessage(err, 'No se pudo guardar la edición. Revisa los datos e intenta de nuevo.'));
     } finally {
       setSaving(false);
     }
@@ -336,12 +336,6 @@ const EditarRegistroClinico: React.FC<EditarRegistroClinicoProps> = ({
           ))}
         </div>
       </div>
-
-      {saveError && (
-        <div style={{ color: 'var(--status-inactive)', marginBottom: 8, fontSize: 'var(--fs-sm)' }}>
-          {saveError}
-        </div>
-      )}
 
       <div className={styles.savebar}>
         <div className={styles.status}>Los campos vacíos se guardan como vacío, no se pierde nada más.</div>

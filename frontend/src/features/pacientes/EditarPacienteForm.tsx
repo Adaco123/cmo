@@ -19,6 +19,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { useErrorToast } from '../../components/ErrorToastProvider';
 import { extractErrorMessage } from '../../utils/errors';
+import { validarDatosPaciente } from '../../utils/validarPaciente';
 
 interface EditarPacienteFormData {
   nombres: string;
@@ -75,9 +76,17 @@ interface EditarPacienteFormProps {
 
 const EditarPacienteForm: React.FC<EditarPacienteFormProps> = ({ paciente, onSuccess, onClose }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState<EditarPacienteFormData>(() => pacienteToFormData(paciente));
   const { showError, showSuccess } = useErrorToast();
+
+  // Misma fecha del encabezado que muestra PacienteForm.tsx (DD/MM/AAAA).
+  const [fechaActual] = useState<string>(() =>
+    new Date().toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+  );
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -93,10 +102,10 @@ const EditarPacienteForm: React.FC<EditarPacienteFormProps> = ({ paciente, onSuc
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitError(null);
 
-    if (!formData.nombres.trim() || !formData.apellidos.trim() || !formData.documento.trim() || !formData.fecha_nacimiento || !formData.sexo) {
-      setSubmitError('Completa los campos obligatorios antes de guardar.');
+    const errorValidacion = validarDatosPaciente(formData);
+    if (errorValidacion) {
+      showError(errorValidacion);
       return;
     }
 
@@ -125,7 +134,6 @@ const EditarPacienteForm: React.FC<EditarPacienteFormProps> = ({ paciente, onSuc
       onSuccess?.(pacienteActualizado);
     } catch (error: unknown) {
       const mensaje = extractErrorMessage(error, 'No se pudo actualizar el paciente.');
-      setSubmitError(mensaje);
       showError(mensaje);
     } finally {
       setIsSubmitting(false);
@@ -138,7 +146,7 @@ const EditarPacienteForm: React.FC<EditarPacienteFormProps> = ({ paciente, onSuc
         <FontAwesomeIcon icon={faUserPen} />
         <h1>Editar Paciente</h1>
         <span className={styles.headerDate}>
-          <FontAwesomeIcon icon={faCalendarAlt} /> Ficha: <span>#{paciente.id}</span>
+          <FontAwesomeIcon icon={faCalendarAlt} /> Fecha: <span>{fechaActual}</span>
         </span>
         {onClose && (
           <button
@@ -153,7 +161,7 @@ const EditarPacienteForm: React.FC<EditarPacienteFormProps> = ({ paciente, onSuc
         )}
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
         <div className={styles.sectionsGrid}>
           {/* 1. Datos Personales */}
           <div className={styles.section}>
@@ -306,7 +314,6 @@ const EditarPacienteForm: React.FC<EditarPacienteFormProps> = ({ paciente, onSuc
           </div>
         </div>
 
-        {submitError && <p className={styles.errorText}>{submitError}</p>}
         <button type="submit" className={styles.btnSaveModern} disabled={isSubmitting}>
           <FontAwesomeIcon icon={faSave} /> {isSubmitting ? 'Guardando...' : 'Guardar Cambios'}
         </button>

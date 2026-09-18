@@ -13,6 +13,7 @@ import {
 import CapturaQrModal from './CapturaQrModal';
 import { getTiposArchivo, type TipoArchivo } from '../../api/tiposarchivo';
 import { extractErrorMessage } from '../../utils/errors';
+import { useErrorToast } from '../../components/ErrorToastProvider';
 import CrearCita from '../../components/CrearCita';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -129,7 +130,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
   const [cargandoArchivos, setCargandoArchivos] = useState(true);
   const [archivosPendientes, setArchivosPendientes] = useState<ArchivoPendiente[]>([]);
   const [subiendo, setSubiendo] = useState(false);
-  const [errorArchivo, setErrorArchivo] = useState<string | null>(null);
+  const { showError } = useErrorToast();
 
   const [showCrearCita, setShowCrearCita] = useState(false);
   const [showAdjuntar, setShowAdjuntar] = useState(false);
@@ -193,7 +194,6 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
     const urlsCreadas: string[] = [];
     setArchivosSubidos([]);
     setArchivosPendientes([]);
-    setErrorArchivo(null);
     setMenuAbiertoId(null);
     setGaleria({});
     setCargandoArchivos(true);
@@ -229,13 +229,12 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
   /** Agrega archivos elegidos (input o drag&drop) a la lista de pendientes, sin subirlos aún. */
   const agregarPendientes = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setErrorArchivo(null);
 
     const nuevos: ArchivoPendiente[] = [];
     for (const file of Array.from(files)) {
       const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
       if (!EXTENSIONES_VALIDAS.includes(ext)) {
-        setErrorArchivo(`"${file.name}" no es un formato válido (solo PDF, JPG o PNG).`);
+        showError(`"${file.name}" no es un formato válido (solo PDF, JPG o PNG).`);
         continue;
       }
       nuevos.push({ localId: `${file.name}-${file.lastModified}-${file.size}`, file });
@@ -247,7 +246,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
       const sinDuplicados = nuevos.filter((n) => !existentes.has(n.localId));
       return [...prev, ...sinDuplicados];
     });
-  }, []);
+  }, [showError]);
 
   /** Se llama por cada foto nueva detectada en la sesión de captura QR: la
    *  descarga del servidor, la mete en la misma lista de pendientes que el
@@ -259,7 +258,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
         const file = new File([blob], `foto-qr-${archivoId}.jpg`, { type: blob.type || 'image/jpeg' });
         setArchivosPendientes((prev) => [...prev, { localId: `qr-${archivoId}`, file }]);
       } catch {
-        setErrorArchivo('No se pudo importar una fotografía tomada por el celular.');
+        showError('No se pudo importar una fotografía tomada por el celular.');
       } finally {
         eliminarArchivoApi(archivoId).catch(() => {
           // Best-effort: si no se pudo borrar la copia transitoria no
@@ -267,7 +266,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
         });
       }
     })();
-  }, []);
+  }, [showError]);
 
   const quitarPendiente = (localId: string) => {
     setArchivosPendientes((prev) => prev.filter((p) => p.localId !== localId));
@@ -279,7 +278,6 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
    *  atención nueva y distinta. */
   const guardarPendientes = useCallback(async () => {
     if (archivosPendientes.length === 0) return;
-    setErrorArchivo(null);
     setSubiendo(true);
     try {
       const atencion = await crearAtencionExterna(paciente.id);
@@ -297,11 +295,11 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
       setArchivosPendientes([]);
       setShowAdjuntar(false);
     } catch (error: unknown) {
-      setErrorArchivo(extractErrorMessage(error, 'No se pudo registrar la atención.'));
+      showError(extractErrorMessage(error, 'No se pudo registrar la atención.'));
     } finally {
       setSubiendo(false);
     }
-  }, [paciente, archivosPendientes, tiposArchivo]);
+  }, [paciente, archivosPendientes, tiposArchivo, showError]);
 
   // Abre/cierra el menú "..." de un archivo puntual (mismo patrón que
   // toggleMenu en VerPaciente.tsx: stopPropagation + toggle por id).
@@ -322,7 +320,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
       });
       setImagenActiva((prev) => (prev?.archivo.id === archivoId ? null : prev));
     } catch {
-      setErrorArchivo('No se pudo eliminar el archivo.');
+      showError('No se pudo eliminar el archivo.');
     } finally {
       setMenuAbiertoId(null);
     }
@@ -343,9 +341,9 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
       link.remove();
       URL.revokeObjectURL(url);
     } catch {
-      setErrorArchivo('No se pudo descargar el archivo.');
+      showError('No se pudo descargar el archivo.');
     }
-  }, []);
+  }, [showError]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -375,7 +373,6 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
     cerrarModalQr();
     setShowAdjuntar(false);
     setArchivosPendientes([]);
-    setErrorArchivo(null);
   };
 
   // ---- Abrir/cerrar el visor de PDF (drawer derecho) ----
@@ -514,8 +511,6 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
             </span>
           </div>
 
-          {errorArchivo && !showAdjuntar && <p className={styles.errorText}>{errorArchivo}</p>}
-
           {cargandoArchivos ? (
             <div className={styles.emptyState}>
               <FontAwesomeIcon icon={faSpinner} spin />
@@ -649,8 +644,6 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
             >
               <FontAwesomeIcon icon={faCamera} /> Tomar fotografías con el celular
             </button>
-
-            {errorArchivo && <p className={styles.errorText}>{errorArchivo}</p>}
 
             {archivosPendientes.length > 0 && (
               <ul className={styles.listaPendientes}>

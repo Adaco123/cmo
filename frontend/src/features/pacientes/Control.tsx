@@ -84,7 +84,6 @@ const Control: React.FC<Props> = ({
     return calculada > horaInicio ? calculada : '';
   })();
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const { showError, showSuccess } = useErrorToast();
   const evolucionRef = useRef<HTMLTextAreaElement>(null);
 
@@ -138,12 +137,11 @@ const Control: React.FC<Props> = ({
   const handleGuardar = async () => {
     const texto = evolucion.trim();
     if (!texto) {
-      setError('Escribe cómo sigue el paciente antes de guardar.');
+      showError('Escribe cómo sigue el paciente antes de guardar.');
       evolucionRef.current?.focus();
       return;
     }
 
-    setError(null);
     setSaving(true);
     try {
       const recetaPayload = recetaRef.current?.getPayload();
@@ -168,7 +166,6 @@ const Control: React.FC<Props> = ({
       onSaved?.(resultado);
     } catch (err) {
       const mensaje = extractErrorMessage(err, 'No se pudo guardar el control. Intenta de nuevo.');
-      setError(mensaje);
       showError(mensaje);
     } finally {
       setSaving(false);
@@ -251,7 +248,6 @@ const Control: React.FC<Props> = ({
           </button>
         </div>
 
-        {error && <div className={styles.error}>{error}</div>}
 
         <div className={styles.actions}>
           {onClose && (

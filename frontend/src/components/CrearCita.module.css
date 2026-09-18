@@ -171,36 +171,64 @@
   min-height: 34px;
 }
 
-/* Botón que reemplaza al input de fecha nativo (ver CrearCita.tsx) — mismo
- * aspecto que un .fieldGroup input normal, pero es un <button> que abre
- * el calendario en vez de un campo editable a mano. */
-.fechaBtn {
+/* ----- FECHA Y HORA (mismo aspecto que Control.tsx) ----- */
+.chips {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: inherit;
-  font-size: var(--fs-sm);
-  line-height: 1.5;
-  padding: 7px 10px;
-  border: 1.5px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background: var(--bg-card);
-  color: var(--text-main);
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.chip {
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.45rem 1.1rem;
+  border-radius: var(--radius-xl);
+  border: 1.5px solid transparent;
+  background: var(--bg-input);
+  color: var(--text-muted);
   cursor: pointer;
-  width: 100%;
-  text-align: left;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: all var(--transition-smooth);
+  user-select: none;
 }
-
-.fechaBtn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+.chip:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-main);
 }
-
-.fechaBtn:focus-visible {
+.chip:focus-visible {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.horaRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+/* Selector más específico que ".fieldGroup input" (width 100%, etc.) */
+.horaRow input[type="time"] {
+  width: auto;
+  background: var(--bg-input);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-lg, 10px);
+  padding: 0.4rem 0.5rem;
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--text-main);
+}
+.horaRow input[type="time"]:focus {
+  border-color: var(--primary);
+}
+
+.subhint {
+  font-size: var(--fs-xs);
+  color: var(--accent);
+  margin-top: 8px;
+  font-weight: 600;
 }
 
 /* ----- BOTÓN GUARDAR ----- */
@@ -276,10 +304,4 @@
   .container {
     padding: 12px;
   }
-}
-.errorText {
-  color: var(--status-inactive);
-  font-size: 0.82rem;
-  font-weight: 600;
-  margin-top: 0.7rem;
 }
