@@ -1,13 +1,16 @@
 /* Login.module.css
-   Rediseño del login alineado a las variables reales de index.css
-   (--bg-body, --primary, --login-gradient, etc.), sin depender de
-   EcoVisionHome.css como hacía el Login anterior.
+   Login con pantalla de espera, en tema claro. El médico atiende con esta
+   pantalla a la vista del paciente: tres TiltCard blancas con las letras
+   C · M · O (en rojo, con la palabra chica de "Consultores Médicos Oruro"
+   en azul debajo) sobre un fondo con degradado radial (blanco al centro, azul en los bordes), sin ningún
+   formulario. El inicio de sesión es un botón discreto que abre el
+   formulario, también en una tarjeta blanca, en una ventana emergente.
 
-   Motivo visual: "signos vitales" — una franja de monitor cardiaco
-   (ECG) en el panel de marca y un anillo giratorio tipo escaneo
-   alrededor de la tarjeta de acceso, ambos construidos en CSS puro
-   (sin canvas ni JS), más el logo de assets/cmo.png como marca de
-   agua y como isotipo con un latido sutil. */
+   Usa las variables de index.css (--bg-card, --bg-card-hover, --text-main,
+   --status-inactive, --primary, etc.). El fondo es CSS puro (sin canvas):
+   ECG que cruza toda la pantalla justo debajo de las tarjetas, dos orbes de
+   luz blanca a la deriva y el logo como marca de agua. Al cargar, las letras entran
+   una tras otra y después aparece el ECG. */
 
 .stage,
 .stage *,
@@ -17,18 +20,25 @@
 }
 
 .stage {
+  --azul-marca: #2A6FB8; /* azul de las palabras chicas; index.css no tiene un token azul saturado */
+  --azul-borde: #0E74D2; /* azul del borde del degradado de fondo */
   position: relative;
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
   font: 16px/145% var(--sans);
   letter-spacing: 0.18px;
-  color: var(--text-on-dark);
-  background: var(--bg-body);
+  color: var(--text-main);
+  /* Degradado radial: blanco en el centro que se va al azul --azul-borde en
+     los bordes. "closest-side" hace que el azul llegue completo al borde de
+     la pantalla por los cuatro lados (y en las esquinas se mantiene). */
+  background: radial-gradient(ellipse farthest-corner at 50% 50%, #ffffff 0%, #ffffff 25%, var(--bg-body) 100%);
 }
 
-/* ---- Marca de agua a nivel de página completa: centrada, arriba,
-   detrás de ambos paneles (por eso vive en .stage y no en .brandPane) ---- */
+/* ================= FONDO ANIMADO ================= */
 .watermark {
   position: absolute;
   inset: 0;
@@ -41,33 +51,37 @@
 .watermark img {
   width: min(72vw, 900px);
   margin-top: 2vh;
-  opacity: 0.07;
+  opacity: 0.09;
 }
 
-/* ================= PANEL IZQUIERDO — identidad + monitor ================= */
-.brandPane {
-  position: relative;
-  z-index: 1;
-  flex: 1.05;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 64px 72px;
-  overflow: hidden;
-  background: radial-gradient(circle at 18% 20%, color-mix(in srgb, var(--primary) 16%, transparent) 0%, transparent 55%);
+.glowOrb,
+.glowOrbSecondary {
+  position: absolute;
+  z-index: 0;
+  border-radius: 50%;
+  pointer-events: none;
 }
 
 .glowOrb {
-  position: absolute;
   width: 520px;
   height: 520px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
-  opacity: 0.14;
+  background: radial-gradient(circle, #ffffff 0%, transparent 70%);
+  opacity: 0.3;
   filter: blur(60px);
   top: -10%;
   left: -12%;
   animation: drift 18s ease-in-out infinite;
+}
+
+.glowOrbSecondary {
+  width: 560px;
+  height: 560px;
+  background: radial-gradient(circle, #ffffff 0%, transparent 70%);
+  opacity: 0.22;
+  filter: blur(70px);
+  bottom: -14%;
+  right: -10%;
+  animation: driftReverse 22s ease-in-out infinite;
 }
 
 @keyframes drift {
@@ -75,41 +89,29 @@
   50% { transform: translate(60px, 40px) scale(1.15); }
 }
 
-.heading {
-  position: relative;
-  z-index: 1;
-  font-size: clamp(2rem, 3.4vw, 2.9rem);
-  font-weight: 600;
-  line-height: 1.15;
-  margin: 0 0 16px;
-  max-width: 480px;
-  letter-spacing: -0.02em;
-  color: var(--text-on-dark);
+@keyframes driftReverse {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-60px, -40px) scale(1.12); }
 }
 
-.desc {
-  position: relative;
-  z-index: 1;
-  max-width: 420px;
-  color: var(--text-on-dark-muted);
-  font-size: 1rem;
-  margin: 0 0 36px;
-}
-
-/* ---- Franja de monitor cardiaco ---- */
+/* ---- ECG: cruza toda la pantalla justo debajo de las tarjetas (en el flujo,
+   no detrás de ellas, para que los picos se vean completos) ---- */
 .ecgTrack {
   position: relative;
   width: 100%;
-  height: 70px;
+  height: 90px;
+  margin-top: clamp(4px, 2vh, 24px);
+  z-index: 1;
   overflow: hidden;
-  margin: 0 0 40px;
+  pointer-events: none;
+  animation: fadeIn 1s ease 0.8s backwards;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
 }
 
 .ecgScroll {
   display: flex;
-  width: 200%;
+  width: max-content;
   height: 100%;
   animation: scrollLeft 5s linear infinite;
 }
@@ -117,7 +119,7 @@
 .ecgScroll svg {
   flex-shrink: 0;
   width: 1200px;
-  height: 70px;
+  height: 90px;
 }
 
 .ecgScroll path {
@@ -126,8 +128,9 @@
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--status-inactive) 70%, transparent));
-  opacity: 0.75;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--status-inactive) 40%, transparent));
+  opacity: 0.85;
 }
 
 @keyframes scrollLeft {
@@ -135,43 +138,165 @@
   to { transform: translateX(-1200px); }
 }
 
-.statsRow {
+/* ================= PANTALLA DE ESPERA — C · M · O ================= */
+.letters {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: flex;
-  gap: 36px;
+  gap: clamp(16px, 3vw, 44px);
+  padding: 32px;
 }
 
-.stat b {
-  display: block;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-on-dark);
+/* Entrada escalonada C → M → O. "backwards" (no "both"): terminada la
+   animación se vuelve al transform normal de la TiltCard. */
+.letterTilt {
+  --tilt-surface: #ffffff;
+  --tilt-shadow: rgba(16, 42, 67, 0.32);
+  width: clamp(110px, 22vw, 270px);
+  animation: letterIn 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 }
 
-.stat span {
-  font-size: 0.78rem;
-  color: var(--text-on-dark-muted);
+.letterTilt:nth-child(2) {
+  animation-delay: 0.18s;
 }
 
-/* ================= PANEL DERECHO — formulario ================= */
-.formPane {
-  position: relative;
-  z-index: 1;
-  flex: 0.9;
-  min-width: 420px;
+.letterTilt:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes letterIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 48px, 0.1px) scale(0.85);
+  }
+}
+
+.letterCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: clamp(22px, 4vw, 44px) 12px clamp(18px, 3vw, 32px);
+  text-align: center;
+  border-radius: var(--card-radius);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-color) 14%, transparent);
+}
+
+.letter {
+  font-family: 'Montserrat', var(--sans);
+  font-size: clamp(4.5rem, 15vw, 11rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  /* Degradado vertical: rojo más oscuro arriba que se aclara hasta el rojo
+     actual (--status-inactive) abajo. El texto es transparente y deja ver el
+     fondo recortado a la forma de la letra. */
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--status-inactive) 70%, black) 15%,
+    var(--status-inactive) 85%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  /* drop-shadow y no text-shadow: con texto transparente el text-shadow se
+     pintaría encima del degradado y lo manchará. */
+  filter: drop-shadow(0 8px 10px color-mix(in srgb, var(--status-inactive) 28%, transparent));
+}
+
+.word {
+  margin-top: clamp(8px, 1.5vw, 16px);
+  padding-left: 0.24em; /* compensa el letter-spacing para que quede centrada */
+  font-family: 'Montserrat', var(--sans);
+  font-size: clamp(0.62rem, 1.35vw, 1rem);
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--azul-marca);
+}
+
+/* ---- Botón discreto que abre el login ---- */
+.openLoginBtn {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 30%, white);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(6px);
+  color: var(--text-muted);
+  font: 500 0.82rem var(--sans);
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.openLoginBtn:hover,
+.openLoginBtn:focus-visible {
+  opacity: 1;
+  border-color: var(--primary);
+  color: var(--text-main);
+}
+
+/* ================= LOGIN EMERGENTE ================= */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  padding: 24px;
+  background: color-mix(in srgb, var(--bg-body) 32%, transparent);
+  backdrop-filter: blur(6px);
+  animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.closeBtn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.closeBtn:hover {
+  background: color-mix(in srgb, var(--text-main) 8%, transparent);
+  color: var(--text-main);
+}
+
+.closeBtn:focus-visible {
+  outline: 2px solid var(--text-main);
+  outline-offset: 2px;
 }
 
 .loginTilt {
+  --tilt-surface: #ffffff;
   width: 400px;
   max-width: 100%;
 }
 
 .card {
+  position: relative;
   padding: 38px 34px 32px;
 }
 
@@ -186,7 +311,7 @@
   width: 42px;
   height: 42px;
   object-fit: contain;
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--primary) 55%, transparent));
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--primary) 40%, transparent));
   animation: heartbeat 2.4s ease-in-out infinite;
 }
 
@@ -201,14 +326,14 @@
 .brandName {
   font-weight: 600;
   font-size: 1rem;
-  color: var(--text-on-dark);
+  color: var(--text-main);
 }
 
 .brandName span {
   display: block;
   font-weight: 400;
   font-size: 0.72rem;
-  color: var(--text-on-dark-muted);
+  color: var(--text-muted);
   margin-top: 2px;
 }
 
@@ -217,12 +342,12 @@
   font-weight: 600;
   margin: 0 0 6px;
   letter-spacing: -0.01em;
-  color: var(--text-on-dark);
+  color: var(--text-main);
 }
 
 .subtitle {
   margin: 0 0 26px;
-  color: var(--text-on-dark-muted);
+  color: var(--text-muted);
   font-size: 0.86rem;
 }
 
@@ -235,7 +360,7 @@
   display: block;
   font-size: 0.8rem;
   font-weight: 500;
-  color: var(--text-on-dark-muted);
+  color: var(--text-muted);
   margin-bottom: 6px;
 }
 
@@ -243,9 +368,9 @@
   width: 100%;
   padding: 12px 14px;
   border-radius: var(--radius-sm);
-  border: 1.5px solid var(--border-color);
-  background: var(--bg-input-dark);
-  color: var(--text-on-dark);
+  border: 1.5px solid color-mix(in srgb, var(--border-color) 30%, white);
+  background: var(--bg-input);
+  color: var(--text-main);
   font-size: 0.92rem;
   font-family: var(--sans);
   outline: none;
@@ -273,7 +398,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--text-on-dark-muted);
+  color: var(--text-muted);
   cursor: pointer;
 }
 
@@ -323,7 +448,7 @@
 }
 
 .submitBtn:focus-visible {
-  outline: 2px solid var(--text-on-dark);
+  outline: 2px solid var(--text-main);
   outline-offset: 2px;
 }
 
@@ -331,32 +456,35 @@
   margin-top: 20px;
   text-align: center;
   font-size: 0.76rem;
-  color: var(--text-on-dark-muted);
+  color: var(--text-muted);
 }
 
-@media (max-width: 980px) {
-  .stage {
-    flex-direction: column;
+
+@media (max-width: 640px) {
+  .letters {
+    padding: 16px;
   }
-  .brandPane {
-    padding: 48px 32px 32px;
-    flex: none;
-  }
-  .formPane {
-    min-width: 0;
-    flex: none;
-    padding: 32px;
-  }
-  .watermark img {
-    width: min(85vw, 640px);
-    margin-top: 6vh;
+  .openLoginBtn {
+    top: 12px;
+    right: 12px;
   }
 }
 
 @media (max-width: 480px) {
-  .statsRow {
-    flex-wrap: wrap;
-    row-gap: 12px;
+  .letters {
+    gap: 10px;
+    padding: 12px;
+  }
+  .letterTilt {
+    width: 30vw;
+  }
+  .letterCard {
+    padding-inline: 4px;
+  }
+  .word {
+    padding-left: 0.08em;
+    font-size: clamp(0.5rem, 2.4vw, 0.62rem);
+    letter-spacing: 0.08em;
   }
   .card {
     padding: 30px 22px 26px;
@@ -365,9 +493,13 @@
 
 @media (prefers-reduced-motion: reduce) {
   .glowOrb,
+  .glowOrbSecondary,
   .ecgScroll,
+  .ecgTrack,
+  .letterTilt,
   .brand img,
-  .submitBtn {
+  .submitBtn,
+  .backdrop {
     animation: none;
   }
 }

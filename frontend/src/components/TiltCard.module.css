@@ -4,7 +4,11 @@
    un único color — lo que cambia con el mouse es su intensidad
    (--glow-intensity, 0 a 1 según la distancia al centro), nunca el tono.
    Para usar otro color, el consumidor puede sobreescribir --tilt-glow
-   con un style inline en el wrapper. */
+   con un style inline en el wrapper.
+
+   Otras dos variables que el consumidor puede sobreescribir en su className:
+   --tilt-surface (fondo de la tarjeta; por defecto --bg-card-dark) y
+   --tilt-shadow (color de la sombra proyectada; por defecto negro). */
 
 .pc-card-wrapper {
   --tilt-glow: #14b8a6;
@@ -16,6 +20,7 @@
   --rotate-x: 0deg;
   --rotate-y: 0deg;
   --card-radius: 24px;
+  --tilt-shadow: rgba(0, 0, 0, 0.8);
 
   perspective: 500px;
   transform: translate3d(0, 0, 0.1px);
@@ -39,16 +44,23 @@
   position: relative;
   border-radius: var(--card-radius);
   overflow: hidden;
-  box-shadow: rgba(0, 0, 0, 0.8) calc((var(--pointer-from-left) * 10px) - 3px)
+  box-shadow: var(--tilt-shadow) calc((var(--pointer-from-left) * 10px) - 3px)
     calc((var(--pointer-from-top) * 20px) - 6px) 20px -5px;
   transition: transform 1s ease, box-shadow 0.5s ease;
   transform: translate3d(0, 0, 0.1px) rotateX(0deg) rotateY(0deg);
 }
 
+/* Modo idle: la inclinación la manda el balanceo automático (JS), así que
+   la tarjeta sigue las variables aunque no haya puntero encima. */
+.pc-card.idle {
+  transition: none;
+  transform: translate3d(0, 0, 0.1px) rotateX(var(--rotate-y)) rotateY(var(--rotate-x));
+}
+
 .pc-card.active {
   transition: none;
   transform: translate3d(0, 0, 0.1px) rotateX(var(--rotate-y)) rotateY(var(--rotate-x));
-  box-shadow: rgba(0, 0, 0, 0.8) calc((var(--pointer-from-left) * 10px) - 3px)
+  box-shadow: var(--tilt-shadow) calc((var(--pointer-from-left) * 10px) - 3px)
       calc((var(--pointer-from-top) * 20px) - 6px) 20px -5px,
     0 0 60px -10px color-mix(in srgb, var(--tilt-glow) 55%, transparent);
 }
@@ -56,7 +68,7 @@
 .pc-inside {
   position: relative;
   border-radius: inherit;
-  background: var(--bg-card-dark, #080F1C);
+  background: var(--tilt-surface, var(--bg-card-dark, #080F1C));
 }
 
 /* Reflejo de un solo color que sigue al puntero — como el vidrio de una

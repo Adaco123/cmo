@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faRightToBracket, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from './AuthProvider';
 import { useErrorToast } from './ErrorToastProvider';
+import '@fontsource/montserrat/600.css';
+import '@fontsource/montserrat/800.css';
 import cmoLogo from '../assets/cmo.png';
 import TiltCard from './TiltCard';
 import styles from './Login.module.css';
@@ -10,6 +14,17 @@ const ECG_PATH =
   'M0,35 L140,35 L165,10 L190,58 L215,4 L240,62 L265,35 L560,35 L585,22 L610,35 ' +
   'L740,35 L765,10 L790,58 L815,4 L840,62 L865,35 L1200,35';
 
+// Pantalla de espera: es lo que ve el paciente mientras el médico lo atiende.
+// Cada letra es una TiltCard; la palabra chica de abajo completa el nombre.
+const LETRAS = [
+  { letra: 'C', palabra: 'Consultores' },
+  { letra: 'M', palabra: 'Médicos' },
+  { letra: 'O', palabra: 'Oruro' },
+];
+
+// El ECG se repite cada 1200px; con 4 copias cubre pantallas de hasta 3600px.
+const ECG_COPIAS = [0, 1, 2, 3];
+
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -17,6 +32,23 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mostrarLogin, setMostrarLogin] = useState(false);
+
+  // Al cerrar se limpia la contraseña: la pantalla queda a la vista del paciente.
+  const cerrarLogin = useCallback(() => {
+    if (loading) return;
+    setMostrarLogin(false);
+    setPassword('');
+  }, [loading]);
+
+  useEffect(() => {
+    if (!mostrarLogin) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') cerrarLogin();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mostrarLogin, cerrarLogin]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,99 +84,111 @@ const Login: React.FC = () => {
 
   return (
     <div className={styles.stage}>
-      {/* Marca de agua a pantalla completa, detrás de ambos paneles */}
+      {/* Fondo animado: marca de agua y dos orbes de luz */}
       <div className={styles.watermark}>
         <img src={cmoLogo} alt="" />
       </div>
+      <div className={styles.glowOrb} />
+      <div className={styles.glowOrbSecondary} />
 
-      {/* ===== Panel izquierdo: identidad + monitor ===== */}
-      <div className={styles.brandPane}>
-        <div className={styles.glowOrb} />
-
-        <h1 className={styles.heading}>Gestión clínica en tiempo real, sin fricción.</h1>
-        <p className={styles.desc}>
-          Historiales, episodios y seguimiento de pacientes en un solo panel, pensado
-          para el ritmo de un consultorio real.
-        </p>
-
-        <div className={styles.ecgTrack}>
-          <div className={styles.ecgScroll}>
-            <svg viewBox="0 0 1200 70" preserveAspectRatio="none">
-              <path d={ECG_PATH} />
-            </svg>
-            <svg viewBox="0 0 1200 70" preserveAspectRatio="none">
-              <path d={ECG_PATH} />
-            </svg>
-          </div>
-        </div>
-
-        <div className={styles.statsRow}>
-          <div className={styles.stat}>
-            <b>128</b>
-            <span>Pacientes hoy</span>
-          </div>
-          <div className={styles.stat}>
-            <b>24/7</b>
-            <span>Disponibilidad</span>
-          </div>
-          <div className={styles.stat}>
-            <b>99.9%</b>
-            <span>Continuidad</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ===== Panel derecho: formulario ===== */}
-      <div className={styles.formPane}>
-        <TiltCard className={styles.loginTilt}>
-          <div className={styles.card}>
-            <div className={styles.brand}>
-              <img src={cmoLogo} alt="CMO" />
-              <div className={styles.brandName}>
-                CMO
-                <span>Gestión clínica</span>
-              </div>
+      {/* ===== Pantalla de espera: C · M · O ===== */}
+      <main className={styles.letters}>
+        {LETRAS.map(({ letra, palabra }, i) => (
+          <TiltCard
+            key={letra}
+            className={styles.letterTilt}
+            glow="var(--status-inactive)"
+            idle
+            phase={i * 2.1}
+          >
+            <div className={styles.letterCard}>
+              <span className={styles.letter}>{letra}</span>
+              <span className={styles.word}>{palabra}</span>
             </div>
+          </TiltCard>
+        ))}
+      </main>
 
-            <h2 className={styles.cardHeading}>Bienvenido de nuevo</h2>
-            <p className={styles.subtitle}>Ingresa tus credenciales para continuar</p>
-
-            <form onSubmit={handleSubmit} noValidate>
-              <div className={styles.field}>
-                <label htmlFor="email">Correo electrónico</label>
-                <input
-                  type="email"
-                  id="email"
-                  placeholder="correo@ejemplo.com"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className={styles.field}>
-                <label htmlFor="password">Contraseña</label>
-                <input
-                  type="password"
-                  id="password"
-                  placeholder="••••••••"
-                  required
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-
-              <button type="submit" className={styles.submitBtn} disabled={loading}>
-                {loading ? 'Entrando...' : 'Entrar al sistema'}
-              </button>
-            </form>
-
-            <p className={styles.hint}>
-              ¿Problemas para ingresar? Contacta al administrador del sistema.
-            </p>
-          </div>
-        </TiltCard>
+      {/* ECG a todo el ancho, justo debajo de las tarjetas */}
+      <div className={styles.ecgTrack} aria-hidden="true">
+        <div className={styles.ecgScroll}>
+          {ECG_COPIAS.map((n) => (
+            <svg key={n} viewBox="0 0 1200 70" preserveAspectRatio="none">
+              <path d={ECG_PATH} />
+            </svg>
+          ))}
+        </div>
       </div>
+
+      {/* ===== Botón discreto que abre el login ===== */}
+      <button type="button" className={styles.openLoginBtn} onClick={() => setMostrarLogin(true)}>
+        <FontAwesomeIcon icon={faRightToBracket} />
+        Iniciar sesión
+      </button>
+
+      {/* ===== Login emergente ===== */}
+      {mostrarLogin && (
+        <div
+          className={styles.backdrop}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) cerrarLogin();
+          }}
+        >
+          <TiltCard className={styles.loginTilt}>
+            <div className={styles.card} role="dialog" aria-modal="true" aria-labelledby="login-titulo">
+              <button type="button" className={styles.closeBtn} onClick={cerrarLogin} aria-label="Cerrar">
+                <FontAwesomeIcon icon={faXmark} />
+              </button>
+
+              <div className={styles.brand}>
+                <img src={cmoLogo} alt="CMO" />
+                <div className={styles.brandName}>
+                  CMO
+                  <span>Gestión clínica</span>
+                </div>
+              </div>
+
+              <h2 id="login-titulo" className={styles.cardHeading}>Bienvenido de nuevo</h2>
+              <p className={styles.subtitle}>Ingresa tus credenciales para continuar</p>
+
+              <form onSubmit={handleSubmit} noValidate>
+                <div className={styles.field}>
+                  <label htmlFor="email">Correo electrónico</label>
+                  <input
+                    type="email"
+                    id="email"
+                    placeholder="correo@ejemplo.com"
+                    autoComplete="email"
+                    autoFocus
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label htmlFor="password">Contraseña</label>
+                  <input
+                    type="password"
+                    id="password"
+                    placeholder="••••••••"
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+
+                <button type="submit" className={styles.submitBtn} disabled={loading}>
+                  {loading ? 'Entrando...' : 'Entrar al sistema'}
+                </button>
+              </form>
+
+              <p className={styles.hint}>
+                ¿Problemas para ingresar? Contacta al administrador del sistema.
+              </p>
+            </div>
+          </TiltCard>
+        </div>
+      )}
     </div>
   );
 };

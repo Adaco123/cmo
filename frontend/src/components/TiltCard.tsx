@@ -16,12 +16,24 @@ import styles from './TiltCard.module.css';
  * meter un formulario real) ni bloquea el pointer-events de lo de adentro
  * (el original hacía eso para un avatar no interactivo; acá los inputs y
  * botones quedan clickeables con normalidad).
+ *
+ * Props opcionales para la pantalla de espera del login:
+ *  - glow:  color del brillo de esta tarjeta (por defecto teal).
+ *  - idle:  si nadie tiene el puntero encima, la tarjeta se balancea sola
+ *           con un movimiento lento (en el consultorio nadie mueve el
+ *           mouse, y sin esto las tarjetas quedarían quietas). Se apaga con
+ *           prefers-reduced-motion.
+ *  - phase: desfase (en segundos) del balanceo, para que varias tarjetas
+ *           con idle no se muevan al unísono.
  */
 
 export interface TiltCardProps {
   children: React.ReactNode;
   enableTilt?: boolean;
   className?: string;
+  glow?: string;
+  idle?: boolean;
+  phase?: number;
 }
 
 const ANIMATION_CONFIG = {
@@ -37,10 +49,12 @@ const adjust = (value: number, fromMin: number, fromMax: number, toMin: number, 
   round(toMin + ((toMax - toMin) * (value - fromMin)) / (fromMax - fromMin));
 const easeInOutCubic = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 
-const TiltCard: React.FC<TiltCardProps> = ({ children, enableTilt = true, className }) => {
+const TiltCard: React.FC<TiltCardProps> = ({ children, enableTilt = true, className, glow, idle = false, phase = 0 }) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const rafId = useRef<number | null>(null);
+  // true mientras el puntero está encima o la tarjeta vuelve al centro: el balanceo idle espera.
+  const idleBlocked = useRef(false);
   const [isActive, setIsActive] = useState(false);
 
   const updateCardTransform = useCallback((offsetX: number, offsetY: number) => {
@@ -83,6 +97,7 @@ const TiltCard: React.FC<TiltCardProps> = ({ children, enableTilt = true, classN
       const wrap = wrapperRef.current;
       if (!wrap) return;
 
+      idleBlocked.current = true;
       const startTime = performance.now();
       const targetX = wrap.clientWidth / 2;
       const targetY = wrap.clientHeight / 2;
@@ -100,6 +115,7 @@ const TiltCard: React.FC<TiltCardProps> = ({ children, enableTilt = true, classN
           rafId.current = requestAnimationFrame(loop);
         } else {
           wrap.style.setProperty('--glow-intensity', '0');
+          idleBlocked.current = false;
         }
       };
 
@@ -120,6 +136,7 @@ const TiltCard: React.FC<TiltCardProps> = ({ children, enableTilt = true, classN
   const handlePointerEnter = useCallback(() => {
     if (!enableTilt) return;
     cancelAnimation();
+    idleBlocked.current = true;
     setIsActive(true);
   }, [enableTilt, cancelAnimation]);
 
@@ -148,17 +165,42 @@ const TiltCard: React.FC<TiltCardProps> = ({ children, enableTilt = true, classN
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!idle || !enableTilt) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    let raf = 0;
+    let amp = 0; // sube de 0 a 1 para que el balanceo arranque suave, sin saltos
+    const loop = (time: number) => {
+      const card = cardRef.current;
+      if (card && !idleBlocked.current) {
+        amp += (1 - amp) * 0.03;
+        const t = time / 1000 + phase;
+        const w = card.clientWidth;
+        const h = card.clientHeight;
+        updateCardTransform(w / 2 + Math.sin(t * 0.7) * w * 0.3 * amp, h / 2 + Math.cos(t * 0.5) * h * 0.3 * amp);
+      } else {
+        amp = 0;
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+
+    return () => cancelAnimationFrame(raf);
+  }, [idle, enableTilt, phase, updateCardTransform]);
+
   return (
     <div
       ref={wrapperRef}
       className={[styles['pc-card-wrapper'], isActive ? styles.active : '', className].filter(Boolean).join(' ')}
+      style={glow ? ({ '--tilt-glow': glow } as React.CSSProperties) : undefined}
       onMouseEnter={handlePointerEnter}
       onMouseMove={handlePointerMove}
       onMouseLeave={handlePointerLeave}
     >
       <section
         ref={cardRef}
-        className={[styles['pc-card'], isActive ? styles.active : ''].filter(Boolean).join(' ')}
+        className={[styles['pc-card'], isActive ? styles.active : '', idle ? styles.idle : ''].filter(Boolean).join(' ')}
       >
         <div className={styles['pc-inside']}>
           <div className={styles['pc-glare']} />
