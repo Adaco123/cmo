@@ -134,13 +134,6 @@ const Login: React.FC = () => {
                 />
               </div>
 
-              <div className={styles.row}>
-                <label>
-                  <input type="checkbox" defaultChecked /> Recordarme
-                </label>
-                <a href="#">¿Olvidaste tu contraseña?</a>
-              </div>
-
               <button type="submit" className={styles.submitBtn} disabled={loading}>
                 {loading ? 'Entrando...' : 'Entrar al sistema'}
               </button>

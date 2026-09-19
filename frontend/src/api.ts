@@ -39,9 +39,10 @@ api.interceptors.request.use(
 function forzarLogout() {
   localStorage.removeItem('token');
   localStorage.removeItem('refresh_token');
+  localStorage.removeItem('user');
   delete api.defaults.headers.common['Authorization'];
-  if (window.location.pathname !== '/login') {
-    window.location.href = '/login';
+  if (window.location.pathname !== '/') {
+    window.location.href = '/';
   }
 }
 

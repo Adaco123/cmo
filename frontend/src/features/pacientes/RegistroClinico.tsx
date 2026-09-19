@@ -7,6 +7,7 @@ import type { Paciente as ApiPaciente } from '../../api/pacientes';
 import Calendario from '../citas/Calendario';
 import { useCalendario } from '../../components/CalendarioProvider';
 import { useAuth } from '../../components/AuthProvider';
+import { nombreCompleto } from '../../auth';
 import Receta from './Receta';
 import type { RecetaHandle } from './Receta';
 import styles from './RegistroClinico.module.css';
@@ -20,11 +21,6 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { useErrorToast } from '../../components/ErrorToastProvider';
 import { extractErrorMessage } from '../../utils/errors';
-
-// Fallback solo por si no hay sesión resuelta todavía — en circunstancias
-// normales se usa medicoId, que sale del médico realmente logueado
-// (ver useAuth() dentro del componente).
-const MEDICO_ID = 1;
 
 /** Extensión -> nombre de categoría en el catálogo tipos_archivo. El id
  *  real se resuelve contra el catálogo cargado del backend (ver
@@ -128,7 +124,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
   paciente,
   pacienteId,
   consultaId,
-  medicoNombre = 'Dr. Miguel',
+  medicoNombre: medicoNombreProp,
   pacienteNombre = '—',
   pacienteEdad = '—',
   diagnosticoPrevio,
@@ -142,8 +138,10 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
   const diagnostico_ant = paciente?.diagnostico ?? diagnosticoPrevio;
 
   const { user } = useAuth();
-  // Usuario.id es string; medico_id en los payloads es number.
-  const medicoId = Number(user?.id) || MEDICO_ID;
+  // medico_id es el id de la tabla `medicos` (viene en /me), NO el id del
+  // usuario. 0 = el usuario no está vinculado a un médico: se bloquea al guardar.
+  const medicoId = user?.medico_id ?? 0;
+  const medicoNombre = medicoNombreProp ?? nombreCompleto(user);
 
   const pageRef = useRef<HTMLDivElement | null>(null);
 
@@ -402,6 +400,10 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
       } else if (faltaNotaControl) {
         showError('Elegiste una fecha de consulta control pero falta escribir la nota de evolución.');
       }
+      return;
+    }
+    if (!medicoId) {
+      showError('Tu usuario no está registrado como médico, así que no se puede guardar la consulta. Pide al administrador que lo vincule a un médico.');
       return;
     }
     if (!pacienteIdFinal) {

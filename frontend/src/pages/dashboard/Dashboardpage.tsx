@@ -15,7 +15,7 @@ import PagosHoyWidget from '../../components/PagosHoyWidget';
 import { useErrorToast } from '../../components/ErrorToastProvider';
 import { extractErrorMessage } from '../../utils/errors';
 
-import InicioTab from './tabs/Iniciotab';
+import InicioTab, { type AgendaHoyItem } from './tabs/Iniciotab';
 import NuevaAtencionTab from './tabs/Nuevaatenciontab';
 import MisPacientesTab from './tabs/Mispacientestab';
 import PacientesExternosTab from './tabs/Pacientesexternostab';
@@ -23,6 +23,43 @@ import SeguimientoControlTab from './tabs/SeguimientoControlTab';
 import ReportesTab from './tabs/Reportestab';
 import './Dashboardpage.css';
 import '../../components/CrearCita.module.css';
+
+// "Hoy" siempre en horario boliviano (America/La_Paz, GMT-4), sin importar
+// la zona horaria del navegador o del servidor.
+function obtenerHoyBolivia(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/La_Paz' }).format(new Date());
+}
+
+// Seguimientos que el usuario "finalizó" desde Inicio. Es solo una marca
+// visual guardada en este navegador (localStorage): no se manda nada al
+// backend. Se guarda junto con la fecha de hoy, así se reinicia sola cada día,
+// y por usuario, para que lo que oculta una cuenta no se le oculte a otra que
+// use el mismo navegador.
+const seguimientosFinalizadosKey = (usuarioId: number | undefined) =>
+  `cmo:seguimientos-finalizados-hoy:${usuarioId ?? 'sin-usuario'}`;
+
+function leerSeguimientosFinalizados(usuarioId: number | undefined): number[] {
+  try {
+    const raw = localStorage.getItem(seguimientosFinalizadosKey(usuarioId));
+    if (!raw) return [];
+    const data = JSON.parse(raw) as { fecha?: string; ids?: unknown };
+    if (data.fecha !== obtenerHoyBolivia() || !Array.isArray(data.ids)) return [];
+    return data.ids.filter((id): id is number => typeof id === 'number');
+  } catch {
+    return [];
+  }
+}
+
+function guardarSeguimientosFinalizados(usuarioId: number | undefined, ids: number[]): void {
+  try {
+    localStorage.setItem(
+      seguimientosFinalizadosKey(usuarioId),
+      JSON.stringify({ fecha: obtenerHoyBolivia(), ids }),
+    );
+  } catch {
+    // Sin localStorage (modo privado, cuota llena): solo se pierde la persistencia.
+  }
+}
 
 /**
  * Reemplaza CMODashboard.tsx. Solo coordina: qué tab está activo,
@@ -41,11 +78,11 @@ const DashboardPage: React.FC = () => {
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
   const [searchSeguimiento, setSearchSeguimiento] = useState('');
 
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/', { replace: true });
   };
 
   const {
@@ -80,7 +117,7 @@ const DashboardPage: React.FC = () => {
   const { showError, showSuccess } = useErrorToast();
 
   const calendarioControl = useCalendario();
-  const { citas, estadosCita, loading: loadingCitas, error: citasError, agendaCargada, refrescarAgenda, finalizarCita } = calendarioControl;
+  const { citas, seguimientos, estadosCita, loading: loadingCitas, error: citasError, agendaCargada, refrescarAgenda, finalizarCita } = calendarioControl;
 
   // La agenda del CalendarioProvider antes solo se cargaba cuando alguien
   // abría el picker del calendario. Dashboardpage la necesita apenas se
@@ -94,14 +131,13 @@ const DashboardPage: React.FC = () => {
   }, []);
 
   const [finalizandoId, setFinalizandoId] = useState<number | null>(null);
+  const [seguimientosFinalizados, setSeguimientosFinalizados] = useState<number[]>(() => leerSeguimientosFinalizados(user?.id));
 
   // "Hoy" siempre en horario boliviano (America/La_Paz, GMT-4), sin
   // importar en qué zona horaria esté configurado el navegador o el
   // servidor donde corra la app — evita que "citas de hoy" se corra un
   // día si alguien la abre desde una máquina con otro huso horario.
-  const hoyBoliviaKey = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/La_Paz',
-  }).format(new Date());
+  const hoyBoliviaKey = obtenerHoyBolivia();
 
   // "Citas de hoy" pendientes de atender: de la fecha de hoy, y sin contar
   // las que ya están Canceladas o Atendidas (buscadas por NOMBRE sobre
@@ -113,6 +149,47 @@ const DashboardPage: React.FC = () => {
     .filter((cita) => !estadosOcultos.has(nombreEstadoPorId.get(cita.estado_id) || ''))
     .sort((a, b) => (a.hora_inicio || '').localeCompare(b.hora_inicio || ''));
 
+  // Controles de seguimiento agendados para hoy. Un seguimiento no tiene
+  // estado: cada control registrado crea una fila nueva que define la
+  // próxima fecha. Por eso, de cada registro clínico solo cuenta el ÚLTIMO
+  // seguimiento (el de id mayor): su proxima_fecha_control es el control
+  // realmente pendiente. Cuando se atiende y se guarda el siguiente control,
+  // el anterior deja de ser el último y sale solo de la lista de hoy.
+  const ultimoSeguimientoPorRegistro = new Map<number, (typeof seguimientos)[number]>();
+  for (const s of seguimientos) {
+    const actual = ultimoSeguimientoPorRegistro.get(s.registro_clinico_id);
+    if (!actual || s.id > actual.id) ultimoSeguimientoPorRegistro.set(s.registro_clinico_id, s);
+  }
+  const controlesHoy = [...ultimoSeguimientoPorRegistro.values()]
+    .filter((s) => String(s.proxima_fecha_control || '').slice(0, 10) === hoyBoliviaKey)
+    .filter((s) => !seguimientosFinalizados.includes(s.id));
+
+  // Agenda de hoy = citas pendientes + controles de seguimiento de hoy,
+  // ordenados por hora (los que no tienen hora van al final).
+  const agendaHoy: AgendaHoyItem[] = [
+    ...citasHoy.map((cita): AgendaHoyItem => ({
+      tipo: 'cita',
+      key: `cita-${cita.id}`,
+      hora: cita.hora_inicio || '',
+      cita,
+    })),
+    ...controlesHoy.map((seguimiento): AgendaHoyItem => ({
+      tipo: 'seguimiento',
+      key: `seguimiento-${seguimiento.id}`,
+      hora: seguimiento.hora_inicio || '',
+      seguimiento,
+    })),
+  ].sort((a, b) => (a.hora || '99:99').localeCompare(b.hora || '99:99'));
+
+  // Abre la pantalla de atención que corresponde al ORIGEN del paciente:
+  // externos → PacienteExterno (archivos / atención externa), propios →
+  // VerPaciente (historia clínica). Antes "Atender" (Inicio) y "Iniciar
+  // atención" (Nueva atención) abrían siempre VerPaciente.
+  const abrirAtencion = (p: Paciente) => {
+    if (p.origen === 'externo') setPacienteExternoSeleccionado(p);
+    else setSelectedPaciente(p);
+  };
+
   const handleFinalizarCita = async (citaId: number) => {
     setFinalizandoId(citaId);
     try {
@@ -122,6 +199,15 @@ const DashboardPage: React.FC = () => {
     } finally {
       setFinalizandoId(null);
     }
+  };
+
+  // "Finalizar" de un seguimiento en Inicio: solo lo oculta de la lista de
+  // hoy (marca local, ver arriba). No cambia nada en el backend.
+  const handleFinalizarSeguimiento = (seguimientoId: number) => {
+    if (seguimientosFinalizados.includes(seguimientoId)) return;
+    const siguientes = [...seguimientosFinalizados, seguimientoId];
+    setSeguimientosFinalizados(siguientes);
+    guardarSeguimientosFinalizados(user?.id, siguientes);
   };
 
   const handleCambiarEstado = async (p: Paciente) => {
@@ -141,25 +227,26 @@ const DashboardPage: React.FC = () => {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onLogout={handleLogout}
-        citasHoyCount={citasHoy.length}
+        citasHoyCount={agendaHoy.length}
       >
         <PagosHoyWidget />
         <InicioTab
           active={activeTab === 'inicio'}
           pacientes={pacientes}
-          citasHoy={citasHoy}
+          agendaHoy={agendaHoy}
           loadingCitas={loadingCitas}
           citasError={citasError}
           finalizandoId={finalizandoId}
           onRefreshCitas={() => refrescarAgenda()}
-          onAtender={(p) => setSelectedPaciente(p)}
+          onAtender={abrirAtencion}
           onFinalizar={(cita) => void handleFinalizarCita(cita.id)}
+          onFinalizarSeguimiento={(seguimiento) => handleFinalizarSeguimiento(seguimiento.id)}
         />
 
         <NuevaAtencionTab
           active={activeTab === 'nueva_atencion'}
           pacientes={pacientes}
-          onIniciarAtencion={(p) => setSelectedPaciente(p)}
+          onIniciarAtencion={abrirAtencion}
           onCrearPaciente={() => setShowPacienteForm(true)}
         />
 

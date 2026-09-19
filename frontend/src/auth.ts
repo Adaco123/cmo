@@ -3,18 +3,40 @@ import axios from 'axios';
 
 export type Rol = 'ADMINISTRADOR' | 'MEDICO' | string;
 
+/**
+ * Lo que devuelve GET /api/usuarios/me: la cuenta (usuarios) + su empleado
+ * y su médico. OJO: son tres tablas con ids distintos — `id` es el de la
+ * cuenta; para citas/consultas/controles se usa `medico_id`.
+ */
 export interface Usuario {
-  id: string;
+  id: number;
+  usuario: string;
+  correo: string | null;
   rol_id: number;
-  nombres: string;
-  apellidos: string;
-  username: string;
-  email: string | null;
-  registro_profesional?: string | null;
-  activo?: boolean;
-  ultimo_login?: string | null;
+  estado?: boolean;
+  empleado_id: number | null;
+  medico_id: number | null;
+  nombres: string | null;
+  apellidos: string | null;
+  especialidad?: string | null;
+  matricula_profesional?: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+/** "Nombres Apellidos" del usuario; si no tiene empleado, cae al nombre de cuenta. */
+export function nombreCompleto(user: Usuario | null | undefined): string {
+  const nombre = [user?.nombres, user?.apellidos].filter(Boolean).join(' ').trim();
+  return nombre || user?.usuario || '';
+}
+
+/** Iniciales para el avatar (máx. 2 letras). */
+export function iniciales(user: Usuario | null | undefined): string {
+  const partes = [user?.nombres, user?.apellidos].filter(Boolean) as string[];
+  const letras = partes.length > 0
+    ? partes.map((p) => p.trim()[0]).join('')
+    : (user?.usuario ?? '').slice(0, 2);
+  return letras.slice(0, 2).toUpperCase() || '?';
 }
 
 interface LoginResponse {
@@ -88,6 +110,14 @@ class AuthStore {
   }
 
   async init(): Promise<void> {
+    // Sin token no hay sesión: se descarta cualquier usuario que haya quedado
+    // guardado (así el guard de rutas no deja pasar a alguien "fantasma").
+    if (!this.state.token) {
+      this.state.user = null;
+      localStorage.removeItem(this.userKey);
+      return;
+    }
+
     const storedUser = localStorage.getItem(this.userKey);
     if (storedUser) {
       try {
@@ -97,18 +127,19 @@ class AuthStore {
       }
     }
 
-    if (this.state.token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${this.state.token}`;
-      // try to refresh user from backend if not present
+    api.defaults.headers.common['Authorization'] = `Bearer ${this.state.token}`;
+
+    // Siempre se refresca el usuario desde /me: el guardado en localStorage
+    // puede venir de una versión anterior (sin medico_id, nombres, etc.).
+    try {
+      const me = await api.get('/api/usuarios/me');
+      this.setUser(me.data.user ?? null);
+    } catch (err) {
+      console.debug('[Auth] init fetch /me failed', err);
+      // Sin red o servidor caído: se conserva el usuario guardado. Si el token
+      // ya no sirve, el interceptor de api.ts se encarga de mandar al login.
       if (!this.state.user) {
-        try {
-          const me = await api.get('/api/usuarios/me');
-          this.setUser(me.data.user ?? null);
-        } catch (err) {
-          // ignore — token might be invalid
-          console.debug('[Auth] init fetch /me failed', err);
-          this.setToken(null);
-        }
+        this.setToken(null);
       }
     }
   }

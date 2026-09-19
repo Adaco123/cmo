@@ -1,8 +1,9 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import DashboardPage from './pages/dashboard/Dashboardpage';
 import HistoriaClinica from './features/pacientes/RegistroClinico';
 import Login from './components/Login';
+import ProtectedRoute from './components/ProtectedRoute';
 import CapturarFotos from './features/capturar-fotos/CapturarFotos';
 import { ErrorToastProvider } from './components/ErrorToastProvider';
 import { CalendarioProvider } from './components/CalendarioProvider';
@@ -21,9 +22,13 @@ function App() {
                 <Routes>
                   
                   <Route path="/" element={<Login />} />
-                  <Route path="/dashboard" element={<DashboardPage/>} />
-                  <Route path="/historia-clinica" element={<HistoriaClinica />} />
+                  <Route element={<ProtectedRoute />}>
+                    <Route path="/dashboard" element={<DashboardPage/>} />
+                    <Route path="/historia-clinica" element={<HistoriaClinica />} />
+                  </Route>
                   <Route path="/capturar-fotos/:token" element={<CapturarFotos />} />
+                  {/* Cualquier ruta inexistente (ej. /login) vuelve al login en vez de quedar en blanco */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </BrowserRouter>
             </ReportesHoyProvider>

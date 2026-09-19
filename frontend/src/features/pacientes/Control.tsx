@@ -6,6 +6,7 @@ import type { RegistroClinico } from '../../api/historialClinico';
 import Calendario from '../citas/Calendario';
 import { useCalendario } from '../../components/CalendarioProvider';
 import { useAuth } from '../../components/AuthProvider';
+import { nombreCompleto } from '../../auth';
 import Receta from './Receta';
 import type { RecetaHandle } from './Receta';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -13,10 +14,6 @@ import { faCalendarCheck, faSpinner, faSave, faCapsules, faXmark, faCalendarDays
 import styles from './Control.module.css';
 import { useErrorToast } from '../../components/ErrorToastProvider';
 import { extractErrorMessage } from '../../utils/errors';
-
-// Fallback solo por si no hay sesión resuelta todavía — ahora sí existe
-// login real (ver useAuth() dentro del componente, más abajo).
-const MEDICO_ID = 1;
 
 /** "YYYY-MM-DD" en fecha LOCAL, a diferencia de toISOString() que usa UTC
  *  y puede adelantar un día en horas de la noche (Bolivia es UTC-4). */
@@ -70,7 +67,7 @@ const Control: React.FC<Props> = ({
   pacienteEdad = '—',
   pacienteCi = '—',
   alergias = '',
-  medicoNombre = 'Dr. Miguel',
+  medicoNombre: medicoNombreProp,
   onSaved,
   onClose,
 }) => {
@@ -88,8 +85,10 @@ const Control: React.FC<Props> = ({
   const evolucionRef = useRef<HTMLTextAreaElement>(null);
 
   const { user } = useAuth();
-  // Usuario.id es string; medico_id en los payloads es number.
-  const medicoId = Number(user?.id) || MEDICO_ID;
+  // medico_id es el id de la tabla `medicos` (viene en /me), NO el id del
+  // usuario. 0 = el usuario no está vinculado a un médico: se bloquea al guardar.
+  const medicoId = user?.medico_id ?? 0;
+  const medicoNombre = medicoNombreProp ?? nombreCompleto(user);
 
   // ---------- calendario para elegir la fecha del próximo control ----------
   const calendarioControl = useCalendario();
@@ -135,6 +134,10 @@ const Control: React.FC<Props> = ({
   };
 
   const handleGuardar = async () => {
+    if (!medicoId) {
+      showError('Tu usuario no está registrado como médico, así que no se puede guardar el control. Pide al administrador que lo vincule a un médico.');
+      return;
+    }
     const texto = evolucion.trim();
     if (!texto) {
       showError('Escribe cómo sigue el paciente antes de guardar.');

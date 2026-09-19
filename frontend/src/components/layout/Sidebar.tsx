@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import cmoImage from '../../assets/cmo.png';
+import { useAuth } from '../AuthProvider';
+import { iniciales, nombreCompleto } from '../../auth';
 export type DashboardTab =
   | 'inicio'
   | 'nueva_atencion'
@@ -24,6 +26,7 @@ interface SidebarProps {
  */
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, onLogout, citasHoyCount }) => {
   const [collapsed, setCollapsed] = useState(false);
+  const { user } = useAuth();
 
   const navItem = (
     tab: DashboardTab,
@@ -146,9 +149,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, onLogout, cit
       </nav>
 
       <div className="sidebar-footer">
-        <div className="avatar">RG</div>
+        <div className="avatar">{iniciales(user)}</div>
         <div className="user-info">
-          <div className="name">Dr. Miguel</div>
+          <div className="name">{nombreCompleto(user)}</div>
         </div>
         <button className="logout" title="Cerrar sesión" onClick={onLogout}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

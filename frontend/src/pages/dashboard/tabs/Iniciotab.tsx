@@ -3,20 +3,32 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRefresh, faCalendarDays } from '@fortawesome/free-solid-svg-icons';
 import { type Paciente } from '../../../api/pacientes';
 import { type Cita } from '../../../api/citas';
+import { type SeguimientoControl } from '../../../api/seguimientoControl';
 import Calendario from '../../../features/citas/Calendario';
 import { useCalendario } from '../../../components/CalendarioProvider';
 import { useReportesHoy } from '../../../components/ReportesHoyProvider';
 
+/**
+ * Una fila de la agenda de hoy: puede ser una cita o un control de
+ * seguimiento agendado para hoy (seguimiento.proxima_fecha_control).
+ * `hora` es la hora de inicio ("HH:MM[:SS]") o '' si no tiene.
+ */
+export type AgendaHoyItem =
+  | { tipo: 'cita'; key: string; hora: string; cita: Cita }
+  | { tipo: 'seguimiento'; key: string; hora: string; seguimiento: SeguimientoControl };
+
 interface InicioTabProps {
   active: boolean;
   pacientes: Paciente[];
-  citasHoy: Cita[];
+  agendaHoy: AgendaHoyItem[];
   loadingCitas: boolean;
   citasError: string | null;
   finalizandoId: number | null;
   onRefreshCitas: () => void;
   onAtender: (paciente: Paciente) => void;
   onFinalizar: (cita: Cita) => void;
+  /** Solo oculta el seguimiento de la lista de hoy; no toca el backend. */
+  onFinalizarSeguimiento: (seguimiento: SeguimientoControl) => void;
 }
 
 function formatMoney(value: string | number): string {
@@ -28,13 +40,14 @@ function formatMoney(value: string | number): string {
 const InicioTab: React.FC<InicioTabProps> = ({
   active,
   pacientes,
-  citasHoy,
+  agendaHoy,
   loadingCitas,
   citasError,
   finalizandoId,
   onRefreshCitas,
   onAtender,
   onFinalizar,
+  onFinalizarSeguimiento,
 }) => {
   const { pagosHoyData, pacientesAtendidosHoy, loading } = useReportesHoy();
 
@@ -63,7 +76,11 @@ const InicioTab: React.FC<InicioTabProps> = ({
           <div className="stat-value">
             {loading ? '--':formatMoney(pagosHoyData?.total_pagado_hoy ?? '0')}
           </div>
-          <div className="stat-change positive">↑ 18% vs ayer</div>
+          <div className={`stat-change ${loading ? '' : (pagosHoyData?.variacion_porcentual ?? 0) >= 0 ? 'positive' : 'negative'}`}>
+            {loading
+              ? '-'
+              : `${(pagosHoyData?.variacion_porcentual ?? 0) >= 0 ? '↑' : '↓'} ${Math.abs(pagosHoyData?.variacion_porcentual ?? 0)}% vs ayer`}
+          </div>
         </div>
 
         <button
@@ -85,7 +102,7 @@ const InicioTab: React.FC<InicioTabProps> = ({
 
       <div className="table-card scroll-animated" style={{ marginTop: '24px' }}>
         <div className="card-header">
-          <h3>Citas de hoy</h3>
+          <h3>Citas y controles de hoy</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ color: 'var(--text-muted)', opacity: 0.7, fontSize: 'var(--fs-sm)' }}>
               {new Intl.DateTimeFormat('es-BO', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}
@@ -106,25 +123,37 @@ const InicioTab: React.FC<InicioTabProps> = ({
           <div className="today-appointments-empty">Cargando citas...</div>
         ) : citasError ? (
           <div className="today-appointments-empty">{citasError}</div>
-        ) : citasHoy.length === 0 ? (
-          <div className="today-appointments-empty">No hay citas programadas para hoy.</div>
+        ) : agendaHoy.length === 0 ? (
+          <div className="today-appointments-empty">No hay citas ni controles programados para hoy.</div>
         ) : (
           <div className="today-appointments-list">
-            {citasHoy.map((cita) => {
-              const paciente = pacientes.find((p) => p.id === cita.paciente_id);
+            {agendaHoy.map((item) => {
+              const pacienteId = item.tipo === 'cita' ? item.cita.paciente_id : item.seguimiento.paciente_id;
+              const paciente = pacientes.find((p) => p.id === pacienteId);
               const fullName = paciente
                 ? `${paciente.nombres} ${paciente.apellidos}`.trim()
-                : `Paciente #${cita.paciente_id}`;
-              const hora = cita.hora_inicio ? String(cita.hora_inicio).slice(0, 5) : '—';
+                : `Paciente #${pacienteId}`;
+              const hora = item.hora ? String(item.hora).slice(0, 5) : '—';
+              const detalle =
+                item.tipo === 'cita'
+                  ? item.cita.motivo || 'Sin motivo registrado'
+                  : `Control de seguimiento · última evolución: ${
+                      item.seguimiento.evolucion.length > 80
+                        ? `${item.seguimiento.evolucion.slice(0, 80)}…`
+                        : item.seguimiento.evolucion
+                    }`;
 
               return (
-                <div key={cita.id} className="today-appointment-item">
+                <div key={item.key} className="today-appointment-item">
                   <div className="today-appointment-time">{hora}</div>
                   <div className="today-appointment-content">
-                    <div className="today-appointment-name">{fullName}</div>
-                    <div className="today-appointment-meta">
-                      {cita.motivo || 'Sin motivo registrado'}
+                    <div className="today-appointment-name">
+                      {fullName}{' '}
+                      <span className={`badge-tipo ${item.tipo}`} style={{ marginLeft: 8 }}>
+                        {item.tipo === 'cita' ? 'Cita' : 'Seguimiento'}
+                      </span>
                     </div>
+                    <div className="today-appointment-meta">{detalle}</div>
                   </div>
                   {paciente ? (
                     <div className="today-appointment-actions">
@@ -135,14 +164,27 @@ const InicioTab: React.FC<InicioTabProps> = ({
                       >
                         Atender
                       </button>
-                      <button
-                        type="button"
-                        className="glow-btn today-appointment-action-btn today-appointment-action-btn-danger"
-                        onClick={() => onFinalizar(cita)}
-                        disabled={finalizandoId === cita.id}
-                      >
-                        {finalizandoId === cita.id ? 'Finalizando...' : 'Finalizar'}
-                      </button>
+                      {item.tipo === 'cita' ? (
+                        <button
+                          type="button"
+                          className="glow-btn today-appointment-action-btn today-appointment-action-btn-danger"
+                          onClick={() => onFinalizar(item.cita)}
+                          disabled={finalizandoId === item.cita.id}
+                        >
+                          {finalizandoId === item.cita.id ? 'Finalizando...' : 'Finalizar'}
+                        </button>
+                      ) : (
+                        // Los seguimientos no tienen estado en el backend: este botón
+                        // solo los quita de la lista de hoy (ver Dashboardpage).
+                        <button
+                          type="button"
+                          className="glow-btn today-appointment-action-btn today-appointment-action-btn-danger"
+                          title="Quitar de la lista de hoy"
+                          onClick={() => onFinalizarSeguimiento(item.seguimiento)}
+                        >
+                          Finalizar
+                        </button>
+                      )}
                     </div>
                   ) : null}
                 </div>

@@ -220,9 +220,25 @@ class PagosResumenHoy_Resource(Resource):
     @jwt_required()
     def get(self):
         total, cantidad = Pago.resumen_pagos_hoy_bolivia()
+        total_ayer, _ = Pago.resumen_pagos_ayer_bolivia()
+
+        total_dec = Decimal(str(total))
+        total_ayer_dec = Decimal(str(total_ayer))
+
+        # Misma regla que /api/pacientes/atendidos-hoy: si ayer no hubo
+        # pagos, la variación es 100% si hoy hubo alguno y 0% si tampoco.
+        if total_ayer_dec == 0:
+            variacion_porcentual = 100.0 if total_dec > 0 else 0.0
+        else:
+            variacion_porcentual = round(
+                float((total_dec - total_ayer_dec) / total_ayer_dec * 100), 2
+            )
+
         return {
             "total_pagado_hoy": str(total),
             "cantidad_pagos": cantidad,
+            "total_pagado_ayer": str(total_ayer),
+            "variacion_porcentual": variacion_porcentual,
         }, 200
 
 

@@ -54,6 +54,23 @@ class Pago(db.Model, BaseModelMixin):
         return total, cantidad
 
     @classmethod
+    def resumen_pagos_ayer_bolivia(cls):
+        """Retorna (total, cantidad) de pagos registrados ayer, hora boliviana."""
+        ahora_bo = datetime.now(BOLIVIA_TZ)
+        fin_dia_bo = ahora_bo.replace(hour=0, minute=0, second=0, microsecond=0)
+        inicio_dia_bo = fin_dia_bo - timedelta(days=1)
+
+        total, cantidad = (
+            db.session.query(
+                func.coalesce(func.sum(cls.monto), 0),
+                func.count(cls.id),
+            )
+            .filter(cls.created_at >= inicio_dia_bo, cls.created_at < fin_dia_bo)
+            .first()
+        )
+        return total, cantidad
+
+    @classmethod
     def resumen_pagos_mes_bolivia(cls):
         """Retorna (total, cantidad) de pagos registrados en el mes actual."""
         ahora_bo = datetime.now(BOLIVIA_TZ)

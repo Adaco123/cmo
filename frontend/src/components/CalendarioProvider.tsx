@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { type Cita, type CitaPayload, getCitas, updateCita } from '../api/citas';
 import {
   type SeguimientoControl,
@@ -9,6 +9,7 @@ import {
 import { type Paciente } from '../api/pacientes';
 import { type EstadoCita, getEstadosCita } from '../api/estadosCita';
 import { usePacientes } from './PacientesProvider';
+import { useAuth } from './AuthProvider';
 
 interface CalendarioContextValue {
   abierto: boolean;
@@ -78,12 +79,20 @@ const CalendarioContext = createContext<CalendarioContextValue | null>(null);
  * en realidad cancelaba la cita. Se agregó el estado "Atendida" al
  * catálogo del backend, y acá se busca siempre por nombre.
  *
+ * La agenda pertenece a la SESIÓN: al cerrar sesión se vacía (citas,
+ * seguimientos, estados, picker abierto y `agendaCargada`), así quien
+ * inicie sesión después — otra cuenta, o la misma horas más tarde en la
+ * misma pestaña — siempre parte de una agenda sin cargar y la pide de
+ * nuevo, en vez de ver la de la sesión anterior. Si una carga sigue en
+ * vuelo al cerrar sesión, su respuesta se descarta.
+ *
  * `pacientes` YA NO se pide acá — se lee de PacientesProvider (que debe
  * montarse arriba de este Provider en App.tsx), para no tener dos copias
  * de la misma lista completa de pacientes en la app.
  */
 export const CalendarioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { pacientes } = usePacientes();
+  const { isAuthenticated } = useAuth();
 
   const [abierto, setAbierto] = useState(false);
   const [citas, setCitas] = useState<Cita[]>([]);
@@ -93,18 +102,49 @@ export const CalendarioProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Número de "sesión": sube cada vez que se cierra sesión. Cada carga
+  // recuerda el número con el que empezó y, si al terminar ya es otro,
+  // descarta su resultado (era de la sesión anterior).
+  const sesionRef = useRef(0);
+  useEffect(() => {
+    if (!isAuthenticated) sesionRef.current += 1;
+  }, [isAuthenticated]);
+
+  // Al pasar a "sin sesión" se vacía todo. Se hace durante el render (patrón
+  // "ajustar estado cuando cambia un valor" de React) y no en un useEffect,
+  // para no dejar ni un render con la agenda vieja a la vista.
+  const [sesionActiva, setSesionActiva] = useState(isAuthenticated);
+  if (sesionActiva !== isAuthenticated) {
+    setSesionActiva(isAuthenticated);
+    if (!isAuthenticated) {
+      setAbierto(false);
+      setCitas([]);
+      setSeguimientos([]);
+      setEstadosCita([]);
+      setAgendaCargada(false);
+      setLoading(false);
+      setError(null);
+    }
+  }
+
   const cargarDatos = useCallback(() => {
+    const sesion = sesionRef.current;
     setLoading(true);
     setError(null);
     Promise.all([getCitas(), getSeguimientos(), getEstadosCita()])
       .then(([citasData, seguimientosData, estadosData]) => {
+        if (sesionRef.current !== sesion) return; // se cerró sesión mientras cargaba
         setCitas(citasData);
         setSeguimientos(seguimientosData);
         setEstadosCita(estadosData);
         setAgendaCargada(true);
       })
-      .catch(() => setError('No se pudieron cargar los datos del calendario.'))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (sesionRef.current === sesion) setError('No se pudieron cargar los datos del calendario.');
+      })
+      .finally(() => {
+        if (sesionRef.current === sesion) setLoading(false);
+      });
   }, []);
 
   const abrir = useCallback(() => {

@@ -28,6 +28,28 @@ def es_admin(usuario):
     return bool(usuario.rol) and usuario.rol.nombre in ROLES_ADMIN
 
 
+def _perfil_usuario(usuario):
+    """Datos de la cuenta + los de su empleado y su médico (si los tiene).
+
+    usuarios, empleados y medicos son tablas distintas con ids distintos
+    (usuarios.id != empleados.id != medicos.id). El frontend necesita
+    `medico_id` para agendar citas / registrar consultas: ese es el id de
+    `medicos`, NO el `id` del usuario.
+    """
+    perfil = usuarios_schema.dump(usuario)
+    empleado = usuario.empleado
+    medico = empleado.medico if empleado else None
+    perfil.update({
+        "empleado_id": empleado.id if empleado else None,
+        "nombres": empleado.nombres if empleado else None,
+        "apellidos": empleado.apellidos if empleado else None,
+        "medico_id": medico.id if medico else None,
+        "especialidad": medico.especialidad if medico else None,
+        "matricula_profesional": medico.matricula_profesional if medico else None,
+    })
+    return perfil
+
+
 class Registro_Resource(Resource):
     def post(self):
         try:
@@ -127,7 +149,7 @@ class Usuario_Resource(Resource):
             user = current_user
             if not user:
                 return {'error': 'Usuario no encontrado'}, 404
-            return {'user': usuarios_schema.dump(user)}, 200
+            return {'user': _perfil_usuario(user)}, 200
         except Exception as e:
             return {'error': f'Error interno del servidor: {str(e)}'}, 500
 

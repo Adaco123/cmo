@@ -24,6 +24,8 @@ export interface PacientesNuevosResponse {
 export interface PagosResumenHoy {
   total_pagado_hoy: string;
   cantidad_pagos: number;
+  total_pagado_ayer: string;
+  variacion_porcentual: number;
 }
 
 export interface PagosReporteMensualDiario {
