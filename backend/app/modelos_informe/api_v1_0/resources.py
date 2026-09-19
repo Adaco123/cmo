@@ -7,6 +7,7 @@ from app.modelos_informe.models import ModeloInforme
 from app.modelos_informe.schemas import ModeloInformeSchema
 from app.modelos_informe.api_v1_0 import modelos_informe_bp
 from app.informes_ecografia.models import InformeEcografia
+from app.categorias_modelo.models import CategoriaModelo
 
 schema = ModeloInformeSchema()
 schema_list = ModeloInformeSchema(many=True)
@@ -36,6 +37,9 @@ def crear_modelos_informe():
     except ValidationError as err:
         return jsonify(err.messages), 400
 
+    if "categoria_id" in data and not CategoriaModelo.get_by_id(data["categoria_id"]):
+        return jsonify({"error": "categoria_id no existe"}), 404
+
     item = ModeloInforme(**data)
     item.save()
     return jsonify(schema.dump(item)), 201
@@ -52,6 +56,9 @@ def actualizar_modelos_informe(item_id):
         data = schema.load(request.get_json(force=True) or {}, partial=True)
     except ValidationError as err:
         return jsonify(err.messages), 400
+
+    if "categoria_id" in data and not CategoriaModelo.get_by_id(data["categoria_id"]):
+        return jsonify({"error": "categoria_id no existe"}), 404
 
     for key, value in data.items():
         setattr(item, key, value)

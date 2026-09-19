@@ -4,6 +4,8 @@ from datetime import timedelta
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+from werkzeug.exceptions import HTTPException
+from sqlalchemy.exc import IntegrityError
 from app.db import db
 from app.extensions import ma, migrate
 from app.usuarios.models import Usuario
@@ -131,4 +133,42 @@ def create_app(settings_module):
 
 
 def register_error_handlers(app):
-    pass
+    # Red de seguridad: hasta acá, cada endpoint chequeaba a mano sus FKs y
+    # dependencias antes de guardar/borrar (ver los distintos módulos), pero
+    # cualquier excepción que se escapara igual (un caso no previsto, un
+    # módulo nuevo al que se le olvide el chequeo) subía cruda y Flask
+    # devolvía HTML genérico en vez de JSON -- el frontend (extractErrorMessage
+    # en utils/errors.ts) espera siempre JSON, así que ese HTML rompía el
+    # manejo de errores en vez de mostrar un mensaje entendible.
+
+    @app.errorhandler(IntegrityError)
+    def _manejar_integrity_error(err):
+        # No debería llegar hasta acá casi nunca (cada POST/PUT/DELETE ya
+        # valida sus FKs/dependencias a mano), pero si algo se escapa, esto
+        # evita un 500 con traceback: hace rollback (la sesión queda inválida
+        # después de un IntegrityError, cualquier query posterior fallaría
+        # si no se hace) y devuelve un 409 claro en vez de HTML.
+        db.session.rollback()
+        app.logger.exception("IntegrityError no capturado en el endpoint")
+        return jsonify({
+            "error": "La operación viola una restricción de la base de datos "
+                     "(un dato relacionado no existe o ya está en uso)."
+        }), 409
+
+    @app.errorhandler(HTTPException)
+    def _manejar_http_exception(err):
+        # Errores propios de Flask/Werkzeug antes de llegar a cualquier vista
+        # (404 de una ruta que no existe, 405 método no permitido, etc.) --
+        # por defecto vienen como HTML, acá se homogeneizan a JSON.
+        return jsonify({"error": err.description or err.name}), err.code
+
+    @app.errorhandler(Exception)
+    def _manejar_excepcion_no_capturada(err):
+        # Cualquier otra excepción no prevista (TypeError, AttributeError,
+        # etc.): rollback por si la sesión quedó con cambios a medio hacer,
+        # se loguea el traceback completo para poder diagnosticarlo después,
+        # y al cliente solo le llega un 500 genérico en JSON (nunca el
+        # traceback ni detalles internos).
+        db.session.rollback()
+        app.logger.exception("Error interno no capturado")
+        return jsonify({"error": "Error interno del servidor"}), 500

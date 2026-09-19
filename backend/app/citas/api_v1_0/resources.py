@@ -11,6 +11,7 @@ from app.pacientes.models import Paciente
 from app.medicos.models import Medico
 from app.estados_cita.models import EstadoCita
 from app.consultorios.models import Consultorio
+from app.consultas.models import Consulta
 from app.shared.disponibilidad_medico import (
     existe_choque_con_cita,
     existe_choque_con_seguimiento,
@@ -114,6 +115,14 @@ class Cita_Resource(Resource):
         item = Cita.get_by_id(item_id)
         if not item:
             return {"error": "Cita no encontrada"}, 404
+
+        # consultas.cita_id es FK a citas.id (nullable, unique) sin ondelete,
+        # así que en Postgres es RESTRICT por defecto: borrar una cita que
+        # ya generó una consulta explotaba con IntegrityError sin capturar
+        # (500 crudo), mismo patrón ya arreglado en pacientes/medicos/etc.
+        if Consulta.simple_filter(cita_id=item.id):
+            return {"error": "Esta cita ya generó una consulta y no se puede eliminar"}, 409
+
         item.delete()
         return "", 204
 

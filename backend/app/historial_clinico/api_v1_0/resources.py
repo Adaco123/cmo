@@ -305,6 +305,13 @@ class RegistroClinicoList_Resource(Resource):
         if not historias:
             historia.save()
 
+        # registros_clinicos.consulta_id es unique=True (relación 1:1 real
+        # con Consulta): sin este chequeo, un segundo POST con la misma
+        # consulta_id explotaba con IntegrityError sin capturar (500 crudo)
+        # en vez de un mensaje claro.
+        if RegistroClinico.simple_filter(consulta_id=data["consulta_id"]):
+            return {"error": "Esa consulta ya tiene un registro clínico registrado"}, 409
+
         data["historia_clinica_id"] = historia.id
         registro = RegistroClinico(**data)
         registro.save()
@@ -343,6 +350,21 @@ class RegistroClinico_Resource(Resource):
         registro = RegistroClinico.get_by_id(registro_id)
         if not registro:
             return {"error": "Registro clínico no encontrado"}, 404
+
+        # Mismo patrón que en pacientes/medicos/consultas: chequear las FK
+        # reales antes de borrar, en vez de dejar que el IntegrityError
+        # salga sin capturar (ninguna de estas relaciones tiene ondelete).
+        if registro.informes:
+            return {"error": "Este registro tiene informes de ecografía asociados y no se puede eliminar"}, 409
+        if registro.recetas:
+            return {"error": "Este registro tiene recetas asociadas y no se puede eliminar"}, 409
+        if registro.examenes_complementarios:
+            return {"error": "Este registro tiene exámenes complementarios asociados y no se puede eliminar"}, 409
+        if registro.archivos:
+            return {"error": "Este registro tiene archivos adjuntos y no se puede eliminar"}, 409
+        if registro.seguimientos_control:
+            return {"error": "Este registro tiene seguimientos de control asociados y no se puede eliminar"}, 409
+
         registro.delete()
         return "", 204
 

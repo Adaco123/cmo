@@ -7,6 +7,16 @@ from app.empleados.models import Empleado
 from app.empleados.schemas import EmpleadoSchema
 from app.empleados.api_v1_0 import empleados_bp
 from app.medicos.models import Medico
+from app.usuarios.models import Usuario
+from app.consultorios.models import Consultorio
+
+
+def _error_fk_inexistente(data):
+    if "usuario_id" in data and not Usuario.get_by_id(data["usuario_id"]):
+        return "usuario_id no existe"
+    if data.get("consultorio_id") is not None and not Consultorio.get_by_id(data["consultorio_id"]):
+        return "consultorio_id no existe"
+    return None
 
 schema = EmpleadoSchema()
 schema_list = EmpleadoSchema(many=True)
@@ -36,6 +46,10 @@ def crear_empleados():
     except ValidationError as err:
         return jsonify(err.messages), 400
 
+    error_fk = _error_fk_inexistente(data)
+    if error_fk:
+        return jsonify({"error": error_fk}), 404
+
     item = Empleado(**data)
     item.save()
     return jsonify(schema.dump(item)), 201
@@ -52,6 +66,10 @@ def actualizar_empleados(item_id):
         data = schema.load(request.get_json(force=True) or {}, partial=True)
     except ValidationError as err:
         return jsonify(err.messages), 400
+
+    error_fk = _error_fk_inexistente(data)
+    if error_fk:
+        return jsonify({"error": error_fk}), 404
 
     for key, value in data.items():
         setattr(item, key, value)

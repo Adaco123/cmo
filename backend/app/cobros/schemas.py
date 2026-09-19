@@ -6,7 +6,6 @@ from app.extensions import ma
 class CobroSchema(ma.Schema):
     id = fields.Int(dump_only=True)
     consulta_id = fields.Int(required=True)
-    paciente_id = fields.Int(required=True)
     monto = fields.Decimal(
         required=True, as_string=True,
         validate=validate.Range(min=0, min_inclusive=False, error="monto debe ser mayor a 0."),

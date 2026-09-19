@@ -261,12 +261,6 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 
-.formError {
-  margin: -4px 0 14px;
-  font-size: 0.82rem;
-  color: var(--status-inactive);
-}
-
 .row {
   display: flex;
   align-items: center;

@@ -8,7 +8,6 @@ from app.cobros.models import Cobro
 from app.cobros.schemas import CobroSchema
 from app.cobros.api_v1_0 import cobros_bp
 from app.consultas.models import Consulta
-from app.pacientes.models import Paciente
 from app.estados_cobro.models import EstadoCobro
 from app.estados_cobro.api_v1_0.resources import _asegurar_estados_cobro_por_defecto
 from app.pagos.models import Pago
@@ -44,8 +43,6 @@ class CobrosList_Resource(Resource):
 
         if not Consulta.get_by_id(data["consulta_id"]):
             return {"error": "La consulta indicada no existe"}, 404
-        if not Paciente.get_by_id(data["paciente_id"]):
-            return {"error": "El paciente indicado no existe"}, 404
         if Cobro.simple_filter(consulta_id=data["consulta_id"]):
             return {"error": "Esa consulta ya tiene un cobro registrado"}, 409
 

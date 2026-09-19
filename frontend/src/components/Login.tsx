@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
+import { useErrorToast } from './ErrorToastProvider';
 import cmoLogo from '../assets/cmo.png';
 import TiltCard from './TiltCard';
 import styles from './Login.module.css';
@@ -12,14 +13,31 @@ const ECG_PATH =
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { showError } = useErrorToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+
+    // Validación propia (el <form> lleva noValidate): ningún aviso sale como
+    // tooltip nativo del navegador, todo pasa por el toast.
+    const correo = email.trim();
+    if (!correo) {
+      showError('Escribe tu correo electrónico.');
+      return;
+    }
+    // Misma tolerancia que el <input type="email"> nativo.
+    if (!/^[^\s@]+@[^\s@]+$/.test(correo)) {
+      showError('El correo electrónico no es válido.');
+      return;
+    }
+    if (!password) {
+      showError('Escribe tu contraseña.');
+      return;
+    }
+
     setLoading(true);
 
     const result = await login(email, password);
@@ -29,7 +47,7 @@ const Login: React.FC = () => {
       navigate('/dashboard');
       return;
     }
-    setError(result.message ?? 'Credenciales inválidas');
+    showError(result.message ?? 'Credenciales inválidas');
   };
 
   return (
@@ -91,7 +109,7 @@ const Login: React.FC = () => {
             <h2 className={styles.cardHeading}>Bienvenido de nuevo</h2>
             <p className={styles.subtitle}>Ingresa tus credenciales para continuar</p>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate>
               <div className={styles.field}>
                 <label htmlFor="email">Correo electrónico</label>
                 <input
@@ -115,8 +133,6 @@ const Login: React.FC = () => {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
-
-              {error ? <div className={styles.formError}>{error}</div> : null}
 
               <div className={styles.row}>
                 <label>

@@ -6,6 +6,7 @@ from marshmallow import ValidationError
 from app.medicos.models import Medico
 from app.medicos.schemas import MedicoSchema
 from app.medicos.api_v1_0 import medicos_bp
+from app.empleados.models import Empleado
 from app.citas.models import Cita
 from app.consultas.models import Consulta
 from app.recetas.models import Receta
@@ -52,6 +53,9 @@ def crear_medicos():
     except ValidationError as err:
         return jsonify(err.messages), 400
 
+    if "empleado_id" in data and not Empleado.get_by_id(data["empleado_id"]):
+        return jsonify({"error": "empleado_id no existe"}), 404
+
     item = Medico(**data)
     item.save()
     return jsonify(schema.dump(item)), 201
@@ -68,6 +72,9 @@ def actualizar_medicos(item_id):
         data = schema.load(request.get_json(force=True) or {}, partial=True)
     except ValidationError as err:
         return jsonify(err.messages), 400
+
+    if "empleado_id" in data and not Empleado.get_by_id(data["empleado_id"]):
+        return jsonify({"error": "empleado_id no existe"}), 404
 
     for key, value in data.items():
         setattr(item, key, value)

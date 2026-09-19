@@ -7,6 +7,23 @@ from app.informes_ecografia.models import InformeEcografia
 from app.informes_ecografia.schemas import InformeEcografiaSchema
 from app.informes_ecografia.api_v1_0 import informes_ecografia_bp
 from app.archivos.models import Archivo
+from app.historial_clinico.models import RegistroClinico
+from app.modelos_informe.models import ModeloInforme
+from app.medicos.models import Medico
+
+
+def _error_fk_inexistente(data):
+    """Valida las FK reales antes de guardar, mismo patrón usado en
+    pacientes/citas/consultas: un id inexistente pasa el schema (solo
+    fields.Int) y explota recién al hacer save() con un IntegrityError
+    sin capturar (500 crudo)."""
+    if "registro_clinico_id" in data and not RegistroClinico.get_by_id(data["registro_clinico_id"]):
+        return "registro_clinico_id no existe"
+    if data.get("modelo_id") is not None and not ModeloInforme.get_by_id(data["modelo_id"]):
+        return "modelo_id no existe"
+    if "medico_id" in data and not Medico.get_by_id(data["medico_id"]):
+        return "medico_id no existe"
+    return None
 
 schema = InformeEcografiaSchema()
 schema_list = InformeEcografiaSchema(many=True)
@@ -36,6 +53,10 @@ def crear_informes_ecografia():
     except ValidationError as err:
         return jsonify(err.messages), 400
 
+    error_fk = _error_fk_inexistente(data)
+    if error_fk:
+        return jsonify({"error": error_fk}), 404
+
     item = InformeEcografia(**data)
     item.save()
     return jsonify(schema.dump(item)), 201
@@ -52,6 +73,10 @@ def actualizar_informes_ecografia(item_id):
         data = schema.load(request.get_json(force=True) or {}, partial=True)
     except ValidationError as err:
         return jsonify(err.messages), 400
+
+    error_fk = _error_fk_inexistente(data)
+    if error_fk:
+        return jsonify({"error": error_fk}), 404
 
     for key, value in data.items():
         setattr(item, key, value)
