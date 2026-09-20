@@ -23,7 +23,7 @@ from app.informes_ecografia.api_v1_0 import informes_ecografia_bp
 from app.medicos.api_v1_0 import medicos_bp
 from app.metodos_pago.api_v1_0 import metodos_pago_bp
 from app.modelos_informe.api_v1_0 import modelos_informe_bp
-
+from app.comandos import registrar_comandos
 from app.pacientes.api_v1_0 import pacientes_bp
 from app.pagos.api_v1_0 import pagos_bp
 from app.historial_clinico.api_v1_0 import historial_clinico_bp
@@ -54,7 +54,7 @@ BLUEPRINTS = (
     (medicos_bp, "/api/medicos"),
     (metodos_pago_bp, "/api/metodos_pago"),
     (modelos_informe_bp, "/api/modelos_informe"),
-    #(origenes_paciente_bp, "/api/origenes_paciente"),
+    
     (pacientes_bp, "/api/pacientes"),
     (pagos_bp, "/api/pagos"),
     (roles_bp, "/api/roles"),
@@ -78,12 +78,7 @@ def create_app(settings_module):
     
     app.config["JWT_SECRET_KEY"] = jwt_secret_key
     app.config["JWT_TOKEN_LOCATION"] = ["headers"]
-    # Antes no se definían estos valores y flask_jwt_extended usaba su
-    # default de 15 minutos para el access token, sin ningún refresh
-    # token disponible. Esto hacía que cualquier inactividad (o incluso
-    # sesiones activas de más de 15 min) terminara en 401. Ahora el
-    # access token dura más y el refresh token permite renovarlo sin
-    # tener que loguearse de nuevo.
+    
     app.config.setdefault("JWT_ACCESS_TOKEN_EXPIRES", timedelta(minutes=30))
     app.config.setdefault("JWT_REFRESH_TOKEN_EXPIRES", timedelta(days=7))
 
@@ -126,7 +121,7 @@ def create_app(settings_module):
 
     for blueprint, prefix in BLUEPRINTS:
         app.register_blueprint(blueprint, url_prefix=prefix)
-
+    registrar_comandos(app)
     register_error_handlers(app)
 
     return app

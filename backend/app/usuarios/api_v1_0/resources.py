@@ -16,16 +16,12 @@ from app.roles.models import Rol
 from app.roles.api_v1_0.resources import _asegurar_roles_por_defecto
 from app.usuarios.schemas import UsuarioSchema
 from app.usuarios.api_v1_0 import usuarios_bp
+from app.shared.permisos import es_admin
 
 usuarios_schema = UsuarioSchema()
 api = Api(usuarios_bp)
 
 CORREO_REGEX = r'^[^@\s]+@[^@\s]+\.[^@\s]+$'
-ROLES_ADMIN = {"Propietario", "Administrador"}
-
-
-def es_admin(usuario):
-    return bool(usuario.rol) and usuario.rol.nombre in ROLES_ADMIN
 
 
 def _perfil_usuario(usuario):
@@ -56,8 +52,8 @@ class Registro_Resource(Resource):
             # En una base de datos nueva, "roles" empieza vacía y quien
             # registre al primer usuario (típicamente vía script/Postman,
             # no desde el frontend) necesita un rol_id válido. Esto
-            # garantiza que "Propietario" (id=1) y "Administrador" (id=2)
-            # ya existan antes de validar el rol_id recibido.
+            # garantiza que "Administrador" y "Médico" ya existan antes de
+            # validar el rol_id recibido.
             _asegurar_roles_por_defecto()
 
             data = request.get_json()
