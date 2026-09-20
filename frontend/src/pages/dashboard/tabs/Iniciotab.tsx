@@ -119,7 +119,7 @@ const InicioTab: React.FC<InicioTabProps> = ({
           </div>
         </div>
 
-        {loadingCitas ? (
+        {loadingCitas && !calendarioControl.agendaCargada ? (
           <div className="today-appointments-empty">Cargando citas...</div>
         ) : citasError ? (
           <div className="today-appointments-empty">{citasError}</div>

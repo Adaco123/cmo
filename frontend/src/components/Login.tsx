@@ -6,6 +6,7 @@ import { useAuth } from './AuthProvider';
 import { useErrorToast } from './ErrorToastProvider';
 import '@fontsource/montserrat/600.css';
 import '@fontsource/montserrat/800.css';
+import garabato from '../assets/garabatos.png';
 import cmoLogo from '../assets/cmo.png';
 import TiltCard from './TiltCard';
 import styles from './Login.module.css';
@@ -24,6 +25,7 @@ const LETRAS = [
 
 // El ECG se repite cada 1200px; con 4 copias cubre pantallas de hasta 3600px.
 const ECG_COPIAS = [0, 1, 2, 3];
+
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -86,7 +88,7 @@ const Login: React.FC = () => {
     <div className={styles.stage}>
       {/* Fondo animado: marca de agua y dos orbes de luz */}
       <div className={styles.watermark}>
-        <img src={cmoLogo} alt="" />
+        <img src={garabato} alt="" />
       </div>
       <div className={styles.glowOrb} />
       <div className={styles.glowOrbSecondary} />
@@ -120,6 +122,8 @@ const Login: React.FC = () => {
         </div>
       </div>
 
+      
+
       {/* ===== Botón discreto que abre el login ===== */}
       <button type="button" className={styles.openLoginBtn} onClick={() => setMostrarLogin(true)}>
         <FontAwesomeIcon icon={faRightToBracket} />
@@ -134,7 +138,7 @@ const Login: React.FC = () => {
             if (e.target === e.currentTarget) cerrarLogin();
           }}
         >
-          <TiltCard className={styles.loginTilt}>
+          <TiltCard className={styles.loginTilt} glow="var(--status-inactive)">
             <div className={styles.card} role="dialog" aria-modal="true" aria-labelledby="login-titulo">
               <button type="button" className={styles.closeBtn} onClick={cerrarLogin} aria-label="Cerrar">
                 <FontAwesomeIcon icon={faXmark} />

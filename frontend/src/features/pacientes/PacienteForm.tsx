@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createPaciente, type PacientePayload, type OrigenPaciente } from '../../api/pacientes';
+import { createPaciente, type Paciente, type PacientePayload, type OrigenPaciente } from '../../api/pacientes';
 import styles from './PacienteForm.module.css';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -40,7 +40,7 @@ interface PacienteFormData {
 const CONSULTORIO_ID = 1;
 
 interface PacienteFormProps {
-  onSuccess?: () => void;
+  onSuccess?: (pacienteCreado: Paciente) => void;
   onClose?: () => void;
   /** Origen preseleccionado en el dropdown (por defecto "propio"). */
   origenInicial?: OrigenPaciente;
@@ -129,13 +129,13 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose, origenI
 
     try {
       setIsSubmitting(true);
-      await createPaciente(payload);
+      const pacienteCreado = await createPaciente(payload);
       setFormData({
         ...initialFormData,
         origen: origenInicial ?? 'propio',
         consultorio_id: String(CONSULTORIO_ID),
       });
-      onSuccess?.();
+      onSuccess?.(pacienteCreado);
       showSuccess('Paciente guardado correctamente');
     } catch (error: unknown) {
       const mensaje = extractErrorMessage(error, 'No se pudo guardar el paciente.');

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   pagosHoy,
   getPacientesAtendidosHoy,
@@ -6,6 +6,7 @@ import {
   type PacientesAtendidosHoy,
 } from '../api/reportes';
 import { useAuth } from './AuthProvider';
+import { useRefrescoAutomatico } from '../hooks/useRefrescoAutomatico';
 
 const REFRESH_MS = 60000;
 
@@ -48,16 +49,24 @@ export const ReportesHoyProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Número de la última carga lanzada. Con el polling de 60 s y los
+  // refrescar() manuales puede haber dos cargas a la vez: la respuesta de
+  // la más vieja se descarta para que no pise a la más nueva.
+  const peticionRef = useRef(0);
+
   const cargar = useCallback(async () => {
+    const peticion = ++peticionRef.current;
     try {
       setError(null);
       const [pagos, pacientes] = await Promise.all([pagosHoy(), getPacientesAtendidosHoy()]);
+      if (peticionRef.current !== peticion) return;
       setPagosHoyData(pagos);
       setPacientesAtendidosHoy(pacientes);
     } catch {
+      if (peticionRef.current !== peticion) return;
       setError('No se pudo cargar el reporte de hoy.');
     } finally {
-      setLoading(false);
+      if (peticionRef.current === peticion) setLoading(false);
     }
   }, []);
 
@@ -67,15 +76,21 @@ export const ReportesHoyProvider: React.FC<{ children: React.ReactNode }> = ({ c
     // la app (chocaba con el login en curso y disparaba un 401 falso).
     if (authLoading) return;
     if (!isAuthenticated) {
+      peticionRef.current += 1; // descarta cargas en vuelo de la sesión anterior
       setPagosHoyData(null);
       setPacientesAtendidosHoy(null);
       setLoading(false);
       return;
     }
     void cargar();
-    const interval = setInterval(() => void cargar(), REFRESH_MS);
-    return () => clearInterval(interval);
   }, [authLoading, isAuthenticated, cargar]);
+
+  // Antes: un setInterval que corría siempre. Ahora se pausa con la pestaña
+  // en segundo plano y refresca en el acto al volver a ella.
+  useRefrescoAutomatico(() => void cargar(), {
+    intervaloMs: REFRESH_MS,
+    habilitado: isAuthenticated && !authLoading,
+  });
 
   return (
     <ReportesHoyContext.Provider

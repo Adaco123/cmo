@@ -10,6 +10,10 @@ import { type Paciente } from '../api/pacientes';
 import { type EstadoCita, getEstadosCita } from '../api/estadosCita';
 import { usePacientes } from './PacientesProvider';
 import { useAuth } from './AuthProvider';
+import { useRefrescoAutomatico } from '../hooks/useRefrescoAutomatico';
+
+/** Cada cuánto se revisa si otro usuario agendó/cambió citas o controles (pestaña visible). */
+const REFRESCO_AGENDA_MS = 30_000;
 
 interface CalendarioContextValue {
   abierto: boolean;
@@ -31,6 +35,13 @@ interface CalendarioContextValue {
    *  para pantallas como "Seguimiento y Control" que necesitan los datos
    *  pero no muestran el picker. */
   refrescarAgenda: () => void;
+  /**
+   * Inserta (o reemplaza, si ya estaba) una cita en el estado compartido
+   * sin pedir nada al backend. Usar con lo que devuelve createCita: la
+   * agenda se actualiza al instante y sin recargar citas, seguimientos y
+   * estados completos.
+   */
+  agregarCita: (cita: Cita) => void;
   /** Actualiza una cita en el backend y en el estado compartido. */
   actualizarCita: (citaId: number, cambios: Partial<CitaPayload>) => Promise<Cita>;
   /**
@@ -106,8 +117,16 @@ export const CalendarioProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // recuerda el número con el que empezó y, si al terminar ya es otro,
   // descarta su resultado (era de la sesión anterior).
   const sesionRef = useRef(0);
+  // Número de la última carga lanzada: si llega una respuesta cuando ya
+  // salió otra más nueva, se descarta (una respuesta vieja nunca pisa a una
+  // más reciente). enVueloRef indica que esa última carga sigue en curso.
+  const peticionRef = useRef(0);
+  const enVueloRef = useRef(false);
   useEffect(() => {
-    if (!isAuthenticated) sesionRef.current += 1;
+    if (!isAuthenticated) {
+      sesionRef.current += 1;
+      enVueloRef.current = false;
+    }
   }, [isAuthenticated]);
 
   // Al pasar a "sin sesión" se vacía todo. Se hace durante el render (patrón
@@ -127,25 +146,51 @@ export const CalendarioProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }
 
-  const cargarDatos = useCallback(() => {
+  // silencioso: refresco automático en segundo plano. No enciende `loading`
+  // ni muestra errores (un fallo de red no debe tapar la agenda a la vista)
+  // y no vuelve a pedir los estados de cita, que casi nunca cambian.
+  const cargarDatos = useCallback((opciones?: { silencioso?: boolean }) => {
+    const silencioso = opciones?.silencioso === true;
     const sesion = sesionRef.current;
-    setLoading(true);
-    setError(null);
-    Promise.all([getCitas(), getSeguimientos(), getEstadosCita()])
+    const peticion = ++peticionRef.current;
+    enVueloRef.current = true;
+    if (!silencioso) {
+      setLoading(true);
+      setError(null);
+    }
+    Promise.all([
+      getCitas(),
+      getSeguimientos(),
+      silencioso ? Promise.resolve(null) : getEstadosCita(),
+    ])
       .then(([citasData, seguimientosData, estadosData]) => {
         if (sesionRef.current !== sesion) return; // se cerró sesión mientras cargaba
+        if (peticionRef.current !== peticion) return; // salió una carga más nueva
         setCitas(citasData);
         setSeguimientos(seguimientosData);
-        setEstadosCita(estadosData);
+        if (estadosData) setEstadosCita(estadosData);
         setAgendaCargada(true);
       })
       .catch(() => {
-        if (sesionRef.current === sesion) setError('No se pudieron cargar los datos del calendario.');
+        if (silencioso) return;
+        if (sesionRef.current === sesion && peticionRef.current === peticion) {
+          setError('No se pudieron cargar los datos del calendario.');
+        }
       })
       .finally(() => {
+        if (peticionRef.current !== peticion) return; // la carga más nueva se encarga
+        enVueloRef.current = false;
         if (sesionRef.current === sesion) setLoading(false);
       });
   }, []);
+
+  // Un cambio local (cita nueva, cita editada...) puede ocurrir mientras
+  // hay una carga en vuelo que arrancó ANTES del cambio: su respuesta no lo
+  // incluiría y lo pisaría. En ese caso se vuelve a pedir la agenda (la
+  // carga vieja queda descartada por peticionRef).
+  const reconciliarSiHayCargaEnVuelo = useCallback(() => {
+    if (enVueloRef.current) cargarDatos();
+  }, [cargarDatos]);
 
   const abrir = useCallback(() => {
     setAbierto(true);
@@ -158,11 +203,39 @@ export const CalendarioProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     cargarDatos();
   }, [cargarDatos]);
 
-  const actualizarCita = useCallback(async (citaId: number, cambios: Partial<CitaPayload>) => {
-    const citaActualizada = await updateCita(citaId, cambios);
-    setCitas((prev) => prev.map((c) => (c.id === citaId ? citaActualizada : c)));
-    return citaActualizada;
-  }, []);
+  // Refresco automático: otro usuario (u otro equipo) puede agendar o
+  // cambiar citas y controles. Solo corre cuando la agenda ya se cargó una
+  // vez, y se omite si hay una carga en curso.
+  const refrescoAutomatico = useCallback(() => {
+    if (enVueloRef.current) return;
+    cargarDatos({ silencioso: true });
+  }, [cargarDatos]);
+  useRefrescoAutomatico(refrescoAutomatico, {
+    intervaloMs: REFRESCO_AGENDA_MS,
+    habilitado: isAuthenticated && agendaCargada,
+  });
+
+  const agregarCita = useCallback(
+    (cita: Cita) => {
+      setCitas((prev) =>
+        prev.some((c) => c.id === cita.id)
+          ? prev.map((c) => (c.id === cita.id ? cita : c))
+          : [...prev, cita]
+      );
+      reconciliarSiHayCargaEnVuelo();
+    },
+    [reconciliarSiHayCargaEnVuelo]
+  );
+
+  const actualizarCita = useCallback(
+    async (citaId: number, cambios: Partial<CitaPayload>) => {
+      const citaActualizada = await updateCita(citaId, cambios);
+      setCitas((prev) => prev.map((c) => (c.id === citaId ? citaActualizada : c)));
+      reconciliarSiHayCargaEnVuelo();
+      return citaActualizada;
+    },
+    [reconciliarSiHayCargaEnVuelo]
+  );
 
   const finalizarCita = useCallback(
     async (citaId: number) => {
@@ -183,9 +256,10 @@ export const CalendarioProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setSeguimientos((prev) =>
         prev.map((s) => (s.id === seguimientoId ? seguimientoActualizado : s))
       );
+      reconciliarSiHayCargaEnVuelo();
       return seguimientoActualizado;
     },
-    []
+    [reconciliarSiHayCargaEnVuelo]
   );
 
   return (
@@ -202,6 +276,7 @@ export const CalendarioProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         abrir,
         cerrar,
         refrescarAgenda,
+        agregarCita,
         actualizarCita,
         finalizarCita,
         actualizarSeguimiento,

@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
 import styles from './Cobrar.module.css';
 import { useErrorToast } from '../../components/ErrorToastProvider';
+import { useReportesHoy } from '../../components/ReportesHoyProvider';
 import { extractErrorMessage } from '../../utils/errors';
 
 interface CobrarProps {
@@ -53,6 +54,7 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado, onClose }) => {
   // Estados de la petición al backend
   const [enviando, setEnviando] = useState<boolean>(false);
   const { showError, showSuccess } = useErrorToast();
+  const { refrescar: refrescarReportesHoy } = useReportesHoy();
 
   // Cálculos derivados
   const baseNum = parseFloat(montoBase) || 0;
@@ -102,6 +104,9 @@ const Cobrar: React.FC<CobrarProps> = ({ consultaId, onCobrado, onClose }) => {
         `Pago confirmado: Bs ${totalPagar.toFixed(2)} (${metodoPago}) — Recibo ${pago.numero_recibo_pago}`
       );
       handleLimpiar();
+      // "Caja de hoy" y "Pagos recibidos hoy" se actualizan ya, sin esperar
+      // al ciclo de 60 s del ReportesHoyProvider.
+      refrescarReportesHoy();
       onCobrado?.();
     } catch (err: unknown) {
       const mensaje = extractErrorMessage(err, 'Ocurrió un error al registrar el pago.');

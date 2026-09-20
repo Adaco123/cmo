@@ -89,7 +89,7 @@ const DashboardPage: React.FC = () => {
     pacientes,
     loading: loadingPacientes,
     error: pacientesError,
-    reload: loadPacientes,
+    guardarPacienteLocal,
     cambiarEstado,
   } = usePacientes();
 
@@ -308,10 +308,12 @@ const DashboardPage: React.FC = () => {
         >
           <PacienteForm
             origenInicial={origenPacienteForm}
-            onSuccess={() => {
+            onSuccess={(pacienteCreado) => {
               setShowPacienteForm(false);
               setOrigenPacienteForm(undefined);
-              void loadPacientes();
+              // El paciente ya viene del backend: se inserta en la lista
+              // compartida sin recargarla entera (sin parpadeo de la tabla).
+              guardarPacienteLocal(pacienteCreado);
             }}
             onClose={() => {
               setShowPacienteForm(false);
@@ -325,9 +327,9 @@ const DashboardPage: React.FC = () => {
         <Modal onClose={() => setPacienteAEditar(null)}>
           <EditarPacienteForm
             paciente={pacienteAEditar}
-            onSuccess={() => {
+            onSuccess={(pacienteActualizado) => {
               setPacienteAEditar(null);
-              void loadPacientes();
+              guardarPacienteLocal(pacienteActualizado);
             }}
             onClose={() => setPacienteAEditar(null)}
           />

@@ -7,6 +7,7 @@ import type { Paciente as ApiPaciente } from '../../api/pacientes';
 import Calendario from '../citas/Calendario';
 import { useCalendario } from '../../components/CalendarioProvider';
 import { useAuth } from '../../components/AuthProvider';
+import { useReportesHoy } from '../../components/ReportesHoyProvider';
 import { nombreCompleto } from '../../auth';
 import Receta from './Receta';
 import type { RecetaHandle } from './Receta';
@@ -182,6 +183,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
     return calculada > controlHoraInicio ? calculada : '';
   })();
   const calendarioControl = useCalendario();
+  const { refrescar: refrescarReportesHoy } = useReportesHoy();
 
   const vitalRefs = useRef<Record<VitalKey, HTMLInputElement | null>>({
     pa_sys: null, pa_dia: null, fc: null, fr: null, sat: null, temp: null, peso: null, talla: null, glu: null,
@@ -446,6 +448,8 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
       // se entera solo — sin esto, la agenda del día / "Seguimiento y
       // Control" seguían mostrando la lista vieja hasta recargar la página.
       calendarioControl.refrescarAgenda();
+      // El registro crea una Consulta: cuenta en "Pacientes atendidos hoy".
+      refrescarReportesHoy();
 
       // El registro y los exámenes ya se crearon aunque algún archivo no
       // se haya podido subir — se avisa aparte (sin bloquear el flujo de

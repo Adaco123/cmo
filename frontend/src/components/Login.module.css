@@ -9,7 +9,10 @@
    Usa las variables de index.css (--bg-card, --bg-card-hover, --text-main,
    --status-inactive, --primary, etc.). El fondo es CSS puro (sin canvas):
    ECG que cruza toda la pantalla justo debajo de las tarjetas, dos orbes de
-   luz blanca a la deriva y el logo como marca de agua. Al cargar, las letras entran
+   luz blanca a la deriva y el logo como marca de agua. Abajo a la izquierda
+   hay una firma "agg" que se dibuja sola. El login emergente usa el mismo
+   lenguaje que las tarjetas: blanco, el rojo con degradado de las letras,
+   azul en los textos chicos y Montserrat. Al cargar, las letras entran
    una tras otra y después aparece el ECG. */
 
 .stage,
@@ -22,6 +25,7 @@
 .stage {
   --azul-marca: #2A6FB8; /* azul de las palabras chicas; index.css no tiene un token azul saturado */
   --azul-borde: #0E74D2; /* azul del borde del degradado de fondo */
+  --rojo-oscuro: color-mix(in srgb, var(--status-inactive) 70%, black); /* arriba del degradado rojo */
   position: relative;
   min-height: 100vh;
   display: flex;
@@ -51,7 +55,10 @@
 .watermark img {
   width: min(72vw, 900px);
   margin-top: 2vh;
-  opacity: 0.09;
+  opacity: 0.35;
+  transform: rotate(30deg);
+  -webkit-mask-image: radial-gradient(ellipse closest-side, #000 40%, transparent 100%);
+  mask-image: radial-gradient(ellipse closest-side, #000 40%, transparent 100%);
 }
 
 .glowOrb,
@@ -192,7 +199,7 @@
      fondo recortado a la forma de la letra. */
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--status-inactive) 70%, black) 15%,
+    var(--rojo-oscuro) 15%,
     var(--status-inactive) 85%
   );
   -webkit-background-clip: text;
@@ -215,6 +222,43 @@
   color: var(--azul-marca);
 }
 
+/* ---- Firma "agg": abajo a la izquierda, inclinada 45° ---- */
+.firma {
+  --firma-w: clamp(120px, 11.5vw, 165px); /* tamaño de la firma */
+  --firma-margen: 16px; /* distancia de la tinta al borde izquierdo e inferior de la pantalla */
+  position: absolute;
+  /* Compensan lo que la firma queda corrida respecto de su punto de giro (esquina
+     inferior izquierda de su caja), para que el margen sea el mismo a cualquier tamaño. */
+  left: calc(var(--firma-margen) + var(--firma-w) * 0.13);
+  bottom: calc(var(--firma-margen) - var(--firma-w) * 0.215);
+  z-index: 2;
+  width: var(--firma-w);
+  height: auto;
+  overflow: visible;
+  transform: rotate(-45deg); /* sube hacia la derecha; usa 45deg para inclinarla al revés */
+  transform-origin: 0% 100%;
+  pointer-events: none;
+  fill: none;
+  stroke: #000000;
+  stroke-width: 2.4; /* trazo delgado; sube o baja este número para más o menos grosor */
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* halo blanco tenue: el negro se lee mejor sobre el azul oscuro de la esquina */
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.55));
+}
+
+/* La firma se "escribe" sola: el trazo mide 1 (pathLength) y se va revelando.
+   El patrón "1 2" (trazo, hueco) evita que se vea un puntito antes de empezar. */
+.firma path {
+  stroke-dasharray: 1 2;
+  stroke-dashoffset: 1;
+  animation: firmaEscribir 2.8s ease-in-out 1.4s forwards;
+}
+
+@keyframes firmaEscribir {
+  to { stroke-dashoffset: 0; }
+}
+
 /* ---- Botón discreto que abre el login ---- */
 .openLoginBtn {
   position: fixed;
@@ -224,23 +268,27 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 16px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 30%, white);
+  padding: 10px 18px;
+  border: 1px solid color-mix(in srgb, var(--status-inactive) 25%, white);
   border-radius: var(--radius-xl);
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(6px);
-  color: var(--text-muted);
-  font: 500 0.82rem var(--sans);
+  background: #ffffff;
+  color: var(--status-inactive);
+  font: 600 0.8rem 'Montserrat', var(--sans);
+  letter-spacing: 0.06em;
+  box-shadow: 0 6px 18px rgba(16, 42, 67, 0.22);
   cursor: pointer;
-  opacity: 0.85;
-  transition: opacity var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  transition: color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
+/* Al pasar el mouse se rellena con el mismo degradado rojo de las letras */
 .openLoginBtn:hover,
 .openLoginBtn:focus-visible {
-  opacity: 1;
-  border-color: var(--primary);
-  color: var(--text-main);
+  border-color: transparent;
+  background: linear-gradient(to bottom, var(--rojo-oscuro), var(--status-inactive));
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--status-inactive) 40%, transparent);
+  outline: none;
 }
 
 /* ================= LOGIN EMERGENTE ================= */
@@ -297,7 +345,18 @@
 
 .card {
   position: relative;
-  padding: 38px 34px 32px;
+  padding: 42px 34px 32px;
+}
+
+/* Franja roja arriba: la recorta el borde redondeado de la tarjeta */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, var(--rojo-oscuro), var(--status-inactive));
 }
 
 .brand {
@@ -311,7 +370,7 @@
   width: 42px;
   height: 42px;
   object-fit: contain;
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--primary) 40%, transparent));
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--status-inactive) 35%, transparent));
   animation: heartbeat 2.4s ease-in-out infinite;
 }
 
@@ -324,25 +383,37 @@
 }
 
 .brandName {
-  font-weight: 600;
-  font-size: 1rem;
-  color: var(--text-main);
+  font-family: 'Montserrat', var(--sans);
+  font-weight: 800;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  color: var(--status-inactive);
 }
 
 .brandName span {
   display: block;
-  font-weight: 400;
-  font-size: 0.72rem;
-  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--azul-marca);
   margin-top: 2px;
 }
 
 .cardHeading {
-  font-size: 1.4rem;
-  font-weight: 600;
   margin: 0 0 6px;
-  letter-spacing: -0.01em;
-  color: var(--text-main);
+  padding-bottom: 0.1em;
+  font-family: 'Montserrat', var(--sans);
+  font-size: 1.55rem;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  /* mismo degradado rojo que las letras C · M · O */
+  background: linear-gradient(to bottom, var(--rojo-oscuro), var(--status-inactive));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
 .subtitle {
@@ -358,10 +429,13 @@
 
 .field label {
   display: block;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
+  font-family: 'Montserrat', var(--sans);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--azul-marca);
 }
 
 .field input {
@@ -382,8 +456,8 @@
 }
 
 .field input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent);
+  border-color: var(--status-inactive);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-inactive) 22%, transparent);
 }
 
 .row {
@@ -424,22 +498,23 @@
   padding: 13px;
   border: none;
   border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, var(--primary), var(--primary-light), var(--primary));
-  background-size: 200% 100%;
-  background-position: 0% 0%;
-  color: #04211d;
-  font-weight: 600;
+  /* mismo degradado rojo que las letras C · M · O */
+  background: linear-gradient(to bottom, var(--rojo-oscuro), var(--status-inactive));
+  color: #ffffff;
+  font-family: 'Montserrat', var(--sans);
+  font-weight: 700;
   font-size: 0.94rem;
+  letter-spacing: 0.04em;
   cursor: pointer;
-  box-shadow: 0 8px 26px color-mix(in srgb, var(--primary) 35%, transparent);
-  transition: background-position 0.5s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--status-inactive) 38%, transparent);
+  transition: filter 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   overflow: hidden;
 }
 
 .submitBtn:hover:not(:disabled) {
-  background-position: 100% 0%;
+  filter: brightness(1.1);
   transform: translateY(-1px);
-  box-shadow: 0 12px 34px color-mix(in srgb, var(--primary) 45%, transparent);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--status-inactive) 46%, transparent);
 }
 
 .submitBtn:disabled {
@@ -501,5 +576,9 @@
   .submitBtn,
   .backdrop {
     animation: none;
+  }
+  .firma path {
+    animation: none;
+    stroke-dashoffset: 0;
   }
 }
