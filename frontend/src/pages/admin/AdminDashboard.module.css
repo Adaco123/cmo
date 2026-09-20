@@ -1,0 +1,334 @@
+/* AdminDashboard.module.css
+   Panel del administrador: alta de usuario + empleado + médico. Mismo lenguaje
+   visual que el login: fondo claro con azul suave, tarjeta blanca con franja
+   roja arriba, títulos en Montserrat con el degradado rojo de las letras
+   C · M · O, etiquetas en azul y botón principal en ese mismo degradado. */
+
+.page {
+  --azul-marca: #2A6FB8;
+  --rojo-oscuro: color-mix(in srgb, var(--status-inactive) 70%, black);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font: 16px/145% var(--sans);
+  letter-spacing: 0.18px;
+  color: var(--text-main);
+  text-align: left;
+  background:
+    radial-gradient(ellipse 60% 45% at 100% 0%, color-mix(in srgb, #0E74D2 22%, transparent), transparent 70%),
+    linear-gradient(160deg, #ffffff 0%, var(--bg-card) 45%, var(--bg-card-hover) 100%);
+}
+
+.page *,
+.page *::before,
+.page *::after {
+  box-sizing: border-box;
+}
+
+/* ================= ENCABEZADO ================= */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px clamp(16px, 4vw, 40px);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 14%, transparent);
+  box-shadow: 0 6px 20px rgba(16, 42, 67, 0.08);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.brandName {
+  font-family: 'Montserrat', var(--sans);
+  font-weight: 800;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  color: var(--status-inactive);
+}
+
+.brandName span {
+  display: block;
+  margin-top: 2px;
+  font-weight: 600;
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--azul-marca);
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.usuario {
+  margin-right: 6px;
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+/* Botón claro (mismo estilo que "Iniciar sesión" del login) */
+.ghostBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 1px solid color-mix(in srgb, var(--status-inactive) 25%, white);
+  border-radius: var(--radius-xl);
+  background: #ffffff;
+  color: var(--status-inactive);
+  font: 600 0.78rem 'Montserrat', var(--sans);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(16, 42, 67, 0.12);
+  transition: color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ghostBtn:hover,
+.ghostBtn:focus-visible {
+  border-color: transparent;
+  background: linear-gradient(to bottom, var(--rojo-oscuro), var(--status-inactive));
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--status-inactive) 38%, transparent);
+  outline: none;
+}
+
+.linkBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: none;
+  border-radius: var(--radius-xl);
+  background: transparent;
+  color: var(--text-muted);
+  font: 600 0.78rem 'Montserrat', var(--sans);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.linkBtn:hover,
+.linkBtn:focus-visible {
+  color: var(--status-inactive);
+  background: color-mix(in srgb, var(--status-inactive) 8%, transparent);
+  outline: none;
+}
+
+/* ================= TARJETA DEL FORMULARIO ================= */
+.main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: clamp(20px, 4vw, 48px) clamp(12px, 3vw, 32px) 56px;
+}
+
+.card {
+  position: relative;
+  width: 100%;
+  max-width: 860px;
+  padding: 44px clamp(20px, 4vw, 44px) 36px;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(16, 42, 67, 0.2), inset 0 0 0 1px color-mix(in srgb, var(--border-color) 12%, transparent);
+}
+
+/* Franja roja arriba: la recorta el borde redondeado de la tarjeta */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, var(--rojo-oscuro), var(--status-inactive));
+}
+
+.title {
+  margin: 0 0 6px;
+  padding-bottom: 0.1em;
+  font-family: 'Montserrat', var(--sans);
+  font-size: clamp(1.5rem, 3vw, 1.9rem);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  /* mismo degradado rojo que las letras C · M · O */
+  background: linear-gradient(to bottom, var(--rojo-oscuro), var(--status-inactive));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  margin: 0 0 22px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.exito {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 22px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--status-active) 12%, white);
+  border: 1px solid color-mix(in srgb, var(--status-active) 35%, white);
+  color: var(--text-main);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+/* ================= FORMULARIO ================= */
+.grupo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+  min-width: 0;
+  margin: 0 0 28px;
+  padding: 0;
+  border: none;
+}
+
+.grupo legend {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--status-inactive) 22%, white);
+  font-family: 'Montserrat', var(--sans);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--status-inactive);
+  float: left; /* hace que el legend ocupe su propia fila dentro del grid */
+}
+
+.field {
+  min-width: 0;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 8px;
+  font-family: 'Montserrat', var(--sans);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--azul-marca);
+}
+
+.field label em {
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--text-muted);
+}
+
+.field input,
+.field select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid color-mix(in srgb, var(--border-color) 30%, white);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-main);
+  font: 0.94rem var(--sans);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.field input::placeholder {
+  color: #5A7089;
+}
+
+.field input:focus,
+.field select:focus {
+  border-color: var(--status-inactive);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-inactive) 22%, transparent);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Botón principal: el mismo degradado rojo de las letras C · M · O */
+.submitBtn {
+  min-width: 220px;
+  padding: 14px 28px;
+  border: none;
+  border-radius: var(--radius-xl);
+  background: linear-gradient(to bottom, var(--rojo-oscuro), var(--status-inactive));
+  color: #ffffff;
+  font-family: 'Montserrat', var(--sans);
+  font-size: 0.94rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--status-inactive) 38%, transparent);
+  transition: filter 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.submitBtn:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--status-inactive) 46%, transparent);
+}
+
+.submitBtn:focus-visible {
+  outline: 2px solid var(--text-main);
+  outline-offset: 3px;
+}
+
+.submitBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .header {
+    position: static; /* en celular el encabezado ocuparía demasiado alto si se quedara fijo */
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .headerRight {
+    justify-content: flex-start;
+  }
+  .grupo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .actions {
+    justify-content: stretch;
+  }
+  .submitBtn {
+    width: 100%;
+  }
+}

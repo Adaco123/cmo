@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRightToBracket, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { authStore } from '../auth';
 import { useAuth } from './AuthProvider';
 import { useErrorToast } from './ErrorToastProvider';
 import '@fontsource/montserrat/600.css';
@@ -78,7 +79,8 @@ const Login: React.FC = () => {
     setLoading(false);
 
     if (result.success) {
-      navigate('/dashboard');
+      // El administrador entra a su panel (alta de usuarios); los demás, al dashboard de siempre.
+      navigate(authStore.esAdministrador ? '/admin' : '/dashboard');
       return;
     }
     showError(result.message ?? 'Credenciales inválidas');

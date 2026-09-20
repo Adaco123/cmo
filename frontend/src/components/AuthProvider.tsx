@@ -7,6 +7,8 @@ interface AuthContextValue {
   /** true mientras se resuelve la sesión guardada al cargar la app. */
   loading: boolean;
   isAuthenticated: boolean;
+  /** true si la sesión es de un Administrador (según el rol del token; el backend valida los permisos reales). */
+  esAdmin: boolean;
   login: (usernameOrEmail: string, password: string) => Promise<ActionResult>;
   logout: () => void;
 }
@@ -61,8 +63,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   }, []);
 
+  const esAdmin = !!user && authStore.esAdministrador;
+
   return (
-    <AuthContext.Provider value={{ user, loading, isAuthenticated: !!user, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, isAuthenticated: !!user, esAdmin, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

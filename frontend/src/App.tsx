@@ -4,6 +4,8 @@ import DashboardPage from './pages/dashboard/Dashboardpage';
 import HistoriaClinica from './features/pacientes/RegistroClinico';
 import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
+import AdminDashboard from './pages/admin/AdminDashboard';
 import CapturarFotos from './features/capturar-fotos/CapturarFotos';
 import { ErrorToastProvider } from './components/ErrorToastProvider';
 import { CalendarioProvider } from './components/CalendarioProvider';
@@ -25,6 +27,10 @@ function App() {
                   <Route element={<ProtectedRoute />}>
                     <Route path="/dashboard" element={<DashboardPage/>} />
                     <Route path="/historia-clinica" element={<HistoriaClinica />} />
+                    {/* Solo administradores: alta de usuario + empleado + médico */}
+                    <Route element={<AdminRoute />}>
+                      <Route path="/admin" element={<AdminDashboard />} />
+                    </Route>
                   </Route>
                   <Route path="/capturar-fotos/:token" element={<CapturarFotos />} />
                   {/* Cualquier ruta inexistente (ej. /login) vuelve al login en vez de quedar en blanco */}

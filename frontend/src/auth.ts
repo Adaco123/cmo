@@ -83,6 +83,24 @@ function getErrorMessage(err: unknown): string {
   return String(err ?? '');
 }
 
+/** Minúsculas y sin tildes: "Administrador", "administrador" y "ADMINISTRADOR" cuentan igual. */
+function normalizarRol(rol: string | null | undefined): string {
+  return (rol ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+}
+
+/** Lee el claim "role" del payload del JWT (el backend lo agrega al iniciar sesión). */
+function leerRolDelToken(token: string | null): Rol | null {
+  if (!token) return null;
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder().decode(bytes)) as { role?: unknown };
+    return typeof payload.role === 'string' ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
 class AuthStore {
   private readonly tokenKey = 'token';
   private readonly refreshTokenKey = 'refresh_token';
@@ -99,6 +117,20 @@ class AuthStore {
 
   get user() {
     return this.state.user;
+  }
+
+  /**
+   * Rol de la sesión (ej. "Administrador"), leído del token. Solo sirve para
+   * decidir qué pantalla mostrar: los permisos de verdad los valida el
+   * backend en cada petición (@admin_required lee el rol de la base de datos,
+   * no del token).
+   */
+  get rol(): Rol | null {
+    return leerRolDelToken(this.state.token);
+  }
+
+  get esAdministrador(): boolean {
+    return normalizarRol(this.rol) === 'administrador';
   }
 
   private persistUser(user: Usuario | null) {
