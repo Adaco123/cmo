@@ -1,11 +1,3 @@
-"""Rutas del módulo roles (solo lectura).
-
-El sistema tiene solo dos roles, Administrador y Médico, y son un catálogo
-fijo: se crean desde el código (ver ROLES_POR_DEFECTO) y no se crean, editan
-ni borran desde la API. Antes POST/PUT/DELETE solo pedían un JWT válido, y
-como es_admin() (shared/permisos.py) reconoce al administrador por el NOMBRE del rol, cualquier
-usuario logueado podía renombrar "Administrador" y dejar a todos sin permisos.
-"""
 import unicodedata
 
 from flask import jsonify
@@ -23,7 +15,6 @@ ROLES_POR_DEFECTO = ["Administrador", "Médico"]
 
 
 def _normalizar(nombre):
-    """'Médico', 'medico' y 'MEDICO' cuentan como el mismo rol (sin tildes ni mayúsculas)."""
     sin_tildes = "".join(
         c for c in unicodedata.normalize("NFD", nombre) if unicodedata.category(c) != "Mn"
     )
@@ -31,7 +22,6 @@ def _normalizar(nombre):
 
 
 def _asegurar_roles_por_defecto():
-
     existentes = {_normalizar(r.nombre) for r in Rol.query.all()}
     hay_nuevos = False
     for nombre in ROLES_POR_DEFECTO:

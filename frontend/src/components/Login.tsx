@@ -7,8 +7,6 @@ import { useAuth } from './AuthProvider';
 import { useErrorToast } from './ErrorToastProvider';
 import '@fontsource/montserrat/600.css';
 import '@fontsource/montserrat/800.css';
-import garabato from '../assets/garabatos.png';
-import cmoLogo from '../assets/cmo.png';
 import TiltCard from './TiltCard';
 import styles from './Login.module.css';
 
@@ -27,6 +25,55 @@ const LETRAS = [
 // El ECG se repite cada 1200px; con 4 copias cubre pantallas de hasta 3600px.
 const ECG_COPIAS = [0, 1, 2, 3];
 
+// Bloqueo por intentos fallidos (solo frontend): tras MAX_INTENTOS contraseñas
+// incorrectas el formulario se bloquea BLOQUEO_MIN minutos. Se guarda en
+// localStorage para que recargar la página no lo reinicie. OJO: es un freno de
+// interfaz, no seguridad real: se salta borrando el localStorage o llamando a
+// la API directamente.
+const MAX_INTENTOS = 6;
+const BLOQUEO_MIN = 20;
+const CLAVE_BLOQUEO = 'cmo_login_bloqueo';
+
+interface EstadoBloqueo {
+  intentos: number;
+  hasta: number | null; // marca de tiempo (ms) hasta la que dura el bloqueo
+}
+
+const SIN_BLOQUEO: EstadoBloqueo = { intentos: 0, hasta: null };
+
+function leerBloqueo(): EstadoBloqueo {
+  try {
+    const raw = localStorage.getItem(CLAVE_BLOQUEO);
+    if (!raw) return SIN_BLOQUEO;
+    const { intentos, hasta } = JSON.parse(raw) as Partial<EstadoBloqueo>;
+    if (typeof intentos !== 'number') return SIN_BLOQUEO;
+    if (typeof hasta === 'number') {
+      if (hasta <= Date.now()) {
+        localStorage.removeItem(CLAVE_BLOQUEO);
+        return SIN_BLOQUEO;
+      }
+      return { intentos, hasta };
+    }
+    return { intentos, hasta: null };
+  } catch {
+    return SIN_BLOQUEO;
+  }
+}
+
+function guardarBloqueo(estado: EstadoBloqueo) {
+  try {
+    if (estado.intentos === 0 && estado.hasta === null) localStorage.removeItem(CLAVE_BLOQUEO);
+    else localStorage.setItem(CLAVE_BLOQUEO, JSON.stringify(estado));
+  } catch {
+    // sin localStorage el bloqueo solo dura mientras la pestaña siga abierta
+  }
+}
+
+function textoBloqueo(msRestantes: number): string {
+  const min = Math.max(1, Math.ceil(msRestantes / 60000));
+  return `Acceso bloqueado por demasiados intentos fallidos. Intente nuevamente en ${min} ${min === 1 ? 'minuto' : 'minutos'}.`;
+}
+
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -36,6 +83,25 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [mostrarLogin, setMostrarLogin] = useState(false);
+  const [bloqueo, setBloqueo] = useState<EstadoBloqueo>(leerBloqueo);
+  const [ahora, setAhora] = useState(() => Date.now());
+
+  const bloqueado = bloqueo.hasta !== null && ahora < bloqueo.hasta;
+
+  // Mientras dura el bloqueo, refresca el tiempo restante y lo levanta al vencer.
+  useEffect(() => {
+    if (bloqueo.hasta === null) return;
+    const hasta = bloqueo.hasta;
+    const id = window.setInterval(() => {
+      const t = Date.now();
+      setAhora(t);
+      if (t >= hasta) {
+        guardarBloqueo(SIN_BLOQUEO);
+        setBloqueo(SIN_BLOQUEO);
+      }
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [bloqueo.hasta]);
 
   // Al cerrar se limpia la contraseña: la pantalla queda a la vista del paciente.
   const cerrarLogin = useCallback(() => {
@@ -55,6 +121,15 @@ const Login: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Se relee de localStorage: otra pestaña pudo haber bloqueado o sumado intentos.
+    const actual = leerBloqueo();
+    if (actual.hasta !== null) {
+      setBloqueo(actual);
+      setAhora(Date.now());
+      showError(textoBloqueo(actual.hasta - Date.now()));
+      return;
+    }
 
     // Validación propia (el <form> lleva noValidate): ningún aviso sale como
     // tooltip nativo del navegador, todo pasa por el toast.
@@ -79,8 +154,28 @@ const Login: React.FC = () => {
     setLoading(false);
 
     if (result.success) {
+      guardarBloqueo(SIN_BLOQUEO);
       // El administrador entra a su panel (alta de usuarios); los demás, al dashboard de siempre.
       navigate(authStore.esAdministrador ? '/admin' : '/dashboard');
+      return;
+    }
+
+    // Solo cuentan las credenciales rechazadas por el servidor (401); un corte
+    // de red o un error 500 no deben acercar al usuario al bloqueo.
+    if (result.status === 401) {
+      const intentos = actual.intentos + 1;
+      if (intentos >= MAX_INTENTOS) {
+        const estado = { intentos, hasta: Date.now() + BLOQUEO_MIN * 60 * 1000 };
+        guardarBloqueo(estado);
+        setBloqueo(estado);
+        setAhora(Date.now());
+        setPassword('');
+        showError(`Superó los ${MAX_INTENTOS} intentos permitidos. El acceso quedó bloqueado por ${BLOQUEO_MIN} minutos.`);
+        return;
+      }
+      guardarBloqueo({ intentos, hasta: null });
+      setBloqueo({ intentos, hasta: null });
+      showError(`${result.message ?? 'Credenciales inválidas'}. Intentos restantes: ${MAX_INTENTOS - intentos}.`);
       return;
     }
     showError(result.message ?? 'Credenciales inválidas');
@@ -88,13 +183,6 @@ const Login: React.FC = () => {
 
   return (
     <div className={styles.stage}>
-      {/* Fondo animado: marca de agua y dos orbes de luz */}
-      <div className={styles.watermark}>
-        <img src={garabato} alt="" />
-      </div>
-      <div className={styles.glowOrb} />
-      <div className={styles.glowOrbSecondary} />
-
       {/* ===== Pantalla de espera: C · M · O ===== */}
       <main className={styles.letters}>
         {LETRAS.map(({ letra, palabra }, i) => (
@@ -140,59 +228,55 @@ const Login: React.FC = () => {
             if (e.target === e.currentTarget) cerrarLogin();
           }}
         >
-          <TiltCard className={styles.loginTilt} glow="var(--status-inactive)">
-            <div className={styles.card} role="dialog" aria-modal="true" aria-labelledby="login-titulo">
-              <button type="button" className={styles.closeBtn} onClick={cerrarLogin} aria-label="Cerrar">
-                <FontAwesomeIcon icon={faXmark} />
-              </button>
+          <div className={styles.card} role="dialog" aria-modal="true" aria-labelledby="login-titulo">
+            <button type="button" className={styles.closeBtn} onClick={cerrarLogin} aria-label="Cerrar">
+              <FontAwesomeIcon icon={faXmark} />
+            </button>
 
-              <div className={styles.brand}>
-                <img src={cmoLogo} alt="CMO" />
-                <div className={styles.brandName}>
-                  CMO
-                  <span>Gestión clínica</span>
-                </div>
+            <h2 id="login-titulo" className={styles.cardHeading}>Iniciar sesión</h2>
+            <p className={styles.subtitle}>Ingrese sus credenciales para acceder al sistema.</p>
+
+            {bloqueado && bloqueo.hasta !== null && (
+              <p className={styles.bloqueo} role="alert">
+                {textoBloqueo(bloqueo.hasta - ahora)}
+              </p>
+            )}
+
+            <form onSubmit={handleSubmit} noValidate>
+              <div className={styles.field}>
+                <label htmlFor="email">Correo electrónico</label>
+                <input
+                  type="email"
+                  id="email"
+                  autoComplete="email"
+                  autoFocus
+                  disabled={bloqueado}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="password">Contraseña</label>
+                <input
+                  type="password"
+                  id="password"
+                  required
+                  autoComplete="current-password"
+                  disabled={bloqueado}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
               </div>
 
-              <h2 id="login-titulo" className={styles.cardHeading}>Bienvenido de nuevo</h2>
-              <p className={styles.subtitle}>Ingresa tus credenciales para continuar</p>
+              <button type="submit" className={styles.submitBtn} disabled={loading || bloqueado}>
+                {loading ? 'Ingresando...' : bloqueado ? 'Acceso bloqueado' : 'Ingresar'}
+              </button>
+            </form>
 
-              <form onSubmit={handleSubmit} noValidate>
-                <div className={styles.field}>
-                  <label htmlFor="email">Correo electrónico</label>
-                  <input
-                    type="email"
-                    id="email"
-                    placeholder="correo@ejemplo.com"
-                    autoComplete="email"
-                    autoFocus
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <div className={styles.field}>
-                  <label htmlFor="password">Contraseña</label>
-                  <input
-                    type="password"
-                    id="password"
-                    placeholder="••••••••"
-                    required
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
-
-                <button type="submit" className={styles.submitBtn} disabled={loading}>
-                  {loading ? 'Entrando...' : 'Entrar al sistema'}
-                </button>
-              </form>
-
-              <p className={styles.hint}>
-                ¿Problemas para ingresar? Contacta al administrador del sistema.
-              </p>
-            </div>
-          </TiltCard>
+            <p className={styles.hint}>
+              ¿Problemas para ingresar? Contacte al administrador del sistema.
+            </p>
+          </div>
         </div>
       )}
     </div>

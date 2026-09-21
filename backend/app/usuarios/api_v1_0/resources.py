@@ -1,4 +1,3 @@
-"""Rutas del módulo usuarios: registro, login, perfil y administración."""
 import re
 
 from flask import request
@@ -13,7 +12,6 @@ from flask_jwt_extended import (
 
 from app.usuarios.models import Usuario
 from app.roles.models import Rol
-from app.roles.api_v1_0.resources import _asegurar_roles_por_defecto
 from app.usuarios.schemas import UsuarioSchema
 from app.usuarios.api_v1_0 import usuarios_bp
 from app.shared.permisos import es_admin
@@ -25,13 +23,6 @@ CORREO_REGEX = r'^[^@\s]+@[^@\s]+\.[^@\s]+$'
 
 
 def _perfil_usuario(usuario):
-    """Datos de la cuenta + los de su empleado y su médico (si los tiene).
-
-    usuarios, empleados y medicos son tablas distintas con ids distintos
-    (usuarios.id != empleados.id != medicos.id). El frontend necesita
-    `medico_id` para agendar citas / registrar consultas: ese es el id de
-    `medicos`, NO el `id` del usuario.
-    """
     perfil = usuarios_schema.dump(usuario)
     empleado = usuario.empleado
     medico = empleado.medico if empleado else None
@@ -44,52 +35,6 @@ def _perfil_usuario(usuario):
         "matricula_profesional": medico.matricula_profesional if medico else None,
     })
     return perfil
-
-
-class Registro_Resource(Resource):
-    def post(self):
-        try:
-            # En una base de datos nueva, "roles" empieza vacía y quien
-            # registre al primer usuario (típicamente vía script/Postman,
-            # no desde el frontend) necesita un rol_id válido. Esto
-            # garantiza que "Administrador" y "Médico" ya existan antes de
-            # validar el rol_id recibido.
-            _asegurar_roles_por_defecto()
-
-            data = request.get_json()
-            campos_requeridos = ['usuario', 'correo', 'contra', 'rol_id']
-            if not data or not all(k in data for k in campos_requeridos):
-                return {'error': 'Faltan datos'}, 400
-
-            nombre_usuario = data['usuario'].strip()
-            correo = data['correo'].strip()
-            contra = data['contra']
-
-            if not contra or not isinstance(contra, str) or contra.strip() == '':
-                return {'error': 'La contraseña es requerida y no puede estar vacía'}, 400
-            if len(contra) < 8:
-                return {'error': 'La contraseña debe tener al menos 8 caracteres'}, 400
-            if not re.match(r'^[A-Za-z0-9_.]{3,50}$', nombre_usuario):
-                return {'error': 'El usuario debe tener entre 3 y 50 caracteres alfanuméricos'}, 400
-            if not re.match(CORREO_REGEX, correo):
-                return {'error': 'El correo no tiene un formato válido'}, 400
-
-            rol_id = int(data['rol_id'])
-            if not Rol.get_by_id(rol_id):
-                return {'error': 'El rol indicado no existe'}, 404
-
-            if Usuario.get_by_correo(correo):
-                return {'error': f'El correo {correo} ya está siendo utilizado por otro usuario'}, 409
-            if Usuario.get_by_usuario(nombre_usuario):
-                return {'error': f'El usuario {nombre_usuario} ya existe'}, 409
-
-            user = Usuario(usuario=nombre_usuario, correo=correo, rol_id=rol_id, estado=True)
-            user.set_password(contra)
-            user.save()
-
-            return {'message': 'Usuario creado exitosamente', 'user': usuarios_schema.dump(user)}, 201
-        except Exception as e:
-            return {'error': f'Error interno del servidor: {str(e)}'}, 500
 
 
 class Login_Resource(Resource):
@@ -260,7 +205,6 @@ class UsuariosList_Resource(Resource):
             return {'error': f'Error interno del servidor: {str(e)}'}, 500
 
 
-api.add_resource(Registro_Resource, '/registrar')
 api.add_resource(Login_Resource, '/login')
 api.add_resource(Refresh_Resource, '/refresh')
 api.add_resource(Usuario_Resource, '/me')

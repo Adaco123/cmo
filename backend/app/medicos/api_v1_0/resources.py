@@ -1,4 +1,3 @@
-"""Rutas CRUD del módulo medicos."""
 import re
 
 from flask import request, jsonify, current_app
@@ -32,13 +31,8 @@ medico_schema = MedicoSchema()
 
 api = Api(medicos_bp)
 
-# Mismo patrón de usuario que Registro_Resource (usuarios/api_v1_0/resources.py)
 _USUARIO_REGEX = r'^[A-Za-z0-9_.]{3,50}$'
 
-# Mismo patrón que en los catálogos (metodos_pago, roles, etc.): antes de
-# borrar, chequear cada FK real que apunta a medicos.id (todas nullable=False
-# y sin ondelete='SET NULL', así que una fila que las use bloquea el DELETE
-# a nivel de base de datos con un IntegrityError sin capturar).
 _DEPENDENCIAS_MEDICO = [
     (Cita, "medico_id", "citas registradas"),
     (Consulta, "medico_id", "consultas registradas"),
@@ -64,68 +58,7 @@ def obtener_medicos(item_id):
     return jsonify(schema.dump(item)), 200
 
 
-@medicos_bp.route("/", methods=["POST"])
-@jwt_required()
-def crear_medicos():
-    try:
-        data = schema.load(request.get_json(force=True) or {})
-    except ValidationError as err:
-        return jsonify(err.messages), 400
-
-    if "empleado_id" in data and not Empleado.get_by_id(data["empleado_id"]):
-        return jsonify({"error": "empleado_id no existe"}), 404
-
-    item = Medico(**data)
-    item.save()
-    return jsonify(schema.dump(item)), 201
-
-
-@medicos_bp.route("/<int:item_id>", methods=["PUT"])
-@jwt_required()
-def actualizar_medicos(item_id):
-    item = Medico.get_by_id(item_id)
-    if item is None:
-        return jsonify({"error": "Medico no encontrado"}), 404
-
-    try:
-        data = schema.load(request.get_json(force=True) or {}, partial=True)
-    except ValidationError as err:
-        return jsonify(err.messages), 400
-
-    if "empleado_id" in data and not Empleado.get_by_id(data["empleado_id"]):
-        return jsonify({"error": "empleado_id no existe"}), 404
-
-    for key, value in data.items():
-        setattr(item, key, value)
-    item.save()
-    return jsonify(schema.dump(item)), 200
-
-
-@medicos_bp.route("/<int:item_id>", methods=["DELETE"])
-@jwt_required()
-def eliminar_medicos(item_id):
-    item = Medico.get_by_id(item_id)
-    if item is None:
-        return jsonify({"error": "Medico no encontrado"}), 404
-
-    for Modelo, campo, descripcion in _DEPENDENCIAS_MEDICO:
-        if Modelo.simple_filter(**{campo: item.id}):
-            return jsonify({
-                "error": f"Este médico tiene {descripcion} y no se puede eliminar"
-            }), 409
-
-    item.delete()
-    return "", 204
-
-
 def _limpiar_bloque(bloque):
-    """Devuelve una copia del bloque con los str sin espacios en los bordes.
-
-    Un str vacío pasa a None: así los campos requeridos de los schemas lo
-    rechazan ("Field may not be null") y los opcionales (telefono,
-    consultorio_id) simplemente quedan en None. La contraseña ('contra')
-    no se toca: los espacios al inicio o al final pueden ser parte de ella.
-    """
     if not isinstance(bloque, dict):
         return {}
     limpio = {}
@@ -137,26 +70,6 @@ def _limpiar_bloque(bloque):
 
 
 class MedicoAltaCompleta_Resource(Resource):
-    """
-    POST /api/medicos/alta-completa
-
-    Crea, en una sola transacción: el Usuario (cuenta), su Empleado y su
-    Medico. Si algo falla, se revierte todo (antes había que llamar a
-    /usuarios/registrar, /empleados/ y /medicos/ por separado y un fallo
-    intermedio dejaba un usuario o empleado huérfano).
-
-    Solo Administrador (@admin_required). Body:
-        {
-          "usuario":  {"usuario", "correo", "contra", "rol_id"},
-          "empleado": {"nombres", "apellidos", "documento",
-                       "telefono"?, "consultorio_id"?},
-          "medico":   {"especialidad", "matricula_profesional"}
-        }
-
-    La contraseña llega como 'contra' (igual que /usuarios/registrar y el
-    login), nunca como 'contrasena_hash': se guarda siempre hasheada.
-    """
-
     @jwt_required()
     @admin_required
     def post(self):
@@ -168,11 +81,8 @@ class MedicoAltaCompleta_Resource(Resource):
         empleado_data = _limpiar_bloque(body.get("empleado"))
         medico_data = _limpiar_bloque(body.get("medico"))
 
-        # 'contra' no es un campo de UsuarioSchema (ahí la columna se llama
-        # contrasena_hash): se saca antes de validar y se hashea al crear.
         contra = usuario_data.pop("contra", None)
 
-        # --- Validación de forma (schemas de cada módulo) ---
         try:
             usuario_validated = usuario_schema.load(
                 usuario_data, partial=("contrasena_hash",)
@@ -194,7 +104,6 @@ class MedicoAltaCompleta_Resource(Resource):
         except ValidationError as err:
             return {"medico": err.messages}, 400
 
-        # Reglas de la cuenta que los schemas no cubren (las mismas de Registro_Resource)
         if not isinstance(contra, str) or not contra.strip():
             return {"usuario": {"contra": ["Requerido"]}}, 400
         if len(contra) < 8:
@@ -204,7 +113,6 @@ class MedicoAltaCompleta_Resource(Resource):
                 "Debe tener entre 3 y 50 caracteres alfanuméricos"
             ]}}, 400
 
-        # --- Validación de relaciones ---
         rol = Rol.get_by_id(usuario_validated["rol_id"])
         if not rol:
             return {"error": "El rol indicado no existe"}, 404
@@ -222,9 +130,8 @@ class MedicoAltaCompleta_Resource(Resource):
         if Medico.simple_filter(matricula_profesional=medico_validated["matricula_profesional"]):
             return {"error": f"La matrícula {medico_validated['matricula_profesional']} ya está registrada"}, 409
 
-        # --- Transacción: todo o nada ---
         try:
-            usuario_validated.pop("contrasena_hash", None)  # nunca del cliente
+            usuario_validated.pop("contrasena_hash", None)
             usuario = Usuario(**usuario_validated)
             usuario.set_password(contra)
             db.session.add(usuario)
@@ -241,7 +148,6 @@ class MedicoAltaCompleta_Resource(Resource):
 
             db.session.commit()
         except IntegrityError:
-            # Carrera entre el chequeo de unicidad y el insert (dos altas a la vez).
             db.session.rollback()
             return {
                 "error": "Alguno de los datos únicos (usuario, correo, documento o matrícula) ya está en uso"

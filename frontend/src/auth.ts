@@ -60,6 +60,8 @@ export interface RegisterPayload {
 export interface ActionResult {
   success: boolean;
   message?: string;
+  /** Código HTTP cuando la petición falló con respuesta del servidor (p. ej. 401). */
+  status?: number;
 }
 
 interface ApiErrorBody {
@@ -218,7 +220,11 @@ class AuthStore {
       return { success: false, message: 'Error al iniciar sesión' };
     } catch (err: unknown) {
       console.error('[Auth] login failed', err);
-      return { success: false, message: getErrorMessage(err) || 'Error de conexión' };
+      return {
+        success: false,
+        message: getErrorMessage(err) || 'Error de conexión',
+        status: axios.isAxiosError(err) ? err.response?.status : undefined,
+      };
     }
   }
 

@@ -10,6 +10,8 @@ export interface Rol {
 export interface Consultorio {
   id: number;
   nombre: string;
+  direccion?: string | null;
+  telefono?: string | null;
 }
 
 /** Catálogo de roles. Los ids pueden cambiar entre bases: siempre buscar por `nombre`. */
@@ -20,6 +22,18 @@ export async function getRoles(): Promise<Rol[]> {
 
 export async function getConsultorios(): Promise<Consultorio[]> {
   const { data } = await api.get<Consultorio[]>('/api/consultorios/');
+  return data;
+}
+
+export interface ConsultorioPayload {
+  nombre: string;
+  direccion?: string;
+  telefono?: string;
+}
+
+/** POST /api/consultorios/ (solo Administrador). */
+export async function crearConsultorio(payload: ConsultorioPayload): Promise<Consultorio> {
+  const { data } = await api.post<Consultorio>('/api/consultorios/', payload);
   return data;
 }
 

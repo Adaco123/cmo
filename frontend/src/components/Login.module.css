@@ -8,12 +8,11 @@
 
    Usa las variables de index.css (--bg-card, --bg-card-hover, --text-main,
    --status-inactive, --primary, etc.). El fondo es CSS puro (sin canvas):
-   ECG que cruza toda la pantalla justo debajo de las tarjetas, dos orbes de
-   luz blanca a la deriva y el logo como marca de agua. Abajo a la izquierda
-   hay una firma "agg" que se dibuja sola. El login emergente usa el mismo
-   lenguaje que las tarjetas: blanco, el rojo con degradado de las letras,
-   azul en los textos chicos y Montserrat. Al cargar, las letras entran
-   una tras otra y después aparece el ECG. */
+   ECG que cruza toda la pantalla justo debajo de las tarjetas. El login
+   emergente es una tarjeta blanca, sobria y estática (sin inclinación ni
+   animaciones): texto en azul marino, botón azul marino y el rojo solo en
+   el logo. Al cargar, las letras entran una tras otra y después aparece
+   el ECG. */
 
 .stage,
 .stage *,
@@ -40,65 +39,6 @@
      los bordes. "closest-side" hace que el azul llegue completo al borde de
      la pantalla por los cuatro lados (y en las esquinas se mantiene). */
   background: radial-gradient(ellipse farthest-corner at 50% 50%, #ffffff 0%, #ffffff 25%, var(--bg-body) 100%);
-}
-
-/* ================= FONDO ANIMADO ================= */
-.watermark {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.watermark img {
-  width: min(72vw, 900px);
-  margin-top: 2vh;
-  opacity: 0.35;
-  transform: rotate(30deg);
-  -webkit-mask-image: radial-gradient(ellipse closest-side, #000 40%, transparent 100%);
-  mask-image: radial-gradient(ellipse closest-side, #000 40%, transparent 100%);
-}
-
-.glowOrb,
-.glowOrbSecondary {
-  position: absolute;
-  z-index: 0;
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.glowOrb {
-  width: 520px;
-  height: 520px;
-  background: radial-gradient(circle, #ffffff 0%, transparent 70%);
-  opacity: 0.3;
-  filter: blur(60px);
-  top: -10%;
-  left: -12%;
-  animation: drift 18s ease-in-out infinite;
-}
-
-.glowOrbSecondary {
-  width: 560px;
-  height: 560px;
-  background: radial-gradient(circle, #ffffff 0%, transparent 70%);
-  opacity: 0.22;
-  filter: blur(70px);
-  bottom: -14%;
-  right: -10%;
-  animation: driftReverse 22s ease-in-out infinite;
-}
-
-@keyframes drift {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(60px, 40px) scale(1.15); }
-}
-
-@keyframes driftReverse {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-60px, -40px) scale(1.12); }
 }
 
 /* ---- ECG: cruza toda la pantalla justo debajo de las tarjetas (en el flujo,
@@ -292,6 +232,7 @@
 }
 
 /* ================= LOGIN EMERGENTE ================= */
+/* Tarjeta estática y sobria: sin inclinación, sin animaciones. */
 .backdrop {
   position: fixed;
   inset: 0;
@@ -302,12 +243,35 @@
   padding: 24px;
   background: color-mix(in srgb, var(--bg-body) 32%, transparent);
   backdrop-filter: blur(6px);
-  animation: fadeIn 0.25s ease;
 }
 
+/* Lo usa .ecgTrack de la pantalla de espera */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+.card {
+  position: relative;
+  width: 420px;
+  max-width: 100%;
+  padding: 40px 36px 30px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  border: 1px solid color-mix(in srgb, var(--border-color) 18%, white);
+  box-shadow: 0 24px 60px rgba(10, 47, 77, 0.35);
+}
+
+/* Franja azul marino arriba: la recorta el borde redondeado de la tarjeta */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--bg-body);
 }
 
 .closeBtn {
@@ -324,7 +288,6 @@
   color: var(--text-muted);
   font-size: 1rem;
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .closeBtn:hover {
@@ -337,184 +300,86 @@
   outline-offset: 2px;
 }
 
-.loginTilt {
-  --tilt-surface: #ffffff;
-  width: 400px;
-  max-width: 100%;
-}
-
-.card {
-  position: relative;
-  padding: 42px 34px 32px;
-}
-
-/* Franja roja arriba: la recorta el borde redondeado de la tarjeta */
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 6px;
-  background: linear-gradient(90deg, var(--rojo-oscuro), var(--status-inactive));
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 26px;
-}
-
-.brand img {
-  width: 42px;
-  height: 42px;
-  object-fit: contain;
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--status-inactive) 35%, transparent));
-  animation: heartbeat 2.4s ease-in-out infinite;
-}
-
-@keyframes heartbeat {
-  0%, 100% { transform: scale(1); }
-  12% { transform: scale(1.08); }
-  24% { transform: scale(1); }
-  36% { transform: scale(1.05); }
-  48% { transform: scale(1); }
-}
-
-.brandName {
-  font-family: 'Montserrat', var(--sans);
-  font-weight: 800;
-  font-size: 1.1rem;
-  letter-spacing: 0.04em;
-  color: var(--status-inactive);
-}
-
-.brandName span {
-  display: block;
-  font-weight: 600;
-  font-size: 0.6rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--azul-marca);
-  margin-top: 2px;
-}
-
 .cardHeading {
   margin: 0 0 6px;
-  padding-bottom: 0.1em;
   font-family: 'Montserrat', var(--sans);
-  font-size: 1.55rem;
-  font-weight: 800;
+  font-size: 1.4rem;
+  font-weight: 700;
   line-height: 1.25;
-  letter-spacing: -0.02em;
-  /* mismo degradado rojo que las letras C · M · O */
-  background: linear-gradient(to bottom, var(--rojo-oscuro), var(--status-inactive));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  color: var(--text-main);
 }
 
 .subtitle {
-  margin: 0 0 26px;
+  margin: 0 0 24px;
   color: var(--text-muted);
   font-size: 0.86rem;
 }
 
+/* Aviso de bloqueo por intentos fallidos */
+.bloqueo {
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  border-left: 4px solid var(--status-inactive);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--status-inactive) 8%, white);
+  color: var(--text-main);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
 .field {
-  margin-bottom: 17px;
+  margin-bottom: 16px;
   position: relative;
 }
 
 .field label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   font-family: 'Montserrat', var(--sans);
-  font-size: 0.66rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--azul-marca);
+  color: var(--text-main);
 }
 
 .field input {
   width: 100%;
-  padding: 12px 14px;
+  padding: 11px 12px;
   border-radius: var(--radius-sm);
-  border: 1.5px solid color-mix(in srgb, var(--border-color) 30%, white);
-  background: var(--bg-input);
+  border: 1px solid color-mix(in srgb, var(--border-color) 40%, white);
+  background: #ffffff;
   color: var(--text-main);
   font-size: 0.92rem;
   font-family: var(--sans);
   outline: none;
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
-.field input::placeholder {
-  color: #5A7089;
+.field input:disabled {
+  background: #EEF2F6;
+  cursor: not-allowed;
 }
 
 .field input:focus {
-  border-color: var(--status-inactive);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-inactive) 22%, transparent);
-}
-
-.row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 2px 0 24px;
-  font-size: 0.8rem;
-}
-
-.row label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.row input[type='checkbox'] {
-  accent-color: var(--primary);
-  width: 15px;
-  height: 15px;
-}
-
-.row a {
-  color: var(--primary-light);
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.row a:hover {
-  text-decoration: underline;
+  border-color: var(--bg-body);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bg-body) 18%, transparent);
 }
 
 .submitBtn {
-  position: relative;
   width: 100%;
-  padding: 13px;
+  margin-top: 8px;
+  padding: 12px;
   border: none;
-  border-radius: var(--radius-xl);
-  /* mismo degradado rojo que las letras C · M · O */
-  background: linear-gradient(to bottom, var(--rojo-oscuro), var(--status-inactive));
+  border-radius: var(--radius-sm);
+  background: var(--bg-body);
   color: #ffffff;
   font-family: 'Montserrat', var(--sans);
-  font-weight: 700;
-  font-size: 0.94rem;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  font-size: 0.92rem;
+  letter-spacing: 0.03em;
   cursor: pointer;
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--status-inactive) 38%, transparent);
-  transition: filter 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-  overflow: hidden;
 }
 
 .submitBtn:hover:not(:disabled) {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
-  box-shadow: 0 12px 30px color-mix(in srgb, var(--status-inactive) 46%, transparent);
+  filter: brightness(1.2);
 }
 
 .submitBtn:disabled {
@@ -523,17 +388,18 @@
 }
 
 .submitBtn:focus-visible {
-  outline: 2px solid var(--text-main);
+  outline: 2px solid var(--bg-body);
   outline-offset: 2px;
 }
 
 .hint {
-  margin-top: 20px;
+  margin: 20px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 18%, white);
   text-align: center;
   font-size: 0.76rem;
   color: var(--text-muted);
 }
-
 
 @media (max-width: 640px) {
   .letters {
@@ -562,19 +428,14 @@
     letter-spacing: 0.08em;
   }
   .card {
-    padding: 30px 22px 26px;
+    padding: 32px 22px 24px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .glowOrb,
-  .glowOrbSecondary,
   .ecgScroll,
   .ecgTrack,
-  .letterTilt,
-  .brand img,
-  .submitBtn,
-  .backdrop {
+  .letterTilt {
     animation: none;
   }
   .firma path {

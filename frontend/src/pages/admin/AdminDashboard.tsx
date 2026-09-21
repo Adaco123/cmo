@@ -10,6 +10,7 @@ import { useAuth } from '../../components/AuthProvider';
 import { useErrorToast } from '../../components/ErrorToastProvider';
 import {
   crearAltaCompleta,
+  crearConsultorio,
   getConsultorios,
   getRoles,
   mensajeErrorAlta,
@@ -52,6 +53,14 @@ const FORM_VACIO: FormAlta = {
   matricula: '',
 };
 
+interface FormConsultorio {
+  nombre: string;
+  telefono: string;
+  direccion: string;
+}
+
+const FORM_CONSULTORIO_VACIO: FormConsultorio = { nombre: '', telefono: '', direccion: '' };
+
 /** Primer error de validación (o null si todo está bien). Igual que el login: se avisa por toast. */
 function validar(f: FormAlta): string | null {
   if (!USUARIO_REGEX.test(f.usuario.trim())) {
@@ -84,6 +93,9 @@ const AdminDashboard: React.FC = () => {
   const [consultorios, setConsultorios] = useState<Consultorio[]>([]);
   const [enviando, setEnviando] = useState(false);
   const [creado, setCreado] = useState<string | null>(null);
+
+  const [formConsultorio, setFormConsultorio] = useState<FormConsultorio>(FORM_CONSULTORIO_VACIO);
+  const [creandoConsultorio, setCreandoConsultorio] = useState(false);
 
   // Catálogos para los desplegables. Los consultorios son opcionales: si no cargan, el campo queda vacío.
   useEffect(() => {
@@ -118,6 +130,41 @@ const AdminDashboard: React.FC = () => {
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       setForm((f) => ({ ...f, [campo]: e.target.value }));
     };
+
+  const cambiarConsultorio =
+    (campo: keyof FormConsultorio) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      setFormConsultorio((f) => ({ ...f, [campo]: e.target.value }));
+    };
+
+  const handleSubmitConsultorio = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (creandoConsultorio) return;
+
+    const nombre = formConsultorio.nombre.trim();
+    if (!nombre) {
+      showError('Escribe el nombre del consultorio.');
+      return;
+    }
+    const telefono = formConsultorio.telefono.trim();
+    const direccion = formConsultorio.direccion.trim();
+
+    setCreandoConsultorio(true);
+    try {
+      const nuevo = await crearConsultorio({
+        nombre,
+        ...(telefono ? { telefono } : {}),
+        ...(direccion ? { direccion } : {}),
+      });
+      // Queda disponible al instante en el desplegable de "Nuevo usuario".
+      setConsultorios((lista) => [...lista, nuevo]);
+      setFormConsultorio(FORM_CONSULTORIO_VACIO);
+      showSuccess(`Consultorio "${nuevo.nombre}" creado correctamente.`);
+    } catch (err) {
+      showErrorFrom(err, 'No se pudo crear el consultorio.');
+    } finally {
+      setCreandoConsultorio(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -310,6 +357,56 @@ const AdminDashboard: React.FC = () => {
             <div className={styles.actions}>
               <button type="submit" className={styles.submitBtn} disabled={enviando}>
                 {enviando ? 'Creando...' : 'Crear usuario'}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className={styles.card} aria-labelledby="consultorio-titulo">
+          <h2 id="consultorio-titulo" className={styles.title}>Nuevo consultorio</h2>
+          <p className={styles.subtitle}>
+            Al crearlo, queda disponible para asignarlo a un usuario en el formulario de arriba.
+          </p>
+
+          <form onSubmit={handleSubmitConsultorio} noValidate>
+            <fieldset className={styles.grupo}>
+              <legend>Datos del consultorio</legend>
+              <div className={styles.field}>
+                <label htmlFor="nuevo-consultorio-nombre">Nombre</label>
+                <input
+                  id="nuevo-consultorio-nombre"
+                  autoComplete="off"
+                  maxLength={150}
+                  value={formConsultorio.nombre}
+                  onChange={cambiarConsultorio('nombre')}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="nuevo-consultorio-telefono">Teléfono <em>(opcional)</em></label>
+                <input
+                  id="nuevo-consultorio-telefono"
+                  type="tel"
+                  autoComplete="off"
+                  maxLength={30}
+                  value={formConsultorio.telefono}
+                  onChange={cambiarConsultorio('telefono')}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="nuevo-consultorio-direccion">Dirección <em>(opcional)</em></label>
+                <input
+                  id="nuevo-consultorio-direccion"
+                  autoComplete="off"
+                  maxLength={200}
+                  value={formConsultorio.direccion}
+                  onChange={cambiarConsultorio('direccion')}
+                />
+              </div>
+            </fieldset>
+
+            <div className={styles.actions}>
+              <button type="submit" className={styles.submitBtn} disabled={creandoConsultorio}>
+                {creandoConsultorio ? 'Creando...' : 'Crear consultorio'}
               </button>
             </div>
           </form>

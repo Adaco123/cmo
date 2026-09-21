@@ -19,10 +19,6 @@ interface CrearCitaProps {
   onSuccess?: (data: Cita) => void;
 }
 
-// Fallback solo por si el Provider todavía no resolvió el usuario
-// (o no hay sesión) — en circunstancias normales se usa medicoId, que
-// sale del médico realmente logueado (ver useAuth() abajo).
-const DEFAULT_MEDICO_ID = 1;
 const DEFAULT_CONSULTORIO_ID = 1;
 
 /** "YYYY-MM-DD" -> "DD/MM/AAAA" (mismo formato que usa Control.tsx). */
@@ -61,10 +57,9 @@ function idEstadoPorDefecto(lista: EstadoCita[]): number {
  */
 const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) => {
   const { user } = useAuth();
-  // Usuario.id es string (viene del backend así); medico_id en los
-  // payloads es number. Si por algo no hay usuario o el id no es
-  // numérico, cae al fallback en vez de mandar NaN al backend.
-  const medicoId = Number(user?.id) || DEFAULT_MEDICO_ID;
+  // medico_id es el id de la tabla `medicos` (viene en /me), NO el id del
+  // usuario: son tablas distintas con ids distintos (igual que en Control.tsx).
+  const medicoId = user?.medico_id ?? 0;
 
   const [formData, setFormData] = useState<CitaPayload>({
     paciente_id: paciente?.id ?? 0,
@@ -129,6 +124,10 @@ const CrearCita: React.FC<CrearCitaProps> = ({ paciente, onClose, onSuccess }) =
 
   // Validación propia (el <form> lleva noValidate): así ningún aviso sale
   // como tooltip nativo del navegador, todo pasa por el toast.
+  if (!medicoId) {
+    showError('Tu usuario no está registrado como médico, así que no se puede agendar la cita. Pide al administrador que lo vincule a un médico.');
+    return;
+  }
   if (!formData.paciente_id) {
     showError('No hay un paciente seleccionado.');
     return;

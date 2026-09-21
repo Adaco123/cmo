@@ -1,0 +1,13 @@
+# Caddyfile
+#
+# Sirve HTTPS en el puerto 5000 (igual que antes con flask run),
+# usando el mismo certificado de mkcert, y reenvía todo el tráfico
+# a Waitress, que corre en HTTP puro en localhost:8000.
+#
+# Colocar este archivo en la carpeta backend, junto al .env,
+# entrypoint.py y los archivos .pem.
+
+192.168.101.250:5000 {
+    tls 192.168.101.250+1.pem 192.168.101.250+1-key.pem
+    reverse_proxy 127.0.0.1:8000
+}
