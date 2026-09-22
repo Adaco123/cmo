@@ -38,33 +38,17 @@ interface VerPacienteProps {
 }
 
 /** Extrae un mensaje de error legible de una respuesta de la API, con fallback genérico. */
-/** "YYYY-MM-DD" en fecha LOCAL, a diferencia de toISOString() que usa UTC
- *  y puede adelantar el día en horas de la noche (Bolivia es UTC-4). */
-function toLocalDateString(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function formatearFechaRelativa(fechaStr: string): string {
+function formatearFecha(fechaStr: string): string {
   if (!fechaStr) return 'Sin fecha';
   const cleanDate = fechaStr.split('T')[0];
-  const hoyStr = toLocalDateString(new Date());
-  const hoyUTC = new Date(hoyStr);
-  const fechaUTC = new Date(cleanDate);
-  if (isNaN(fechaUTC.getTime())) return fechaStr;
+  const fecha = new Date(cleanDate);
+  if (isNaN(fecha.getTime())) return fechaStr;
 
-  const diffDias = Math.floor((hoyUTC.getTime() - fechaUTC.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDias === 0) return 'Hoy';
-  if (diffDias === 1) return 'Ayer';
-  if (diffDias < 7) return `Hace ${diffDias} días`;
-  if (diffDias < 14) return 'Hace 1 semana';
-  if (diffDias < 30) return `Hace ${Math.floor(diffDias / 7)} semanas`;
-  const diffMeses = Math.floor(diffDias / 30.44);
-  if (diffMeses < 12) return `Hace ${diffMeses} meses`;
-  const años = Math.floor(diffMeses / 12);
-  return `Hace ${años} año${años > 1 ? 's' : ''}`;
+  return new Intl.DateTimeFormat('es-BO', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(fecha);
 }
 
 function getRegistroFechaValor(registro: RegistroClinico): number {
@@ -165,7 +149,7 @@ const RegistroCard: React.FC<RegistroCardProps> = React.memo(function RegistroCa
         <div className={styles.cardHead} onClick={() => onAbrir(registro.id)}>
           <div className={styles.cardHeadMain}>
             <span className={styles.cardFecha}>
-              {formatearFechaRelativa(registro.fecha)}
+              {formatearFecha(registro.fecha)}
               {registro.hora ? ` · ${registro.hora}` : ''}
             </span>
             <span className={styles.cardTitulo} title={registro.diagnostico || registro.motivo_consulta || undefined}>

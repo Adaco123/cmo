@@ -21,6 +21,7 @@ from reportlab.platypus import (
     Frame,
     HRFlowable,
     Image,
+    PageBreak,
     PageTemplate,
     Paragraph,
     Spacer,
@@ -307,6 +308,55 @@ def _header_block(registro, styles):
     return header
 
 
+def _nombre_medico(medico):
+    if not medico or not medico.empleado:
+        return "—"
+    return f"Dr(a). {medico.empleado.nombres} {medico.empleado.apellidos}"
+
+
+def _seguimientos_tabla(seguimientos, styles):
+    """Tabla de visitas de seguimiento del paciente: una fila por control,
+    con fecha, evolución, médico y la próxima fecha si quedó agendada."""
+    encabezados = ["FECHA", "EVOLUCIÓN", "MÉDICO", "PRÓX. CONTROL"]
+    header_row = [Paragraph(h, styles["Label"]) for h in encabezados]
+
+    data_rows = [header_row]
+    for seguimiento in seguimientos:
+        data_rows.append([
+            Paragraph(_format_value(seguimiento.fecha), styles["Value"]),
+            Paragraph(_format_value(seguimiento.evolucion), styles["Value"]),
+            Paragraph(_nombre_medico(seguimiento.medico), styles["Value"]),
+            Paragraph(_format_value(seguimiento.proxima_fecha_control), styles["Value"]),
+        ])
+
+    col_w = CONTENT_W * 0.14, CONTENT_W * 0.5, CONTENT_W * 0.22, CONTENT_W * 0.14
+    table = Table(data_rows, colWidths=list(col_w), repeatRows=1)
+    table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.9, PRIMARY),
+        ("LINEBELOW", (0, 1), (-1, -2), 0.6, LINE),
+    ]))
+    return table
+
+
+def _seguimientos_section(seguimientos, styles):
+    """Sección 'SEGUIMIENTOS DEL PACIENTE': controles posteriores a esta
+    consulta (día 15, 22, 29...), o un aviso si todavía no hay ninguno."""
+    if not seguimientos:
+        cuerpo = Paragraph("Sin seguimientos registrados.", styles["Value"])
+    else:
+        cuerpo = _seguimientos_tabla(seguimientos, styles)
+    wrap = Table([[_section_title("SEGUIMIENTOS DEL PACIENTE", styles)], [cuerpo]], colWidths=[CONTENT_W])
+    wrap.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (0, 0), 0), ("BOTTOMPADDING", (0, 0), (0, 0), 0),
+        ("TOPPADDING", (0, 1), (0, 1), 6), ("BOTTOMPADDING", (0, 1), (0, 1), 0),
+    ]))
+    return wrap
+
+
 def _paciente_block(paciente, styles):
     """Nombre del paciente + grilla de datos, sin fondos ni bordes de color."""
     nombre = f"{paciente.nombres} {paciente.apellidos}" if paciente else "Paciente no registrado"
@@ -389,6 +439,7 @@ def _build_registro_pdf(registro: RegistroClinico) -> bytes:
     story.append(Spacer(1, 10))
 
     # ---------------- Evaluación clínica (incluye hallazgos ecográficos) ----------------
+    tiene_alergias = bool(registro.alergias) and str(registro.alergias).strip() not in ("", "—")
     consulta_rows = [
         ("Motivo de consulta", _format_value(registro.motivo_consulta), False),
         ("Enfermedad actual", _format_value(registro.enfermedad_actual), False),
@@ -396,21 +447,16 @@ def _build_registro_pdf(registro: RegistroClinico) -> bytes:
         ("Hallazgos ecográficos", _format_value(registro.hallazgos_ecograficos), False),
         ("Diagnóstico", _format_value(registro.diagnostico), False),
         ("Tratamiento", _format_value(registro.tratamiento), False),
+        ("Alergias", _format_value(registro.alergias), tiene_alergias),
+        ("Observaciones", _format_value(registro.observaciones), False),
     ]
     story.append(_section("EVALUACIÓN CLÍNICA", consulta_rows, styles, ncols=1))
     story.append(Spacer(1, 10))
 
-    # ---------------- Seguimiento y alertas ----------------
-    tiene_alergias = bool(registro.alergias) and str(registro.alergias).strip() not in ("", "—")
-    control_rows = [
-        ("Consulta de control", _format_value(registro.consulta_control), False),
-        ("Alergias", _format_value(registro.alergias), tiene_alergias),
-        ("Observaciones", _format_value(registro.observaciones), False),
-    ]
-    story.append(_section(
-        "SEGUIMIENTO Y ALERTAS" if tiene_alergias else "SEGUIMIENTO",
-        control_rows, styles, ncols=2,
-    ))
+    # ---------------- Seguimientos del paciente (controles posteriores) ----------------
+    seguimientos = sorted(registro.seguimientos_control or [], key=lambda s: s.fecha)
+    story.append(PageBreak())
+    story.append(_seguimientos_section(seguimientos, styles))
 
     doc.build(story)
     return buffer.getvalue()

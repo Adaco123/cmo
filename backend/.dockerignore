@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+.env
+config/
+migrations/
+serve.py
+Caddyfile
+caddy.exe

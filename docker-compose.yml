@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cmo
+      POSTGRES_USER: cmo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cmo -d cmo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SECRET_KEY: ${SECRET_KEY}
+      DATABASE_URL: postgresql://cmo:${POSTGRES_PASSWORD}@db:5432/cmo
+    volumes:
+      - uploads:/app/uploads
+    ports:
+      - "5000:5000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /
+    restart: unless-stopped
+    depends_on:
+      - backend
+    volumes:
+      - ./certs/${CERT_FILE}:/etc/nginx/certs/cert.pem:ro
+      - ./certs/${CERT_KEY_FILE}:/etc/nginx/certs/key.pem:ro
+    ports:
+      - "8080:80"
+      - "8443:443"
+
+volumes:
+  pgdata:
+  uploads:

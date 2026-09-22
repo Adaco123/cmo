@@ -201,7 +201,6 @@ const FORM_CHIPS: string[] = [];
 const DB: Record<Tab, Record<string, string>[]> = { medicamentos: MED_DB, examenes: EXAM_DB, formulas: FORM_DB };
 const CHIPS: Record<Tab, string[]> = { medicamentos: MED_CHIPS, examenes: EXAM_CHIPS, formulas: FORM_CHIPS };
 const TITLES: Record<Tab, string> = { medicamentos: "Medicamentos", examenes: "Exámenes", formulas: "Fórmulas magistrales" };
-const TIPO_ID: Record<Tab, number> = { medicamentos: 1, examenes: 2, formulas: 3 };
 
 /* ============================================================
    Horario sugerido a partir de la frecuencia
@@ -1118,7 +1117,6 @@ const Receta = forwardRef<RecetaHandle, RecetaProps>(function Receta(
               <FontAwesomeIcon icon={faTriangleExclamation} /> Alergias: {tieneAlergias ? alergias : "No"}
             </p>
           </div>
-          <div className={styles.badge}>tipo_receta_id: {TIPO_ID[tab]}</div>
           <div className={styles["drawer-close"]} onClick={closeDrawer}>
             <FontAwesomeIcon icon={faXmark} />
           </div>
