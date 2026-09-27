@@ -483,9 +483,7 @@ class RegistroClinicoCompleto_Resource(Resource):
         seguimiento_validated = None
         seguimiento_recetas_validated = {}
         if seguimiento_data:
-            evolucion = (seguimiento_data.get("evolucion") or "").strip()
-            if not evolucion:
-                return {"seguimiento_control": {"evolucion": ["Requerido"]}}, 400
+            evolucion = (seguimiento_data.get("evolucion") or "").strip() or None
 
             # 👇 fix: antes se mandaba el string crudo directo al modelo
             # (nunca pasaba por SeguimientoControlSchema.load), y SQLAlchemy
@@ -776,13 +774,11 @@ class SeguimientoControl_Resource(Resource):
 
         body = request.get_json(force=True) or {}
         medico_id = body.get("medico_id")
-        evolucion = (body.get("evolucion") or "").strip()
+        evolucion = (body.get("evolucion") or "").strip() or None
         recetas_data = body.get("recetas", {}) or {}
 
         if not Medico.get_by_id(medico_id):
             return {"error": "El médico indicado no existe"}, 404
-        if not evolucion:
-            return {"evolucion": ["Requerido"]}, 400
 
         # 👇 mismo fix que en registro-completo: convertir antes de pasarlo
         # al modelo, no dejar que llegue como str crudo a la columna Date.
@@ -863,9 +859,7 @@ class SeguimientoControlEditar_Resource(Resource):
         body = request.get_json(force=True) or {}
 
         if "evolucion" in body:
-            evolucion = (body.get("evolucion") or "").strip()
-            if not evolucion:
-                return {"evolucion": ["Requerido"]}, 400
+            evolucion = (body.get("evolucion") or "").strip() or None
         else:
             evolucion = seguimiento.evolucion
 

@@ -34,7 +34,7 @@ class HistoriaClinica(db.Model, BaseModelMixin):
     def __repr__(self):
         return f"<HistoriaClinica id={self.id} paciente_id={self.paciente_id}>"
 
-
+#consulta clinica mas conocido en el frontend
 class RegistroClinico(db.Model, BaseModelMixin):
     __tablename__ = "registros_clinicos"
 
@@ -50,17 +50,17 @@ class RegistroClinico(db.Model, BaseModelMixin):
         unique=True,   # relación 1:1 real con Consulta
     )
 
-    # --- Signos vitales ------------------------------------------------
+    
     presion_arterial = db.Column(db.String(15), nullable=False)
     frecuencia_cardiaca = db.Column(db.SmallInteger, nullable=False)
     frecuencia_respiratoria = db.Column(db.SmallInteger, nullable=True)
-    saturacion_oxigeno = db.Column(db.SmallInteger, nullable=False)   # SpO2, en % (ej. 98)
+    saturacion_oxigeno = db.Column(db.SmallInteger, nullable=False)  
     glicemia = db.Column(db.Numeric(5, 1), nullable=True)
     temperatura = db.Column(db.Numeric(4, 1), nullable=False)
     peso = db.Column(db.Numeric(5, 2), nullable=False)
     talla = db.Column(db.Numeric(4, 2), nullable=True)
     hallazgos_ecograficos=db.Column(db.Text,nullable=False)
-    # --- Lo exclusivo del registro clínico (no de la consulta) -----------
+    #Lo exclusivo del registro clínico (no de la consulta)
     enfermedad_actual = db.Column(db.Text)
     examen_fisico = db.Column(db.Text)
     tratamiento = db.Column(db.Text)
@@ -80,13 +80,9 @@ class RegistroClinico(db.Model, BaseModelMixin):
     consulta = db.relationship("Consulta", back_populates="registro_clinico")
     informes = db.relationship("InformeEcografia", back_populates="registro_clinico")
 
-    # Restaurado: tu modelo real de Archivo (el que me pasaste) SÍ tiene
-    # registro_clinico_id y back_populates="archivos" apuntando aquí.
-    # Sin esta línea, SQLAlchemy va a fallar al armar el mapper con un
-    # InvalidRequestError por back_populates sin su contraparte.
     archivos = db.relationship("Archivo", back_populates="registro_clinico")
     recetas = db.relationship("Receta", back_populates="registro_clinico")
-    # Nuevo: módulo de exámenes complementarios que acabamos de diseñar.
+    
     examenes_complementarios = db.relationship(
         "ExamenComplementario", back_populates="registro_clinico"
     )
@@ -139,9 +135,9 @@ class SeguimientoControl(db.Model, BaseModelMixin):
     )
 
     fecha = db.Column(db.Date, server_default=db.func.current_date(), nullable=False)
-    evolucion = db.Column(db.Text, nullable=False)          # "sigue con fiebre", "mejoró", "sanó"
-    proxima_fecha_control = db.Column(db.Date)               # NULL = ya no debe volver
-    hora_inicio = db.Column(db.Time, nullable=True)           # hora del control agendado (opcional)
+    evolucion = db.Column(db.Text, nullable=True)            
+    proxima_fecha_control = db.Column(db.Date)               
+    hora_inicio = db.Column(db.Time, nullable=True)           
     hora_fin = db.Column(db.Time, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now(), nullable=False)
     updated_at = db.Column(

@@ -226,7 +226,7 @@ const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes,
                             <FontAwesomeIcon icon={faClock} /> {horaSeguimiento}
                           </span>
                           <span className={styles.citaNombre}>{nombrePaciente(s.paciente_id)}</span>
-                          <span className={styles.citaMotivo}>{s.evolucion}</span>
+                          <span className={styles.citaMotivo}>{s.evolucion || 'Sin nota de evolución'}</span>
                           {s.proxima_fecha_control && (
                             <span className={styles.citaMotivo}>
                               Próximo control: {s.proxima_fecha_control}

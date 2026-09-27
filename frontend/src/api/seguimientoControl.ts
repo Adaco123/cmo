@@ -8,7 +8,7 @@ import type { RecetasPayload, Receta } from './recetas';
  * se manda vacío `{}`.
  */
 export interface SeguimientoControlPayload {
-  evolucion: string;
+  evolucion: string | null;
   proxima_fecha_control?: string | null;
   hora_inicio?: string | null;
   hora_fin?: string | null;
@@ -31,7 +31,7 @@ export interface SeguimientoControl {
   medico_id: number;
   fecha: string;
 
-  evolucion: string;
+  evolucion: string | null;
   proxima_fecha_control?: string | null;
   hora_inicio?: string | null;
   hora_fin?: string | null;

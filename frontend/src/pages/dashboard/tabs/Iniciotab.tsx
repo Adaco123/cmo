@@ -137,10 +137,14 @@ const InicioTab: React.FC<InicioTabProps> = ({
               const detalle =
                 item.tipo === 'cita'
                   ? item.cita.motivo || 'Sin motivo registrado'
-                  : `Control de seguimiento · última evolución: ${
-                      item.seguimiento.evolucion.length > 80
-                        ? `${item.seguimiento.evolucion.slice(0, 80)}…`
-                        : item.seguimiento.evolucion
+                  : `Control de seguimiento${
+                      item.seguimiento.evolucion
+                        ? ` · última evolución: ${
+                            item.seguimiento.evolucion.length > 80
+                              ? `${item.seguimiento.evolucion.slice(0, 80)}…`
+                              : item.seguimiento.evolucion
+                          }`
+                        : ' · sin nota de evolución'
                     }`;
 
               return (

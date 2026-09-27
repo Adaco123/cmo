@@ -253,13 +253,10 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
   ];
   const vitalesFaltantes = vitalesObligatorios.filter(v => !v.completo).map(v => v.label);
   const faltan = vitalesFaltantes.length;
-  // Elegir fecha de control sin escribir la nota de evolución no debe
-  // poder guardarse: el backend exige `evolucion` no vacía para crear el
-  // seguimiento_control, y el frontend hasta ahora omitía el bloque
-  // entero en silencio si la nota estaba vacía — la fecha/hora elegidas
-  // se perdían sin ningún error visible.
-  const faltaNotaControl = !controlNota.trim() && !!controlFecha;
-  const listoParaGuardar = faltan === 0 && !faltaNotaControl;
+  // La fecha de control ya no depende de la nota de evolución: el backend
+  // ahora acepta seguimiento_control con evolucion=null, así que se puede
+  // agendar solo la fecha sin escribir nada más.
+  const listoParaGuardar = faltan === 0;
 
   const [saving, setSaving] = useState(false);
   const editorRef = useRef<HTMLDivElement | null>(null);
@@ -374,9 +371,13 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
       payload.recetas = recetaPayload;
     }
 
-    if (controlNota.trim()) {
+    // El seguimiento de control ahora solo depende de la fecha, no de la
+    // nota: consulta_control (arriba) es un campo del registro clínico,
+    // evolucion es un campo propio del seguimiento que se completa después
+    // desde Control.tsx cuando el paciente vuelve.
+    if (controlFecha) {
       payload.seguimiento_control = {
-        evolucion: controlNota.trim(),
+        evolucion: null,
         proxima_fecha_control: proximaFechaControl,
         hora_inicio: controlHoraInicio.trim() || null,
         hora_fin: controlHoraFin || null,
@@ -399,8 +400,6 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
       setTimeout(() => setShake(false), 400);
       if (faltan > 0) {
         showError(`Faltan signos vitales obligatorios: ${vitalesFaltantes.join(', ')}.`);
-      } else if (faltaNotaControl) {
-        showError('Elegiste una fecha de consulta control pero falta escribir la nota de evolución.');
       }
       return;
     }
@@ -767,9 +766,9 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                     <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>(+45 min automático)</span>
                   </div>
                 )}
-                {!controlNota.trim() && controlFecha && (
-                  <div className={styles.subhint} style={{ color: 'var(--warn, #C08A2E)' }}>
-                    Elegiste una fecha pero falta la nota — sin nota no se registra el seguimiento
+                {controlFecha && (
+                  <div className={styles.subhint}>
+                    Se agenda el control sin nota de evolución (se completa después)
                   </div>
                 )}
               </div>
@@ -780,9 +779,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
             <div className={`${styles.status} ${listoParaGuardar ? styles.ok : ''}`}>
               {listoParaGuardar
                 ? <><b>Listo para guardar</b> · todos los signos vitales completos</>
-                : faltan > 0
-                  ? <>Faltan <b>{faltan}</b> {faltan === 1 ? 'signo vital obligatorio' : 'signos vitales obligatorios'}</>
-                  : <>Elegiste fecha de control pero falta la <b>nota de evolución</b></>}
+                : <>Faltan <b>{faltan}</b> {faltan === 1 ? 'signo vital obligatorio' : 'signos vitales obligatorios'}</>}
             </div>
             <button className={`${styles.btnSaveModern} ${shake ? styles.shake : ''}`} disabled={saving} onClick={handleGuardar}>
               <i className="fas fa-save"></i> {saving ? 'Guardando...' : 'Guardar registro clínico'} <kbd>Ctrl + Enter</kbd>

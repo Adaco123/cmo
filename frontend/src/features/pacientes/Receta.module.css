@@ -309,13 +309,13 @@
   /* Medicamentos: nombre, instrucciones, indicaciones y horario de
      cada línea (todo lo demás dentro de la fila usa em, relativo a
      esta). 2.94cqw ≈ 18pt de Word. */
-  --cmo-fs-medicamento: 2.94cqw;
+  --cmo-fs-medicamento: 3.5cqw;
 
   /* Exámenes: nombre del examen + su indicación previa */
-  --cmo-fs-examen: 1.96cqw;
+  --cmo-fs-examen: 2.45cqw;
 
   /* Fórmulas magistrales — columna izquierda (lista de ingredientes) */
-  --cmo-fs-formula-ingrediente: 1.9cqw;
+  --cmo-fs-formula-ingrediente: 2.45cqw;
   /* Fórmulas magistrales — columna derecha (detalle de preparación) */
   --cmo-fs-formula-cantidad: 1.7cqw;
   --cmo-fs-formula-forma: 1.6cqw;
@@ -447,7 +447,7 @@
    que en la hoja impresa a tamaño real, y no se corten en pantalla. */
 .cmo-rp-med-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.05em; gap: 3cqw; font-size: var(--cmo-fs-medicamento); }
 .cmo-rp-med-col-left { display: grid; grid-template-columns: auto 1fr; align-items: baseline; column-gap: 0.5em; row-gap: 0.02em; flex: 0 0 42%; min-width: 0; }
-.cmo-rp-num { grid-column: 1; grid-row: 1; font-weight: 700; color: var(--status-inactive, #C1443F); font-size: 0.95em; }
+.cmo-rp-num { grid-column: 1; grid-row: 1; font-weight: 700; color:  #080808; font-size: 0.95em; }
 .cmo-rp-med-name { grid-column: 2; grid-row: 1; font-weight: 600; color: #16233A; }
 .cmo-rp-med-cantidad { grid-column: 2; grid-row: 2; font-size: 0.72em; color: #555; margin-top: -0.05em; font-family: var(--sans, Arial, sans-serif); }
 .cmo-rp-med-col-right { flex: 0 0 50%; text-align: left; padding-left: 2cqw; }

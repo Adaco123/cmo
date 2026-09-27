@@ -197,7 +197,9 @@ const SeguimientoControlTab: React.FC<SeguimientoControlTabProps> = ({ active, p
             <tbody>
               {filas.map((fila) => {
                 const key = fila.tipo === 'cita' ? `cita-${fila.cita.id}` : `seguimiento-${fila.seguimiento.id}`;
-                const detalle = fila.tipo === 'cita' ? (fila.cita.motivo || 'Sin motivo registrado') : fila.seguimiento.evolucion;
+                const detalle = fila.tipo === 'cita'
+                  ? (fila.cita.motivo || 'Sin motivo registrado')
+                  : (fila.seguimiento.evolucion || 'Sin nota de evolución');
                 const hora = fila.tipo === 'cita'
                   ? formatHora(fila.cita.hora_inicio, fila.cita.hora_fin)
                   : formatHora(fila.seguimiento.hora_inicio, fila.seguimiento.hora_fin);
@@ -292,7 +294,7 @@ const EditarFilaModal: React.FC<EditarFilaModalProps> = ({ fila, onClose, onGuar
   const [horaInicio, setHoraInicio] = useState(horaInicioOriginal);
   const [motivo, setMotivo] = useState(esCita ? (fila.cita.motivo || '') : '');
   const [estadoId, setEstadoId] = useState<number>(esCita ? fila.cita.estado_id : 0);
-  const [evolucion, setEvolucion] = useState(esCita ? '' : fila.seguimiento.evolucion);
+  const [evolucion, setEvolucion] = useState(esCita ? '' : (fila.seguimiento.evolucion || ''));
   const [guardando, setGuardando] = useState(false);
 
   // hora_fin se calcula sola (inicio + 45 min), igual que en Control/CrearCita.

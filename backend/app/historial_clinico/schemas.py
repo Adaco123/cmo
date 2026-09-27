@@ -182,7 +182,7 @@ class SeguimientoControlSchema(Schema):
     registro_clinico_id = fields.Int(required=True)
     medico_id = fields.Int(required=True)
     fecha = fields.Date(dump_only=True)
-    evolucion = fields.Str(required=True, validate=validate.Length(min=1))
+    evolucion = fields.Str(allow_none=True, load_default=None)
     proxima_fecha_control = fields.Date(allow_none=True, load_default=None)
     hora_inicio = fields.Time(allow_none=True, load_default=None)
     hora_fin = fields.Time(allow_none=True, load_default=None)
