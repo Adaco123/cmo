@@ -138,7 +138,7 @@
 
 .receta-widget .campo-nombre-wrap { position: relative; }
 
-.receta-widget .add-btn { width: auto; height: 38px; padding: 0 16px; gap: 6px; font-size: 0.8rem; font-weight: 700; align-self: end; }
+.receta-widget .add-btn { width: auto; min-width: 100px; height: 38px; padding: 0 28px; gap: 6px; font-size: 0.8rem; font-weight: 700; color: #fff; align-self: end; }
 
 .receta-widget .suggestions {
   position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 20;

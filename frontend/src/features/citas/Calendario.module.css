@@ -49,6 +49,45 @@
   flex-wrap: wrap;
 }
 
+.footerSeleccion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+.footerFecha {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-main);
+  text-transform: capitalize;
+}
+
+.confirmarBtn {
+  flex-shrink: 0;
+  height: 38px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 10px;
+  background: var(--cmo-primary);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.confirmarBtn:hover {
+  filter: brightness(1.08);
+}
+
+.confirmarBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .dayPicker {
   flex: 1 1 320px;
 }
@@ -190,6 +229,16 @@
   border-left: 1px solid var(--border-color);
   padding-left: 24px;
   min-width: 0; /* permite que los hijos con ellipsis se encojan de verdad */
+}
+
+/* Altura fija: el panel de citas/seguimientos no debe cambiar el alto del
+   modal según cuántas citas tenga el día (ver comentario en Calendario.tsx
+   junto a listaScrollRef). Si el contenido no llena esta altura, el
+   contenedor simplemente queda con espacio vacío abajo, sin barra de scroll. */
+.listaScroll {
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 6px;
 }
 
 .listaDia h4 {

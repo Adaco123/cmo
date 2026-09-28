@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { DayPicker } from 'react-day-picker';
 import { es } from 'date-fns/locale';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -17,8 +17,10 @@ interface CalendarioProps {
   onSelectCita?: (cita: Cita) => void;
   /** Cuando viene seteado, el calendario entra en "modo selección": aparece
    * un botón "Usar esta fecha" que devuelve el día elegido (YYYY-MM-DD) y
-   * cierra el modal. Las citas/seguimientos ya agendados se siguen viendo
-   * en sus colores — es solo informativo, no bloquea elegir ese día. */
+   * cierra el modal. El panel de citas/seguimientos del día se sigue
+   * mostrando (para ver horarios ocupados y evitar choques), con altura
+   * fija y scroll propio para que el modal no cambie de alto al elegir un
+   * día con varias citas — ver comentario junto a listaScrollRef. */
   onConfirmarFecha?: (fecha: string) => void;
 }
 
@@ -55,23 +57,15 @@ function mensajeSeguimiento(nombrePaciente: string, fechaLabel: string): string 
 
 const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes, onClose, onSelectCita, onConfirmarFecha }) => {
   const [selectedDay, setSelectedDay] = useState<Date | undefined>(new Date());
-  const ultimoClickRef = useRef<{ dia: string; hora: number } | null>(null);
+  const listaScrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Doble click sobre un día = confirmar directo, sin pasar por el botón
-  // "Usar esta fecha". Solo aplica en modo selección (onConfirmarFecha
-  // presente) — en modo lectura (Iniciotab.tsx) no hace nada especial.
-  const handleDayClick = (dia: Date) => {
-    if (!onConfirmarFecha) return;
-    const clave = toDateKey(dia);
-    const ahora = Date.now();
-    const anterior = ultimoClickRef.current;
-    if (anterior && anterior.dia === clave && ahora - anterior.hora < 400) {
-      ultimoClickRef.current = null;
-      onConfirmarFecha(clave);
-    } else {
-      ultimoClickRef.current = { dia: clave, hora: ahora };
-    }
-  };
+  // Altura del panel de citas/seguimientos fija (ver .listaScroll en el
+  // CSS): si creciera con la cantidad de citas del día, el modal (centrado
+  // con align-items: center) cambiaría de alto y se recentraría en
+  // pantalla. Al cambiar de día, el scroll interno vuelve al inicio.
+  useEffect(() => {
+    if (listaScrollRef.current) listaScrollRef.current.scrollTop = 0;
+  }, [selectedDay]);
 
   const citasPorFecha = useMemo(() => {
     const map = new Map<string, Cita[]>();
@@ -142,7 +136,6 @@ const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes,
             locale={es}
             selected={selectedDay}
             onSelect={setSelectedDay}
-            onDayClick={handleDayClick}
             modifiers={{ conCitas: diasConCitas, conSeguimientos: diasConSeguimientos }}
             modifiersClassNames={{
               conCitas: styles.diaConCitas,
@@ -169,6 +162,7 @@ const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes,
 
           <div className={styles.listaDia}>
             <h4>{fechaLabel || 'Selecciona un día'}</h4>
+            <div className={styles.listaScroll} ref={listaScrollRef}>
             <h4 className={styles.subtitulo}>Citas</h4>
             {citasDelDiaSeleccionado.length === 0 ? (
               <p className={styles.sinCitas}>No hay citas registradas este día.</p>
@@ -263,8 +257,23 @@ const Calendario: React.FC<CalendarioProps> = ({ citas, seguimientos, pacientes,
                 </ul>
               </>
             )}
+            </div>
           </div>
         </div>
+
+        {onConfirmarFecha && (
+          <div className={styles.footerSeleccion}>
+            <span className={styles.footerFecha}>{fechaLabel || 'Selecciona un día'}</span>
+            <button
+              type="button"
+              className={styles.confirmarBtn}
+              disabled={!selectedDay}
+              onClick={() => selectedDay && onConfirmarFecha(toDateKey(selectedDay))}
+            >
+              Usar esta fecha
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
