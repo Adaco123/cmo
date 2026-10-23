@@ -375,3 +375,11 @@
     grid-template-columns: 1fr;
   }
 }
+/* Asterisco rojo para marcar los campos obligatorios del formulario
+   (nombres, apellidos, fecha de nacimiento y sexo). Lo comparten
+   PacienteForm y EditarPacienteForm. */
+.reqAsterisk {
+  color: var(--status-inactive, #dc2626);
+  font-weight: 700;
+  margin-left: 2px;
+}

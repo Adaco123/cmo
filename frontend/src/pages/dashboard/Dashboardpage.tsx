@@ -106,7 +106,7 @@ const DashboardPage: React.FC = () => {
     return (
       !q ||
       fullName.includes(q) ||
-      p.documento.toLowerCase().includes(q) ||
+      (p.documento ?? '').toLowerCase().includes(q) ||
       (p.telefono || '').toLowerCase().includes(q) ||
       (p.correo || '').toLowerCase().includes(q)
     );

@@ -10,6 +10,7 @@ import RegistroClinicoDetalle from './RegistroClinicoDetalle';
 import Control from './Control';
 import CrearCita from '../../components/CrearCita.tsx';
 import Cobrar from '../../features/pacientes/Cobrar';
+import AdjuntarArchivos from './AdjuntarArchivos';
 import styles from './VerPaciente.module.css';
 import '../../components/CrearCita.module.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -30,6 +31,7 @@ import {
   faDownload,
   faFileSignature,
   faXmark,
+  faCloudUploadAlt,
 } from '@fortawesome/free-solid-svg-icons';
 
 interface VerPacienteProps {
@@ -65,6 +67,7 @@ interface PacienteSidebarProps {
   paciente?: ApiPaciente | null;
   alergias: string[];
   onNuevaConsulta: () => void;
+  onSubirArchivos: () => void;
   onCrearCita: () => void;
   onConsultaControl: () => void;
   controlDisabled: boolean;
@@ -75,6 +78,7 @@ const PacienteSidebar: React.FC<PacienteSidebarProps> = ({
   paciente,
   alergias,
   onNuevaConsulta,
+  onSubirArchivos,
   onCrearCita,
   onConsultaControl,
   controlDisabled,
@@ -96,6 +100,15 @@ const PacienteSidebar: React.FC<PacienteSidebarProps> = ({
       <button type="button" className={styles.accionBtn} onClick={onNuevaConsulta} title="Nueva consulta">
         <FontAwesomeIcon icon={faCirclePlus} />
         <span>Nueva consulta</span>
+      </button>
+      <button
+        type="button"
+        className={styles.accionBtn}
+        onClick={onSubirArchivos}
+        title="Subir archivos o tomar fotos con el celular"
+      >
+        <FontAwesomeIcon icon={faCloudUploadAlt} />
+        <span>Subir archivos</span>
       </button>
       <button type="button" className={styles.accionBtn} onClick={onCrearCita} title="Crear cita">
         <FontAwesomeIcon icon={faCalendarCheck} />
@@ -206,6 +219,7 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
 
   const [showHistoriaClinica, setShowHistoriaClinica] = useState(false);
   const [showCrearCita, setShowCrearCita] = useState(false);
+  const [showAdjuntar, setShowAdjuntar] = useState(false);
   const [showControl, setShowControl] = useState(false);
   const [showCobrar, setShowCobrar] = useState(false);
   const [consultaIdParaCobro, setConsultaIdParaCobro] = useState<number | null>(null);
@@ -365,6 +379,7 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
         paciente={paciente}
         alergias={alergias}
         onNuevaConsulta={() => setShowHistoriaClinica(true)}
+        onSubirArchivos={() => setShowAdjuntar(true)}
         onCrearCita={() => setShowCrearCita(true)}
         onConsultaControl={() => setShowControl(true)}
         controlDisabled={!registroMasReciente}
@@ -433,6 +448,13 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
           acá solo se monta condicionalmente. */}
       {showHistoriaClinica && (
         <HistoriaClinica paciente={paciente} onClose={() => setShowHistoriaClinica(false)} onSave={handleRegistroGuardado} />
+      )}
+
+      {/* AdjuntarArchivos es un modal autocontenido (trae su propio backdrop
+          y botón de cerrar): subir PDF/JPG/PNG sueltos o tomar fotos con el
+          celular, igual que "Nueva atención" de pacientes externos. */}
+      {showAdjuntar && paciente && (
+        <AdjuntarArchivos paciente={paciente} onClose={() => setShowAdjuntar(false)} />
       )}
 
       {registroIdEditando !== null && (

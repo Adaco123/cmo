@@ -29,7 +29,7 @@ export function useBuscarPaciente(pacientes: Paciente[]) {
     window.setTimeout(() => {
       const matches = pacientes.filter((p) => {
         const fullName = `${p.nombres} ${p.apellidos}`.toLowerCase();
-        return fullName.includes(q) || p.documento.toLowerCase().includes(q);
+        return fullName.includes(q) || (p.documento ?? '').toLowerCase().includes(q);
       });
       setResultados(matches);
       setBusquedaEstado(matches.length > 0 ? 'encontrado' : 'no_encontrado');

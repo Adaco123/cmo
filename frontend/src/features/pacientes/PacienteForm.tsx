@@ -114,7 +114,7 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose, origenI
     const payload: PacientePayload = {
       nombres: formData.nombres.trim(),
       apellidos: formData.apellidos.trim(),
-      documento: formData.documento.trim(),
+      documento: normalizeOptional(formData.documento),
       fecha_nacimiento: formData.fecha_nacimiento,
       sexo: sexoMap[formData.sexo] ?? 'O',
       direccion: normalizeOptional(formData.direccion),
@@ -176,7 +176,7 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose, origenI
             </div>
             <div className={`${styles.row} ${styles.rowThree}`}>
               <div className={styles.fieldGroup}>
-                <label htmlFor="nombres"><FontAwesomeIcon icon={faUser} /> Nombres</label>
+                <label htmlFor="nombres"><FontAwesomeIcon icon={faUser} /> Nombres <span className={styles.reqAsterisk}>*</span></label>
                 <input
                   type="text"
                   id="nombres"
@@ -188,7 +188,7 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose, origenI
                 />
               </div>
               <div className={styles.fieldGroup}>
-                <label htmlFor="apellidos"><FontAwesomeIcon icon={faUser} /> Apellidos</label>
+                <label htmlFor="apellidos"><FontAwesomeIcon icon={faUser} /> Apellidos <span className={styles.reqAsterisk}>*</span></label>
                 <input
                   type="text"
                   id="apellidos"
@@ -208,13 +208,12 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose, origenI
                   placeholder="Ej: 12345678"
                   value={formData.documento}
                   onChange={handleChange}
-                  required
                 />
               </div>
             </div>
             <div className={`${styles.row} ${styles.rowThree}`}>
               <div className={styles.fieldGroup}>
-                <label htmlFor="fecha_nacimiento"><FontAwesomeIcon icon={faCalendarAlt} /> Fecha de Nacimiento</label>
+                <label htmlFor="fecha_nacimiento"><FontAwesomeIcon icon={faCalendarAlt} /> Fecha de Nacimiento <span className={styles.reqAsterisk}>*</span></label>
                 <input
                   type="date"
                   id="fecha_nacimiento"
@@ -225,7 +224,7 @@ const PacienteForm: React.FC<PacienteFormProps> = ({ onSuccess, onClose, origenI
                 />
               </div>
               <div className={styles.fieldGroup}>
-                <label htmlFor="sexo"><FontAwesomeIcon icon={faVenusMars} /> Sexo</label>
+                <label htmlFor="sexo"><FontAwesomeIcon icon={faVenusMars} /> Sexo <span className={styles.reqAsterisk}>*</span></label>
                 <select id="sexo" name="sexo" value={formData.sexo} onChange={handleChange}>
                   <option value="">Seleccione</option>
                   <option value="masculino">Masculino</option>

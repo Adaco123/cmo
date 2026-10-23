@@ -9,7 +9,8 @@ export type OrigenPaciente = 'propio' | 'externo';
 export interface PacientePayload {
   nombres: string;
   apellidos: string;
-  documento: string;
+  /** Opcional: un bebé u otra persona puede no tener CI (el backend guarda NULL). */
+  documento?: string | null;
   fecha_nacimiento: string;
   sexo: 'M' | 'F' | 'O';
   direccion?: string | null;

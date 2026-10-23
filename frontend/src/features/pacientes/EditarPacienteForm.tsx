@@ -55,7 +55,7 @@ function pacienteToFormData(paciente: Paciente): EditarPacienteFormData {
   return {
     nombres: paciente.nombres,
     apellidos: paciente.apellidos,
-    documento: paciente.documento,
+    documento: paciente.documento ?? '',
     fecha_nacimiento: paciente.fecha_nacimiento || '',
     sexo: SEXO_BACKEND_A_FORM[paciente.sexo] || '',
     direccion: paciente.direccion || '',
@@ -114,7 +114,7 @@ const EditarPacienteForm: React.FC<EditarPacienteFormProps> = ({ paciente, onSuc
     const payload: Partial<PacientePayload> = {
       nombres: formData.nombres.trim(),
       apellidos: formData.apellidos.trim(),
-      documento: formData.documento.trim(),
+      documento: normalizeOptional(formData.documento),
       fecha_nacimiento: formData.fecha_nacimiento,
       sexo: SEXO_FORM_A_BACKEND[formData.sexo] ?? 'O',
       direccion: normalizeOptional(formData.direccion),
@@ -171,7 +171,7 @@ const EditarPacienteForm: React.FC<EditarPacienteFormProps> = ({ paciente, onSuc
             </div>
             <div className={`${styles.row} ${styles.rowThree}`}>
               <div className={styles.fieldGroup}>
-                <label htmlFor="nombres"><FontAwesomeIcon icon={faUser} /> Nombres</label>
+                <label htmlFor="nombres"><FontAwesomeIcon icon={faUser} /> Nombres <span className={styles.reqAsterisk}>*</span></label>
                 <input
                   type="text"
                   id="nombres"
@@ -183,7 +183,7 @@ const EditarPacienteForm: React.FC<EditarPacienteFormProps> = ({ paciente, onSuc
                 />
               </div>
               <div className={styles.fieldGroup}>
-                <label htmlFor="apellidos"><FontAwesomeIcon icon={faUser} /> Apellidos</label>
+                <label htmlFor="apellidos"><FontAwesomeIcon icon={faUser} /> Apellidos <span className={styles.reqAsterisk}>*</span></label>
                 <input
                   type="text"
                   id="apellidos"
@@ -203,13 +203,12 @@ const EditarPacienteForm: React.FC<EditarPacienteFormProps> = ({ paciente, onSuc
                   placeholder="Ej: 12345678"
                   value={formData.documento}
                   onChange={handleChange}
-                  required
                 />
               </div>
             </div>
             <div className={`${styles.row} ${styles.rowThree}`}>
               <div className={styles.fieldGroup}>
-                <label htmlFor="fecha_nacimiento"><FontAwesomeIcon icon={faCalendarAlt} /> Fecha de Nacimiento</label>
+                <label htmlFor="fecha_nacimiento"><FontAwesomeIcon icon={faCalendarAlt} /> Fecha de Nacimiento <span className={styles.reqAsterisk}>*</span></label>
                 <input
                   type="date"
                   id="fecha_nacimiento"
@@ -220,7 +219,7 @@ const EditarPacienteForm: React.FC<EditarPacienteFormProps> = ({ paciente, onSuc
                 />
               </div>
               <div className={styles.fieldGroup}>
-                <label htmlFor="sexo"><FontAwesomeIcon icon={faVenusMars} /> Sexo</label>
+                <label htmlFor="sexo"><FontAwesomeIcon icon={faVenusMars} /> Sexo <span className={styles.reqAsterisk}>*</span></label>
                 <select id="sexo" name="sexo" value={formData.sexo} onChange={handleChange}>
                   <option value="">Seleccione</option>
                   <option value="masculino">Masculino</option>
