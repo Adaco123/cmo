@@ -3,7 +3,7 @@ from datetime import datetime
 
 from flask import request, current_app
 from flask_restful import Api, Resource
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from marshmallow import ValidationError
 from app.db import db
 from app.consultas.schemas import ConsultaSchema
@@ -21,6 +21,7 @@ from app.historial_clinico.schemas import (
 )
 from app.historial_clinico.api_v1_0 import historial_clinico_bp
 from app.pacientes.models import Paciente
+from app.usuarios.models import Usuario
 from app.pacientes.schemas import PacienteSchema
 from app.consultas.models import Consulta
 
@@ -157,13 +158,17 @@ def _validar_bloques_recetas(recetas_data: dict):
     return recetas_validated, None
 
 
-def _crear_recetas_desde_bloques(recetas_validated: dict, registro_clinico_id: int,
-                                  medico_id: int, seguimiento_control_id=None):
+def _crear_recetas_desde_bloques(recetas_validated: dict, registro_clinico_id,
+                                  medico_id: int, seguimiento_control_id=None,
+                                  consulta_id=None):
     """Crea las Receta + sus ítems dentro de la transacción activa.
 
     recetas_validated: clave -> lista de bloques; cada bloque de la lista
     se guarda como su propia fila Receta (una por cada "receta" que el
     doctor haya agregado por separado en el frontend).
+
+    Si la receta cuelga de una consulta sin registro clínico (atenciones de
+    "Subir archivos"), registro_clinico_id va None y se pasa consulta_id.
     """
     item_model_by_clave = {
         "medicamentos": RecetaMedicamento,
@@ -178,6 +183,7 @@ def _crear_recetas_desde_bloques(recetas_validated: dict, registro_clinico_id: i
         for bloque in bloques:
             receta = Receta(
                 registro_clinico_id=registro_clinico_id,
+                consulta_id=consulta_id,
                 tipo_receta_id=tipo.id,
                 medico_id=medico_id,
                 seguimiento_control_id=seguimiento_control_id,
@@ -190,7 +196,10 @@ def _crear_recetas_desde_bloques(recetas_validated: dict, registro_clinico_id: i
                 item = ItemModel(receta_id=receta.id, **item_data)
                 db.session.add(item)
 
-                if clave == "examenes":
+                # Sin registro clínico no hay donde colgar el examen espejo
+                # (examenes_complementarios.registro_clinico_id es obligatorio):
+                # la solicitud queda solo en la receta.
+                if clave == "examenes" and registro_clinico_id is not None:
                     # Espejo en examenes_complementarios: nace vacío
                     # (resultado=None) y queda vinculado a esta solicitud,
                     # heredando su categoría. Así ya aparece como "pendiente"
@@ -838,6 +847,59 @@ class SeguimientoControl_Resource(Resource):
         }, 201
 
 
+class RecetasDeConsulta_Resource(Resource):
+    """
+    POST /api/historial_clinico/consultas/<int:consulta_id>/recetas
+
+    Crea recetas (medicamentos / exámenes / fórmulas, cada bloque = una
+    Receta) directamente sobre una Consulta que NO tiene registro clínico:
+    las atenciones de "Subir archivos" (paciente propio) o de pacientes
+    externos. Body: {"recetas": {"medicamentos": [...], "examenes": [...],
+    "formulas": [...]}} — mismo formato que en registro-completo.
+
+    El médico de la receta es el del usuario con sesión iniciada (igual que
+    al crear la atención). Si la consulta ya tiene registro clínico, la
+    receta debe crearse desde ese registro, no por acá.
+    """
+
+    @jwt_required()
+    def post(self, consulta_id):
+        consulta = Consulta.get_by_id(consulta_id)
+        if not consulta:
+            return {"error": "Consulta no encontrada"}, 404
+
+        if consulta.registro_clinico is not None:
+            return {
+                "error": "Esta consulta tiene registro clínico: la receta se crea desde su registro."
+            }, 409
+
+        usuario = Usuario.get_by_id(get_jwt_identity())
+        medico = usuario.empleado.medico if usuario and usuario.empleado else None
+        if not medico:
+            return {
+                "error": "Tu usuario no tiene una ficha de médico asociada, así que no puede recetar."
+            }, 422
+
+        body = request.get_json(force=True) or {}
+        recetas_validated, error = _validar_bloques_recetas(body.get("recetas", {}) or {})
+        if error:
+            return error
+        if not recetas_validated:
+            return {"error": "Agrega al menos un medicamento, examen o fórmula a la receta."}, 400
+
+        try:
+            recetas_creadas = _crear_recetas_desde_bloques(
+                recetas_validated, None, medico.id, consulta_id=consulta.id
+            )
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Error guardando recetas de la consulta")
+            return {"error": "No se pudo guardar la receta"}, 500
+
+        return {"recetas": receta_schema.dump(recetas_creadas, many=True)}, 201
+
+
 class SeguimientoControlEditar_Resource(Resource):
     """
     PUT /api/historial_clinico/seguimientos/<int:seguimiento_id>
@@ -964,6 +1026,7 @@ class SeguimientoControlList_Resource(Resource):
         return seguimiento_schema_list.dump(seguimientos), 200
 api.add_resource(SeguimientoControlList_Resource, "/seguimientos")
 api.add_resource(SeguimientoControlEditar_Resource, "/seguimientos/<int:seguimiento_id>")
+api.add_resource(RecetasDeConsulta_Resource, "/consultas/<int:consulta_id>/recetas")
 api.add_resource(RegistroClinicoDetalleCompleto_Resource, "/registros/<int:registro_id>/completo")
 api.add_resource(RegistroClinicoCompleto_Resource, "/registro-completo")
 api.add_resource(RegistroClinicoCompletoUpdate_Resource, "/registro-completo/<int:registro_id>")

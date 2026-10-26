@@ -1,3 +1,5 @@
+import api from '../api';
+
 /**
  * Igual que examenesComplementarios.ts: las recetas se crean únicamente
  * como parte del payload combinado en POST /historial_clinico/registro-completo.
@@ -79,7 +81,11 @@ export interface RecetaExamen extends Omit<RecetaExamenItemPayload, 'urgencia'> 
 
 export interface Receta {
   id: number;
-  registro_clinico_id: number;
+  /** null en las recetas de una atención sin registro clínico (ver consulta_id). */
+  registro_clinico_id: number | null;
+  /** Consulta de la que cuelga la receta cuando no hay registro clínico
+   *  (atenciones de "Subir archivos"). */
+  consulta_id?: number | null;
   tipo_receta_id: number;
   medico_id: number;
   seguimiento_control_id?: number | null;
@@ -91,4 +97,23 @@ export interface Receta {
   examenes: RecetaExamen[];
   created_at?: string;
   updated_at?: string;
+}
+
+/**
+ * Crea recetas directamente sobre una consulta SIN registro clínico (las
+ * atenciones de "Subir archivos"). Cada bloque del payload genera su propia
+ * Receta; el médico es el del usuario con sesión iniciada.
+ */
+export async function crearRecetasConsulta(consultaId: number, recetas: RecetasPayload): Promise<Receta[]> {
+  const { data } = await api.post<{ recetas: Receta[] }>(
+    `/api/historial_clinico/consultas/${consultaId}/recetas`,
+    { recetas },
+  );
+  return data.recetas;
+}
+
+/** Recetas de un paciente que cuelgan de una consulta sin registro clínico. */
+export async function getRecetasConsultasPaciente(pacienteId: number): Promise<Receta[]> {
+  const { data } = await api.get<Receta[]>(`/api/recetas/recetas/paciente/${pacienteId}/consultas`);
+  return data;
 }

@@ -11,6 +11,9 @@ import Control from './Control';
 import CrearCita from '../../components/CrearCita.tsx';
 import Cobrar from '../../features/pacientes/Cobrar';
 import AdjuntarArchivos from './AdjuntarArchivos';
+import ArchivosAtencionItem from './ArchivosAtencionItem';
+import { getArchivosPorPaciente, type ArchivoResponse } from '../../api/archivos';
+import { getRecetasConsultasPaciente, type Receta as RecetaGuardada } from '../../api/recetas';
 import styles from './VerPaciente.module.css';
 import '../../components/CrearCita.module.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -58,6 +61,50 @@ function getRegistroFechaValor(registro: RegistroClinico): number {
   const fechaHora = `${registro.fecha}${registro.hora ? `T${registro.hora}` : ''}`;
   const valor = Date.parse(fechaHora);
   return Number.isNaN(valor) ? 0 : valor;
+}
+
+/** Atención sin registro clínico (creada con "Subir archivos"): sus archivos
+ *  adjuntos y sus recetas. Se muestra en el historial como una tarjeta propia. */
+interface GrupoArchivos {
+  consultaId: number;
+  fecha: string;
+  archivos: ArchivoResponse[];
+  recetas: RecetaGuardada[];
+}
+
+/** Agrupa por consulta los archivos y las recetas que cuelgan directamente de
+ *  una consulta SIN registro clínico. Los archivos de los exámenes de un
+ *  registro clínico ya se ven dentro de ese registro, así que se excluyen.
+ *  Una consulta con recetas pero sin archivos (por haberlos eliminado) sigue
+ *  apareciendo. */
+function agruparAtencionesSueltas(
+  archivos: ArchivoResponse[],
+  recetas: RecetaGuardada[],
+  consultaIdsConRegistro: Set<number>,
+): GrupoArchivos[] {
+  const mapa = new Map<number, GrupoArchivos>();
+  const grupoDe = (consultaId: number): GrupoArchivos => {
+    let g = mapa.get(consultaId);
+    if (!g) {
+      g = { consultaId, fecha: '', archivos: [], recetas: [] };
+      mapa.set(consultaId, g);
+    }
+    return g;
+  };
+  for (const a of archivos) {
+    if (a.consulta_id == null || consultaIdsConRegistro.has(a.consulta_id)) continue;
+    const g = grupoDe(a.consulta_id);
+    g.archivos.push(a);
+    if (a.created_at && a.created_at > g.fecha) g.fecha = a.created_at;
+  }
+  for (const r of recetas) {
+    if (r.consulta_id == null || consultaIdsConRegistro.has(r.consulta_id)) continue;
+    const g = grupoDe(r.consulta_id);
+    g.recetas.push(r);
+    const f = r.created_at ?? r.fecha;
+    if (f && f > g.fecha) g.fecha = f;
+  }
+  return Array.from(mapa.values());
 }
 
 /* ================= SUBCOMPONENTES ================= */
@@ -220,6 +267,21 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
   const [showHistoriaClinica, setShowHistoriaClinica] = useState(false);
   const [showCrearCita, setShowCrearCita] = useState(false);
   const [showAdjuntar, setShowAdjuntar] = useState(false);
+  // Todos los archivos del paciente; de ahí salen las tarjetas "Archivos
+  // adjuntos" del historial (atenciones sin registro clínico).
+  // Se guarda junto al id del paciente al que pertenecen: si cambia el
+  // paciente, los archivos del anterior no se muestran ni un instante.
+  const [adjuntosCargados, setAdjuntosCargados] = useState<
+    { pacienteId: number; archivos: ArchivoResponse[]; recetas: RecetaGuardada[] } | null
+  >(null);
+  const archivosPaciente = useMemo(
+    () => (adjuntosCargados && adjuntosCargados.pacienteId === paciente?.id ? adjuntosCargados.archivos : []),
+    [adjuntosCargados, paciente?.id],
+  );
+  const recetasConsultas = useMemo(
+    () => (adjuntosCargados && adjuntosCargados.pacienteId === paciente?.id ? adjuntosCargados.recetas : []),
+    [adjuntosCargados, paciente?.id],
+  );
   const [showControl, setShowControl] = useState(false);
   const [showCobrar, setShowCobrar] = useState(false);
   const [consultaIdParaCobro, setConsultaIdParaCobro] = useState<number | null>(null);
@@ -259,7 +321,39 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
     return () => { isMounted = false; };
   }, [paciente?.id]);
 
-  const registros = expediente?.registros_clinicos || [];
+  // Subir un contador vuelve a pedir los archivos (p. ej. tras "Subir archivos").
+  const [versionArchivos, setVersionArchivos] = useState(0);
+
+  useEffect(() => {
+    const pacienteId = paciente?.id;
+    if (!pacienteId) return;
+    let isMounted = true;
+
+    const cargarArchivos = async () => {
+      // Por separado: si fallan las recetas, los archivos igual se muestran (y al revés).
+      const [archivosRes, recetasRes] = await Promise.allSettled([
+        getArchivosPorPaciente(pacienteId),
+        getRecetasConsultasPaciente(pacienteId),
+      ]);
+      if (archivosRes.status === 'rejected') {
+        console.error('No se pudieron cargar los archivos del paciente', archivosRes.reason);
+      }
+      if (recetasRes.status === 'rejected') {
+        console.error('No se pudieron cargar las recetas de las consultas del paciente', recetasRes.reason);
+      }
+      if (!isMounted) return;
+      setAdjuntosCargados({
+        pacienteId,
+        archivos: archivosRes.status === 'fulfilled' ? archivosRes.value : [],
+        recetas: recetasRes.status === 'fulfilled' ? recetasRes.value : [],
+      });
+    };
+
+    void cargarArchivos();
+    return () => { isMounted = false; };
+  }, [paciente?.id, versionArchivos]);
+
+  const registros = useMemo(() => expediente?.registros_clinicos || [], [expediente]);
 
   // Timeline: siempre del más reciente al más antiguo, sin toggle de orden —
   // la lectura cronológica descendente es la que tiene sentido para un timeline.
@@ -269,6 +363,39 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
   );
 
   const registroMasReciente = registrosOrdenados[0] ?? null;
+
+  // Historial = registros clínicos + atenciones con solo archivos, mezclados
+  // por fecha (más reciente primero).
+  const gruposArchivos = useMemo(
+    () => agruparAtencionesSueltas(archivosPaciente, recetasConsultas, new Set(registros.map((r) => r.consulta_id))),
+    [archivosPaciente, recetasConsultas, registros],
+  );
+
+  type ItemHistorial =
+    | { tipo: 'registro'; clave: string; valor: number; registro: RegistroClinico }
+    | { tipo: 'archivos'; clave: string; valor: number; grupo: GrupoArchivos };
+
+  const itemsHistorial = useMemo<ItemHistorial[]>(() => {
+    const items: ItemHistorial[] = [
+      ...registrosOrdenados.map((registro): ItemHistorial => ({
+        tipo: 'registro', clave: `r-${registro.id}`, valor: getRegistroFechaValor(registro), registro,
+      })),
+      ...gruposArchivos.map((grupo): ItemHistorial => ({
+        tipo: 'archivos', clave: `a-${grupo.consultaId}`, valor: Date.parse(grupo.fecha) || 0, grupo,
+      })),
+    ];
+    return items.sort((a, b) => b.valor - a.valor);
+  }, [registrosOrdenados, gruposArchivos]);
+
+  const handleArchivoEliminado = useCallback((archivoId: number) => {
+    setAdjuntosCargados((prev) =>
+      prev ? { ...prev, archivos: prev.archivos.filter((a) => a.id !== archivoId) } : prev,
+    );
+  }, []);
+
+  const handleRecetasCreadas = useCallback((nuevas: RecetaGuardada[]) => {
+    setAdjuntosCargados((prev) => (prev ? { ...prev, recetas: [...nuevas, ...prev.recetas] } : prev));
+  }, []);
 
   const abrirDetalle = useCallback((id: number) => {
     setRegistroIdDetalle(id);
@@ -391,7 +518,7 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
           <h1>Historial clínico</h1>
           <div className={styles.mainHeadRight}>
             <span className={styles.contador}>
-              {registrosOrdenados.length} {registrosOrdenados.length === 1 ? 'consulta' : 'consultas'}
+              {itemsHistorial.length} {itemsHistorial.length === 1 ? 'consulta' : 'consultas'}
             </span>
             {onClose && (
               <button type="button" className={styles.volverBtn} onClick={onClose} title="Cerrar expediente">
@@ -415,29 +542,45 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
           </div>
         )}
 
-        {!loading && !error && registrosOrdenados.length === 0 && (
+        {!loading && !error && itemsHistorial.length === 0 && (
           <div className={styles.emptyState}>
             <FontAwesomeIcon icon={faFileMedicalAlt} />
             <p>No hay registros clínicos para este paciente todavía.</p>
           </div>
         )}
 
-        {!loading && !error && registrosOrdenados.length > 0 && (
+        {!loading && !error && itemsHistorial.length > 0 && (
           <div className={styles.timeline}>
-            {registrosOrdenados.map((registro) => (
-              <RegistroCard
-                key={registro.id}
-                registro={registro}
-                expandido={registroIdDetalle === registro.id}
-                menuAbierto={menuAbiertoId === registro.id}
-                onAbrir={abrirDetalle}
-                onToggleMenu={toggleMenu}
-                onEditar={handleEditarRegistro}
-                onEliminar={handleEliminarRegistro}
-                onDescargarPdf={handleDescargarPdf}
-                onDescargarConsentimiento={handleDescargarConsentimiento}
-              />
-            ))}
+            {itemsHistorial.map((item) =>
+              item.tipo === 'registro' ? (
+                <RegistroCard
+                  key={item.clave}
+                  registro={item.registro}
+                  expandido={registroIdDetalle === item.registro.id}
+                  menuAbierto={menuAbiertoId === item.registro.id}
+                  onAbrir={abrirDetalle}
+                  onToggleMenu={toggleMenu}
+                  onEditar={handleEditarRegistro}
+                  onEliminar={handleEliminarRegistro}
+                  onDescargarPdf={handleDescargarPdf}
+                  onDescargarConsentimiento={handleDescargarConsentimiento}
+                />
+              ) : (
+                paciente && (
+                  <ArchivosAtencionItem
+                    key={item.clave}
+                    consultaId={item.grupo.consultaId}
+                    paciente={paciente}
+                    alergias={alergias}
+                    archivos={item.grupo.archivos}
+                    recetas={item.grupo.recetas}
+                    fecha={item.grupo.fecha}
+                    onEliminado={handleArchivoEliminado}
+                    onRecetasCreadas={handleRecetasCreadas}
+                  />
+                )
+              ),
+            )}
           </div>
         )}
       </main>
@@ -454,7 +597,11 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
           y botón de cerrar): subir PDF/JPG/PNG sueltos o tomar fotos con el
           celular, igual que "Nueva atención" de pacientes externos. */}
       {showAdjuntar && paciente && (
-        <AdjuntarArchivos paciente={paciente} onClose={() => setShowAdjuntar(false)} />
+        <AdjuntarArchivos
+          paciente={paciente}
+          onClose={() => setShowAdjuntar(false)}
+          onGuardado={() => setVersionArchivos((v) => v + 1)}
+        />
       )}
 
       {registroIdEditando !== null && (

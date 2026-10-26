@@ -18,6 +18,8 @@ from app.recetas.schemas import (
 )
 from app.recetas.api_v1_0 import recetas_bp
 from app.historial_clinico.models import RegistroClinico
+from app.consultas.models import Consulta
+from app.pacientes.models import Paciente
 from app.medicos.models import Medico
 from app.examenes_complementarios.models import ExamenComplementario
 from app.archivos.models import Archivo
@@ -46,8 +48,14 @@ class RecetaList_Resource(Resource):
         except ValidationError as err:
             return err.messages, 400
 
-        if not RegistroClinico.get_by_id(data["registro_clinico_id"]):
+        registro_clinico_id = data.get("registro_clinico_id")
+        consulta_id = data.get("consulta_id")
+        if registro_clinico_id is None and consulta_id is None:
+            return {"error": "Indica registro_clinico_id o consulta_id"}, 400
+        if registro_clinico_id is not None and not RegistroClinico.get_by_id(registro_clinico_id):
             return {"error": "El registro clínico indicado no existe"}, 404
+        if consulta_id is not None and not Consulta.get_by_id(consulta_id):
+            return {"error": "La consulta indicada no existe"}, 404
         if not Medico.get_by_id(data["medico_id"]):
             return {"error": "El médico indicado no existe"}, 404
 
@@ -75,8 +83,9 @@ class Receta_Resource(Resource):
         except ValidationError as err:
             return err.messages, 400
 
-        # El registro clínico de una receta no se reasigna por edición.
+        # El registro clínico / la consulta de una receta no se reasignan por edición.
         data.pop("registro_clinico_id", None)
+        data.pop("consulta_id", None)
 
         if "medico_id" in data and not Medico.get_by_id(data["medico_id"]):
             return {"error": "El médico indicado no existe"}, 404
@@ -123,6 +132,29 @@ class RecetasPorRegistroClinico_Resource(Resource):
             Receta.query
             .filter_by(registro_clinico_id=registro_clinico_id, estado=True)
             .order_by(Receta.fecha.desc())
+            .all()
+        )
+        return receta_schema_list.dump(recetas), 200
+
+
+class RecetasConsultasPaciente_Resource(Resource):
+    """GET /api/recetas/recetas/paciente/<id>/consultas
+
+    Recetas de un paciente que cuelgan directamente de una consulta (las
+    atenciones sin registro clínico, p. ej. las de "Subir archivos"). Las
+    recetas de un registro clínico se leen con su propio endpoint.
+    """
+
+    @jwt_required()
+    def get(self, paciente_id):
+        if not Paciente.get_by_id(paciente_id):
+            return {"error": "Paciente no encontrado"}, 404
+
+        recetas = (
+            Receta.query
+            .join(Consulta, Consulta.id == Receta.consulta_id)
+            .filter(Consulta.paciente_id == paciente_id, Receta.estado.is_(True))
+            .order_by(Receta.created_at.desc())
             .all()
         )
         return receta_schema_list.dump(recetas), 200
@@ -309,6 +341,7 @@ class RecetaFormulaMagistral_Resource(Resource):
 api.add_resource(RecetaList_Resource, "/recetas")
 api.add_resource(Receta_Resource, "/recetas/<int:receta_id>")
 api.add_resource(RecetasPorRegistroClinico_Resource, "/recetas/registro-clinico/<int:registro_clinico_id>")
+api.add_resource(RecetasConsultasPaciente_Resource, "/recetas/paciente/<int:paciente_id>/consultas")
 
 api.add_resource(RecetaMedicamentoList_Resource, "/recetas/<int:receta_id>/medicamentos")
 api.add_resource(RecetaMedicamento_Resource, "/recetas/medicamentos/<int:medicamento_id>")
