@@ -6,15 +6,15 @@ import {
   eliminarArchivo,
   type ArchivoResponse,
 } from '../../api/archivos';
-import { crearRecetasConsulta, type Receta as RecetaGuardada, type RecetasPayload } from '../../api/recetas';
+import type { Receta as RecetaGuardada } from '../../api/recetas';
+import type { ExamenComplementario } from '../../api/examenesComplementarios';
 import type { Paciente } from '../../api/pacientes';
-import { useAuth } from '../../components/AuthProvider';
-import { nombreCompleto } from '../../auth';
 import { useErrorToast } from '../../components/ErrorToastProvider';
 import { extractErrorMessage } from '../../utils/errors';
-import Receta from './Receta';
-import type { RecetaHandle } from './Receta';
+import { buildWhatsAppUrl, formatFechaLabel, mensajeReceta } from '../../utils/recetaWhatsapp';
+import ExamenAtencionCard from './ExamenAtencionCard';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import {
   faChevronDown,
   faDownload,
@@ -22,7 +22,6 @@ import {
   faExpand,
   faFileImage,
   faFilePdf,
-  faFilePrescription,
   faTrash,
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
@@ -30,6 +29,8 @@ import {
 import timeline from './VerPaciente.module.css';
 // Lista de archivos y visor: mismos estilos que la ficha de pacientes externos.
 import styles from './PacienteExterno.module.css';
+// Recetas y exámenes: mismos estilos que RegistroClinicoDetalle.
+import detalle from './RegistroClinicoDetalle.module.css';
 
 const esPdf = (nombre: string) => nombre.toLowerCase().endsWith('.pdf');
 
@@ -46,34 +47,34 @@ function formatearFechaHora(iso: string): string {
 }
 
 interface Props {
-  /** Consulta (atención) a la que pertenecen los archivos y las recetas. */
-  consultaId: number;
   paciente: Paciente;
-  alergias: string[];
   archivos: ArchivoResponse[];
-  /** Recetas ya guardadas en esta atención. */
+  /** Recetas de esta atención (solo lectura: se crean al guardar la atención). */
   recetas: RecetaGuardada[];
-  /** Fecha ISO de la atención (la del archivo o receta más reciente del grupo). */
+  /** Exámenes de esta atención (pendientes o completos). */
+  examenes: ExamenComplementario[];
+  /** Fecha ISO de la atención (la del archivo, receta o examen más reciente del grupo). */
   fecha: string;
   /** Se llama tras eliminar un archivo para que el padre lo saque de su lista. */
   onEliminado: (archivoId: number) => void;
-  /** Se llama con las recetas recién guardadas para que el padre las agregue a su lista. */
-  onRecetasCreadas: (recetas: RecetaGuardada[]) => void;
+  /** Se llama cuando un examen cambia (observaciones) para que el padre lo actualice. */
+  onExamenActualizado: (examen: ExamenComplementario) => void;
 }
 
 /**
  * Tarjeta del historial clínico para una atención sin registro clínico:
- * archivos adjuntos (PDF/JPG/PNG subidos con "Subir archivos") y, si el
- * médico las pone, recetas. Se muestra mezclada en el timeline por fecha,
+ * archivos adjuntos (PDF/JPG/PNG subidos con "Subir archivos"), y las recetas
+ * y exámenes que el médico registró al guardar. Las recetas solo se ven y se
+ * envían por WhatsApp (no se receta después de guardar); los exámenes
+ * pendientes se completan acá (observaciones, fotos). Se muestra mezclada en el timeline por fecha,
  * junto a las consultas con registro clínico. Al abrirla, descarga las
  * miniaturas de sus imágenes (no antes, para no bajar todas las fotos del
  * paciente al abrir la ficha).
  */
 const ArchivosAtencionItem: React.FC<Props> = ({
-  consultaId, paciente, alergias, archivos, recetas, fecha, onEliminado, onRecetasCreadas,
+  paciente, archivos, recetas, examenes, fecha, onEliminado, onExamenActualizado,
 }) => {
   const { showError, showSuccess, confirm } = useErrorToast();
-  const { user } = useAuth();
   const [expandido, setExpandido] = useState(false);
   const [menuAbiertoId, setMenuAbiertoId] = useState<number | null>(null);
 
@@ -84,57 +85,6 @@ const ArchivosAtencionItem: React.FC<Props> = ({
   // Visor: PDF en drawer lateral, imagen en lightbox.
   const [visor, setVisor] = useState<{ archivo: ArchivoResponse; url: string } | null>(null);
   const [cargandoVisor, setCargandoVisor] = useState(false);
-
-  // Receta: el panel (Receta.tsx) solo se monta la primera vez que se pide,
-  // para no cargar uno por cada tarjeta del historial; después se queda
-  // montado, así el borrador no se pierde al cerrar el panel.
-  const recetaRef = useRef<RecetaHandle>(null);
-  const [recetaMontada, setRecetaMontada] = useState(false);
-  const [recetaAbierta, setRecetaAbierta] = useState(false);
-  const [tieneBorrador, setTieneBorrador] = useState(false);
-  const [guardandoReceta, setGuardandoReceta] = useState(false);
-
-  const abrirReceta = () => {
-    setExpandido(true);
-    setRecetaMontada(true);
-    setRecetaAbierta(true);
-  };
-
-  const cerrarReceta = () => {
-    setRecetaAbierta(false);
-    setTieneBorrador(!!recetaRef.current?.getPayload());
-  };
-
-  const guardarReceta = async () => {
-    const payload = recetaRef.current?.getPayload();
-    if (!payload) {
-      setTieneBorrador(false);
-      showError('La receta está vacía: agrega al menos un medicamento, examen o fórmula.');
-      return;
-    }
-    setGuardandoReceta(true);
-    try {
-      const nuevas = await crearRecetasConsulta(consultaId, payload as RecetasPayload);
-      onRecetasCreadas(nuevas);
-      recetaRef.current?.reset();
-      setTieneBorrador(false);
-      showSuccess(nuevas.length === 1 ? 'Receta guardada correctamente' : `${nuevas.length} recetas guardadas correctamente`);
-    } catch (err: unknown) {
-      showError(extractErrorMessage(err, 'No se pudo guardar la receta.'));
-    } finally {
-      setGuardandoReceta(false);
-    }
-  };
-
-  const descartarBorrador = async () => {
-    const aceptar = await confirm('¿Descartar la receta sin guardar?', {
-      textoAceptar: 'Descartar',
-      textoCancelar: 'Cancelar',
-    });
-    if (!aceptar) return;
-    recetaRef.current?.reset();
-    setTieneBorrador(false);
-  };
 
   // Lupa dentro del lightbox: mover el mouse (o el dedo) sobre la imagen
   // amplía la zona bajo el cursor, sin perder de vista la foto completa.
@@ -241,6 +191,7 @@ const ArchivosAtencionItem: React.FC<Props> = ({
   const resumen = [
     cantidad > 0 ? `${cantidad} ${cantidad === 1 ? 'archivo' : 'archivos'}` : null,
     recetas.length > 0 ? `${recetas.length} ${recetas.length === 1 ? 'receta' : 'recetas'}` : null,
+    examenes.length > 0 ? `${examenes.length} ${examenes.length === 1 ? 'examen' : 'exámenes'}` : null,
   ].filter(Boolean).join(' · ');
 
   return (
@@ -254,7 +205,7 @@ const ArchivosAtencionItem: React.FC<Props> = ({
         <div className={timeline.cardHead} onClick={() => setExpandido((v) => !v)}>
           <div className={timeline.cardHeadMain}>
             <span className={timeline.cardFecha}>{formatearFechaHora(fecha)}</span>
-            <span className={timeline.cardTitulo}>{cantidad > 0 ? 'Archivos adjuntos' : 'Receta'}</span>
+            <span className={timeline.cardTitulo}>{cantidad > 0 ? 'Archivos adjuntos' : recetas.length > 0 ? 'Receta' : 'Exámenes'}</span>
             {resumen && <span className={timeline.cardSub}>{resumen}</span>}
           </div>
           <div className={timeline.cardHeadActions}>
@@ -311,103 +262,94 @@ const ArchivosAtencionItem: React.FC<Props> = ({
             )}
             {cargandoVisor && <p className={styles.uploadingText}>Abriendo archivo...</p>}
 
-            {/* ---- Recetas de esta atención ---- */}
+            {/* ---- Recetas de esta atención: solo ver y enviar por WhatsApp ---- */}
             {recetas.length > 0 && (
-              <div style={{ marginTop: cantidad > 0 ? 16 : 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ marginTop: cantidad > 0 ? 16 : 0 }}>
                 {recetas.map((r) => (
-                  <div
-                    key={r.id}
-                    style={{
-                      background: 'var(--bg-input)', border: '1px solid var(--border-color)',
-                      borderRadius: 'var(--radius-sm)', padding: '12px 14px', fontSize: 13,
-                      display: 'flex', flexDirection: 'column', gap: 8,
-                    }}
-                  >
-                    <b style={{ color: 'var(--accent)', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.4 }}>
-                      <FontAwesomeIcon icon={faFilePrescription} /> Receta
-                    </b>
-                    {r.indicaciones_generales && <p style={{ margin: 0, color: 'var(--text-muted)' }}>{r.indicaciones_generales}</p>}
-                    {r.medicamentos.map((m) => (
-                      <div key={`m${m.id}`}>
-                        <b>{m.medicamento}</b> — {m.dosis}
-                        {m.via_administracion && ` · ${m.via_administracion}`}
-                        {m.frecuencia && ` · ${m.frecuencia}`}
-                        {m.duracion && ` · ${m.duracion}`}
-                        {m.indicaciones && <div style={{ color: 'var(--text-muted)' }}>{m.indicaciones}</div>}
+                  <div key={r.id} className={detalle.recetaCard}>
+                    {paciente.telefono && (
+                      <div className={detalle.recetaHeadRow}>
+                        <a
+                          className={detalle.whatsappBtn}
+                          href={buildWhatsAppUrl(
+                            paciente.telefono,
+                            mensajeReceta(
+                              `${paciente.nombres} ${paciente.apellidos}`.trim(),
+                              formatFechaLabel(r.created_at ?? r.fecha ?? fecha),
+                              r,
+                            ),
+                          )}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Enviar receta por WhatsApp"
+                        >
+                          <FontAwesomeIcon icon={faWhatsapp} /> Enviar por WhatsApp
+                        </a>
                       </div>
-                    ))}
-                    {r.formulas_magistrales.map((f) => (
-                      <div key={`f${f.id}`}>
-                        <b>{f.nombre_formula}</b>
-                        <div style={{ color: 'var(--text-muted)' }}>{f.ingredientes}</div>
-                        {(f.forma_farmaceutica || f.via_administracion) && (
-                          <div style={{ color: 'var(--text-muted)' }}>
-                            {[f.forma_farmaceutica, f.cantidad_preparar, f.via_administracion].filter(Boolean).join(' · ')}
+                    )}
+                    {r.indicaciones_generales && <p className={detalle.indicaciones}>{r.indicaciones_generales}</p>}
+                    {r.medicamentos.length > 0 && (
+                      <div className={detalle.bloqueReceta}>
+                        <span className={detalle.bloqueLabel}>Medicamentos</span>
+                        {r.medicamentos.map((m) => (
+                          <div key={m.id} className={detalle.itemReceta}>
+                            <b>{m.medicamento}</b> — {m.dosis}
+                            {m.via_administracion && ` · ${m.via_administracion}`}
+                            {m.frecuencia && ` · ${m.frecuencia}`}
+                            {m.duracion && ` · ${m.duracion}`}
+                            {m.indicaciones && <div className={detalle.itemIndicaciones}>{m.indicaciones}</div>}
                           </div>
-                        )}
+                        ))}
                       </div>
-                    ))}
-                    {r.examenes.map((e) => (
-                      <div key={`e${e.id}`}>
-                        <b>{e.nombre_examen}</b>{e.urgencia === 'Urgente' && ' · Urgente'}
-                        <span style={{ color: 'var(--text-muted)' }}> (examen solicitado)</span>
+                    )}
+                    {r.formulas_magistrales.length > 0 && (
+                      <div className={detalle.bloqueReceta}>
+                        <span className={detalle.bloqueLabel}>Fórmulas magistrales</span>
+                        {r.formulas_magistrales.map((f) => (
+                          <div key={f.id} className={detalle.itemReceta}>
+                            <b>{f.nombre_formula}</b>
+                            <div className={detalle.itemIndicaciones}>{f.ingredientes}</div>
+                            {(f.forma_farmaceutica || f.via_administracion) && (
+                              <div className={detalle.itemIndicaciones}>
+                                {[f.forma_farmaceutica, f.cantidad_preparar, f.via_administracion].filter(Boolean).join(' · ')}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
+                    {r.examenes.length > 0 && (
+                      <div className={detalle.bloqueReceta}>
+                        <span className={detalle.bloqueLabel}>Exámenes solicitados</span>
+                        {r.examenes.map((e) => (
+                          <div key={e.id} className={detalle.itemReceta}>
+                            <b>{e.nombre_examen}</b>
+                            {e.urgencia === 'Urgente' && <span className={detalle.tagUrgente}>Urgente</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Borrador sin guardar: el panel de receta ya se cerró pero aún no se guardó. */}
-            {tieneBorrador && (
-              <div
-                style={{
-                  marginTop: 14, padding: '10px 12px', borderRadius: 'var(--radius-sm)',
-                  border: '1px dashed var(--accent-border)', background: 'var(--accent-bg)',
-                  display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 13,
-                }}
-              >
-                <span style={{ flex: 1, minWidth: 160, fontWeight: 600 }}>Receta sin guardar</span>
-                <button type="button" className={styles.btnSecundario} onClick={abrirReceta} disabled={guardandoReceta}>
-                  Editar
-                </button>
-                <button type="button" className={styles.btnSecundario} onClick={() => void descartarBorrador()} disabled={guardandoReceta}>
-                  Descartar
-                </button>
-                <button type="button" className={styles.btnPrimario} onClick={() => void guardarReceta()} disabled={guardandoReceta}>
-                  {guardandoReceta ? 'Guardando...' : 'Guardar receta'}
-                </button>
-              </div>
-            )}
-
-            {!tieneBorrador && (
-              <div style={{ marginTop: cantidad > 0 || recetas.length > 0 ? 14 : 0 }}>
-                <button type="button" className={styles.btnSecundario} onClick={abrirReceta}>
-                  <FontAwesomeIcon icon={faFilePrescription} /> Recetar en esta atención
-                </button>
+            {/* ---- Exámenes: los pendientes se completan acá ---- */}
+            {examenes.length > 0 && (
+              <div style={{ marginTop: cantidad > 0 || recetas.length > 0 ? 16 : 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {examenes.map((ex) => (
+                  <ExamenAtencionCard
+                    key={ex.id}
+                    examen={ex}
+                    onActualizado={onExamenActualizado}
+                    onAbrirArchivo={(archivo, url) => { setLupaVisible(false); setVisor({ archivo, url }); }}
+                  />
+                ))}
               </div>
             )}
           </div>
         )}
       </div>
-
-      {/* Panel de receta: portal a <body> para que su capa fija cubra toda la
-          pantalla y no dependa de la tarjeta. Mismo componente que usa el
-          registro clínico, así que también permite imprimir. */}
-      {recetaMontada &&
-        createPortal(
-          <Receta
-            ref={recetaRef}
-            isOpen={recetaAbierta}
-            onClose={cerrarReceta}
-            pacienteNombre={`${paciente.nombres} ${paciente.apellidos}`.trim()}
-            pacienteEdad={paciente.edad != null ? String(paciente.edad) : '—'}
-            pacienteCi={paciente.documento || '—'}
-            alergias={alergias.join(', ')}
-            medicoNombre={nombreCompleto(user)}
-          />,
-          document.body,
-        )}
 
       {/* Portal a <body>: así "position: fixed" usa la pantalla completa y no
           queda recortado dentro de la ficha. */}

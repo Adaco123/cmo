@@ -235,6 +235,15 @@ class ArchivosPorPaciente_Resource(Resource):
             .filter(HistoriaClinica.paciente_id == paciente_id)
             .all()
         )
+        # Archivos de exámenes de atenciones sin registro clínico (cuelgan
+        # de la consulta).
+        archivos_examenes += (
+            Archivo.query
+            .join(ExamenComplementario, ExamenComplementario.id == Archivo.examen_complementario_id)
+            .join(Consulta, Consulta.id == ExamenComplementario.consulta_id)
+            .filter(Consulta.paciente_id == paciente_id)
+            .all()
+        )
         # Archivos de pacientes externos: cuelgan de una Consulta (ya no
         # directo del paciente), así que se llega a ellos vía join.
         archivos_directos = (
@@ -297,6 +306,9 @@ def _extension(nombre_archivo):
 
 
 def _paciente_de_examen(examen):
+    if examen.registro_clinico_id is None:
+        consulta = Consulta.get_by_id(examen.consulta_id)
+        return Paciente.get_by_id(consulta.paciente_id) if consulta else None
     registro = RegistroClinico.get_by_id(examen.registro_clinico_id)
     historia = HistoriaClinica.get_by_id(registro.historia_clinica_id) if registro else None
     return Paciente.get_by_id(historia.paciente_id) if historia else None

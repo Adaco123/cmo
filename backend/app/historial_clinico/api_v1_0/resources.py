@@ -196,10 +196,7 @@ def _crear_recetas_desde_bloques(recetas_validated: dict, registro_clinico_id,
                 item = ItemModel(receta_id=receta.id, **item_data)
                 db.session.add(item)
 
-                # Sin registro clínico no hay donde colgar el examen espejo
-                # (examenes_complementarios.registro_clinico_id es obligatorio):
-                # la solicitud queda solo en la receta.
-                if clave == "examenes" and registro_clinico_id is not None:
+                if clave == "examenes":
                     # Espejo en examenes_complementarios: nace vacío
                     # (resultado=None) y queda vinculado a esta solicitud,
                     # heredando su categoría. Así ya aparece como "pendiente"
@@ -208,6 +205,7 @@ def _crear_recetas_desde_bloques(recetas_validated: dict, registro_clinico_id,
                     db.session.flush()  # necesita item.id
                     db.session.add(ExamenComplementario(
                         registro_clinico_id=registro_clinico_id,
+                        consulta_id=consulta_id,
                         categoria_id=item.categoria_id,
                         receta_examen_id=item.id,
                         nombre_examen=item.nombre_examen,
@@ -851,15 +849,17 @@ class RecetasDeConsulta_Resource(Resource):
     """
     POST /api/historial_clinico/consultas/<int:consulta_id>/recetas
 
-    Crea recetas (medicamentos / exámenes / fórmulas, cada bloque = una
-    Receta) directamente sobre una Consulta que NO tiene registro clínico:
-    las atenciones de "Subir archivos" (paciente propio) o de pacientes
-    externos. Body: {"recetas": {"medicamentos": [...], "examenes": [...],
-    "formulas": [...]}} — mismo formato que en registro-completo.
+    Guarda, en una sola transacción, las recetas (medicamentos / exámenes /
+    fórmulas, cada bloque = una Receta) y los exámenes complementarios
+    directos de una Consulta SIN registro clínico: las atenciones de
+    "Subir archivos". Body: {"recetas": {...}, "examenes_complementarios":
+    [...]} — mismo formato que registro-completo. Los exámenes solicitados
+    en una receta nacen como "Pendiente" (igual que en un registro clínico).
 
-    El médico de la receta es el del usuario con sesión iniciada (igual que
-    al crear la atención). Si la consulta ya tiene registro clínico, la
-    receta debe crearse desde ese registro, no por acá.
+    Regla clínica: se hace UNA sola vez, al guardar la atención. Si la
+    consulta ya tiene recetas o exámenes, responde 409 (no se receta ni se
+    piden exámenes después de guardar). El médico es el del usuario con
+    sesión iniciada.
     """
 
     @jwt_required()
@@ -873,31 +873,76 @@ class RecetasDeConsulta_Resource(Resource):
                 "error": "Esta consulta tiene registro clínico: la receta se crea desde su registro."
             }, 409
 
-        usuario = Usuario.get_by_id(get_jwt_identity())
-        medico = usuario.empleado.medico if usuario and usuario.empleado else None
-        if not medico:
+        if consulta.recetas or consulta.examenes_complementarios:
             return {
-                "error": "Tu usuario no tiene una ficha de médico asociada, así que no puede recetar."
-            }, 422
+                "error": "Esta atención ya fue guardada con su receta/exámenes y no puede modificarse."
+            }, 409
 
         body = request.get_json(force=True) or {}
+
+        examenes_validated = []
+        for i, ex in enumerate(body.get("examenes_complementarios", []) or []):
+            categoria_nombre = ex.get("categoria")
+            if categoria_nombre not in CATEGORIAS_EXAMEN_VALIDAS:
+                return {
+                    "examenes_complementarios": {
+                        i: {"categoria": [f"Debe ser una de: {sorted(CATEGORIAS_EXAMEN_VALIDAS)}"]}
+                    }
+                }, 400
+            nombre_examen = (ex.get("nombre_examen") or "").strip()
+            if not nombre_examen:
+                return {"examenes_complementarios": {i: {"nombre_examen": ["Requerido"]}}}, 400
+            examenes_validated.append({
+                "categoria_nombre": categoria_nombre,
+                "nombre_examen": nombre_examen,
+                "resultado": (ex.get("resultado") or "").strip() or None,
+                "observaciones": (ex.get("observaciones") or "").strip() or None,
+            })
+
         recetas_validated, error = _validar_bloques_recetas(body.get("recetas", {}) or {})
         if error:
             return error
-        if not recetas_validated:
-            return {"error": "Agrega al menos un medicamento, examen o fórmula a la receta."}, 400
+        if not recetas_validated and not examenes_validated:
+            return {"error": "Agrega al menos una receta o un examen."}, 400
+
+        medico = None
+        if recetas_validated:
+            usuario = Usuario.get_by_id(get_jwt_identity())
+            medico = usuario.empleado.medico if usuario and usuario.empleado else None
+            if not medico:
+                return {
+                    "error": "Tu usuario no tiene una ficha de médico asociada, así que no puede recetar."
+                }, 422
 
         try:
-            recetas_creadas = _crear_recetas_desde_bloques(
-                recetas_validated, None, medico.id, consulta_id=consulta.id
-            )
+            examenes_creados = []
+            for ex in examenes_validated:
+                categoria = _get_or_create_categoria_examen(ex["categoria_nombre"])
+                examen = ExamenComplementario(
+                    consulta_id=consulta.id,
+                    categoria_id=categoria.id,
+                    nombre_examen=ex["nombre_examen"],
+                    resultado=ex["resultado"],
+                    observaciones=ex["observaciones"],
+                )
+                db.session.add(examen)
+                examenes_creados.append(examen)
+
+            recetas_creadas = []
+            if recetas_validated:
+                recetas_creadas = _crear_recetas_desde_bloques(
+                    recetas_validated, None, medico.id, consulta_id=consulta.id
+                )
             db.session.commit()
         except Exception:
             db.session.rollback()
-            current_app.logger.exception("Error guardando recetas de la consulta")
-            return {"error": "No se pudo guardar la receta"}, 500
+            current_app.logger.exception("Error guardando recetas/exámenes de la consulta")
+            return {"error": "No se pudo guardar la receta/exámenes"}, 500
 
-        return {"recetas": receta_schema.dump(recetas_creadas, many=True)}, 201
+        return {
+            "recetas": receta_schema.dump(recetas_creadas, many=True),
+            "examenes_complementarios": examen_complementario_schema.dump(examenes_creados, many=True),
+        }, 201
 
 
 class SeguimientoControlEditar_Resource(Resource):

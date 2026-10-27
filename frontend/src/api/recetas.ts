@@ -1,4 +1,5 @@
 import api from '../api';
+import type { ExamenComplementario, ExamenComplementarioItemPayload } from './examenesComplementarios';
 
 /**
  * Igual que examenesComplementarios.ts: las recetas se crean únicamente
@@ -104,12 +105,21 @@ export interface Receta {
  * atenciones de "Subir archivos"). Cada bloque del payload genera su propia
  * Receta; el médico es el del usuario con sesión iniciada.
  */
-export async function crearRecetasConsulta(consultaId: number, recetas: RecetasPayload): Promise<Receta[]> {
-  const { data } = await api.post<{ recetas: Receta[] }>(
+export async function crearRecetasConsulta(
+  consultaId: number,
+  datos: {
+    recetas?: RecetasPayload | null;
+    examenes_complementarios?: ExamenComplementarioItemPayload[];
+  },
+): Promise<{ recetas: Receta[]; examenes_complementarios: ExamenComplementario[] }> {
+  const { data } = await api.post<{ recetas: Receta[]; examenes_complementarios: ExamenComplementario[] }>(
     `/api/historial_clinico/consultas/${consultaId}/recetas`,
-    { recetas },
+    {
+      recetas: datos.recetas ?? {},
+      examenes_complementarios: datos.examenes_complementarios ?? [],
+    },
   );
-  return data.recetas;
+  return data;
 }
 
 /** Recetas de un paciente que cuelgan de una consulta sin registro clínico. */

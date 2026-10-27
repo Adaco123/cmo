@@ -27,7 +27,10 @@ class ExamenComplementario(db.Model, BaseModelMixin):
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
 
-    registro_clinico_id = db.Column(db.BigInteger, db.ForeignKey('registros_clinicos.id'), nullable=False)
+    # Cuelga de un registro clínico O directamente de una consulta (atenciones
+    # de "Subir archivos", sin registro clínico). Ver ck_examenes_registro_o_consulta.
+    registro_clinico_id = db.Column(db.BigInteger, db.ForeignKey('registros_clinicos.id'), nullable=True)
+    consulta_id = db.Column(db.BigInteger, db.ForeignKey('consultas.id'), nullable=True)
     categoria_id = db.Column(db.SmallInteger, db.ForeignKey('categorias_examen.id'), nullable=False)
     # Nullable: NULL cuando el paciente trae el examen directo (sin solicitud
     # previa). Si el médico lo solicitó en una receta, apunta a esa fila y
@@ -49,7 +52,15 @@ class ExamenComplementario(db.Model, BaseModelMixin):
         nullable=False,
     )
 
+    __table_args__ = (
+        db.CheckConstraint(
+            "registro_clinico_id IS NOT NULL OR consulta_id IS NOT NULL",
+            name="ck_examenes_registro_o_consulta",
+        ),
+    )
+
     registro_clinico = db.relationship("RegistroClinico", back_populates="examenes_complementarios")
+    consulta = db.relationship("Consulta", back_populates="examenes_complementarios")
     categoria = db.relationship("CategoriaExamen", back_populates="examenes")
     archivos = db.relationship("Archivo", back_populates="examen_complementario", cascade="all, delete-orphan")
     receta_examen = db.relationship("RecetaExamen", back_populates="resultado_examen")

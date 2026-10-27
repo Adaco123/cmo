@@ -14,6 +14,7 @@ import AdjuntarArchivos from './AdjuntarArchivos';
 import ArchivosAtencionItem from './ArchivosAtencionItem';
 import { getArchivosPorPaciente, type ArchivoResponse } from '../../api/archivos';
 import { getRecetasConsultasPaciente, type Receta as RecetaGuardada } from '../../api/recetas';
+import { getExamenesConsultasPaciente, type ExamenComplementario } from '../../api/examenesComplementarios';
 import styles from './VerPaciente.module.css';
 import '../../components/CrearCita.module.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -70,6 +71,7 @@ interface GrupoArchivos {
   fecha: string;
   archivos: ArchivoResponse[];
   recetas: RecetaGuardada[];
+  examenes: ExamenComplementario[];
 }
 
 /** Agrupa por consulta los archivos y las recetas que cuelgan directamente de
@@ -80,13 +82,14 @@ interface GrupoArchivos {
 function agruparAtencionesSueltas(
   archivos: ArchivoResponse[],
   recetas: RecetaGuardada[],
+  examenes: ExamenComplementario[],
   consultaIdsConRegistro: Set<number>,
 ): GrupoArchivos[] {
   const mapa = new Map<number, GrupoArchivos>();
   const grupoDe = (consultaId: number): GrupoArchivos => {
     let g = mapa.get(consultaId);
     if (!g) {
-      g = { consultaId, fecha: '', archivos: [], recetas: [] };
+      g = { consultaId, fecha: '', archivos: [], recetas: [], examenes: [] };
       mapa.set(consultaId, g);
     }
     return g;
@@ -102,6 +105,13 @@ function agruparAtencionesSueltas(
     const g = grupoDe(r.consulta_id);
     g.recetas.push(r);
     const f = r.created_at ?? r.fecha;
+    if (f && f > g.fecha) g.fecha = f;
+  }
+  for (const ex of examenes) {
+    if (ex.consulta_id == null || consultaIdsConRegistro.has(ex.consulta_id)) continue;
+    const g = grupoDe(ex.consulta_id);
+    g.examenes.push(ex);
+    const f = ex.created_at ?? ex.fecha;
     if (f && f > g.fecha) g.fecha = f;
   }
   return Array.from(mapa.values());
@@ -272,7 +282,7 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
   // Se guarda junto al id del paciente al que pertenecen: si cambia el
   // paciente, los archivos del anterior no se muestran ni un instante.
   const [adjuntosCargados, setAdjuntosCargados] = useState<
-    { pacienteId: number; archivos: ArchivoResponse[]; recetas: RecetaGuardada[] } | null
+    { pacienteId: number; archivos: ArchivoResponse[]; recetas: RecetaGuardada[]; examenes: ExamenComplementario[] } | null
   >(null);
   const archivosPaciente = useMemo(
     () => (adjuntosCargados && adjuntosCargados.pacienteId === paciente?.id ? adjuntosCargados.archivos : []),
@@ -280,6 +290,10 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
   );
   const recetasConsultas = useMemo(
     () => (adjuntosCargados && adjuntosCargados.pacienteId === paciente?.id ? adjuntosCargados.recetas : []),
+    [adjuntosCargados, paciente?.id],
+  );
+  const examenesConsultas = useMemo(
+    () => (adjuntosCargados && adjuntosCargados.pacienteId === paciente?.id ? adjuntosCargados.examenes : []),
     [adjuntosCargados, paciente?.id],
   );
   const [showControl, setShowControl] = useState(false);
@@ -331,9 +345,10 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
 
     const cargarArchivos = async () => {
       // Por separado: si fallan las recetas, los archivos igual se muestran (y al revés).
-      const [archivosRes, recetasRes] = await Promise.allSettled([
+      const [archivosRes, recetasRes, examenesRes] = await Promise.allSettled([
         getArchivosPorPaciente(pacienteId),
         getRecetasConsultasPaciente(pacienteId),
+        getExamenesConsultasPaciente(pacienteId),
       ]);
       if (archivosRes.status === 'rejected') {
         console.error('No se pudieron cargar los archivos del paciente', archivosRes.reason);
@@ -341,11 +356,15 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
       if (recetasRes.status === 'rejected') {
         console.error('No se pudieron cargar las recetas de las consultas del paciente', recetasRes.reason);
       }
+      if (examenesRes.status === 'rejected') {
+        console.error('No se pudieron cargar los exámenes de las consultas del paciente', examenesRes.reason);
+      }
       if (!isMounted) return;
       setAdjuntosCargados({
         pacienteId,
         archivos: archivosRes.status === 'fulfilled' ? archivosRes.value : [],
         recetas: recetasRes.status === 'fulfilled' ? recetasRes.value : [],
+        examenes: examenesRes.status === 'fulfilled' ? examenesRes.value : [],
       });
     };
 
@@ -367,8 +386,8 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
   // Historial = registros clínicos + atenciones con solo archivos, mezclados
   // por fecha (más reciente primero).
   const gruposArchivos = useMemo(
-    () => agruparAtencionesSueltas(archivosPaciente, recetasConsultas, new Set(registros.map((r) => r.consulta_id))),
-    [archivosPaciente, recetasConsultas, registros],
+    () => agruparAtencionesSueltas(archivosPaciente, recetasConsultas, examenesConsultas, new Set(registros.map((r) => r.consulta_id))),
+    [archivosPaciente, recetasConsultas, examenesConsultas, registros],
   );
 
   type ItemHistorial =
@@ -393,8 +412,10 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
     );
   }, []);
 
-  const handleRecetasCreadas = useCallback((nuevas: RecetaGuardada[]) => {
-    setAdjuntosCargados((prev) => (prev ? { ...prev, recetas: [...nuevas, ...prev.recetas] } : prev));
+  const handleExamenActualizado = useCallback((examen: ExamenComplementario) => {
+    setAdjuntosCargados((prev) =>
+      prev ? { ...prev, examenes: prev.examenes.map((e) => (e.id === examen.id ? examen : e)) } : prev,
+    );
   }, []);
 
   const abrirDetalle = useCallback((id: number) => {
@@ -569,14 +590,13 @@ const VerPaciente: React.FC<VerPacienteProps> = ({ paciente, onClose }) => {
                 paciente && (
                   <ArchivosAtencionItem
                     key={item.clave}
-                    consultaId={item.grupo.consultaId}
                     paciente={paciente}
-                    alergias={alergias}
                     archivos={item.grupo.archivos}
                     recetas={item.grupo.recetas}
+                    examenes={item.grupo.examenes}
                     fecha={item.grupo.fecha}
                     onEliminado={handleArchivoEliminado}
-                    onRecetasCreadas={handleRecetasCreadas}
+                    onExamenActualizado={handleExamenActualizado}
                   />
                 )
               ),
