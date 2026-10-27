@@ -48,9 +48,14 @@ class PacientesList_Resource(Resource):
         except ValidationError as err:
             return err.messages, 400
 
-        existente = Paciente.query.filter_by(documento=data.get("documento")).first()
-        if existente is not None:
-            return {"error": "Ya existe un paciente registrado con ese número de documento (CI)."}, 409
+        # Solo se chequea duplicado si se indicó documento: filter_by(documento=None)
+        # compara con IS NULL y bloquearía a todo paciente sin CI en cuanto
+        # existiera otro sin CI.
+        documento = data.get("documento")
+        if documento is not None:
+            existente = Paciente.query.filter_by(documento=documento).first()
+            if existente is not None:
+                return {"error": "Ya existe un paciente registrado con ese número de documento (CI)."}, 409
 
         error_fk = _error_fk_inexistente(data)
         if error_fk:

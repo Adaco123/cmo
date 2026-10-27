@@ -456,8 +456,10 @@
 .cmo-rp-horario { font-size: 0.82em; color: #555; margin-top: 0em; font-family: var(--sans, Arial, sans-serif); }
 
 /* ---------- exámenes: tamaño de letra independiente (--cmo-fs-examen) ---------- */
-.cmo-rp-exam-item { margin-bottom: 0.55em; }
-.cmo-rp-exam-linea { font-size: var(--cmo-fs-examen); line-height: 1.5; }
+/* Mismo interlineado que los ingredientes de las fórmulas (line-height 1.4 y
+   sin separación extra entre ítems), para que entren más exámenes por hoja. */
+.cmo-rp-exam-item { margin-bottom: 0; }
+.cmo-rp-exam-linea { font-size: var(--cmo-fs-examen); line-height: 1.4; }
 .cmo-rp-exam-previas {
   font-size: calc(var(--cmo-fs-examen) * 0.8);
   color: #555;

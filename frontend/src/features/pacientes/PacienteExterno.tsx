@@ -474,7 +474,7 @@ const PacienteExterno: React.FC<PacienteExternoProps> = ({ paciente, onClose }) 
           <div className={styles.pacienteCard}>
             <div className={styles.avatar}>{nombrePaciente.charAt(0) || '?'}</div>
             <h2 className={styles.pacienteNombre}>{nombrePaciente}</h2>
-            <p className={styles.pacienteMeta}>Doc: {paciente.documento}</p>
+            <p className={styles.pacienteMeta}>Doc: {paciente.documento || 'Sin documento'}</p>
             {paciente.telefono && (
               <p className={styles.pacienteMeta}>{paciente.telefono}</p>
             )}

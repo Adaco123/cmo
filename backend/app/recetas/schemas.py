@@ -50,7 +50,10 @@ class RecetaExamenSchema(ma.Schema):
 class RecetaSchema(ma.Schema):
     id = fields.Integer(dump_only=True)
 
-    registro_clinico_id = fields.Integer(required=True)
+    # Uno de los dos es obligatorio (se valida en el endpoint): el registro
+    # clínico (flujo normal) o la consulta (atenciones de "Subir archivos").
+    registro_clinico_id = fields.Integer(required=False, allow_none=True)
+    consulta_id = fields.Integer(required=False, allow_none=True)
     tipo_receta_id = fields.Integer(required=True)
     medico_id = fields.Integer(required=True)
     seguimiento_control_id = fields.Integer(dump_only=True, allow_none=True)

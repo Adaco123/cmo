@@ -2,7 +2,7 @@
 import re
 from datetime import date
 
-from marshmallow import fields, validate, ValidationError
+from marshmallow import fields, validate, ValidationError, pre_load
 from app.extensions import ma
 
 # --- Regex reutilizables ---
@@ -37,8 +37,10 @@ class PacienteSchema(ma.Schema):
             validate.Regexp(RE_NOMBRE, error="Apellidos solo puede contener letras y espacios."),
         ],
     )
+    # Opcional (un bebé no tiene CI). Si viene, se valida igual que antes.
     documento = fields.Str(
-        required=True,
+        required=False,
+        allow_none=True,
         validate=[
             validate.Length(min=5, max=20),
             validate.Regexp(RE_DOCUMENTO, error="Formato de documento (CI) inválido."),
@@ -71,6 +73,18 @@ class PacienteSchema(ma.Schema):
     estado = fields.Bool()
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
+
+    @pre_load
+    def documento_vacio_a_none(self, data, **kwargs):
+        """Un documento en blanco ('' o solo espacios) se trata como "sin
+        documento" (None), nunca como cadena vacía: dos pacientes con '' se
+        chocarían en la restricción UNIQUE."""
+        if isinstance(data, dict) and isinstance(data.get("documento"), str):
+            if not data["documento"].strip():
+                data = {**data, "documento": None}
+            else:
+                data = {**data, "documento": data["documento"].strip()}
+        return data
 
     def calcular_edad(self, paciente):
         fecha_nac = paciente.fecha_nacimiento

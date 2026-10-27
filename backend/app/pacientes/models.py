@@ -12,7 +12,10 @@ class Paciente(db.Model, BaseModelMixin):
 
     nombres = db.Column(db.String(100), nullable=False)
     apellidos = db.Column(db.String(100), nullable=False)
-    documento = db.Column(db.String(30), nullable=False, unique=True)
+    # Opcional: un bebé u otra persona puede no tener CI. Se guarda NULL (no
+    # cadena vacía) para que la restricción UNIQUE siga valiendo solo entre
+    # documentos reales — Postgres permite varios NULL en una columna UNIQUE.
+    documento = db.Column(db.String(30), nullable=True, unique=True)
     fecha_nacimiento = db.Column(db.Date, nullable=False)
     sexo = db.Column(db.String(1), nullable=False)
     direccion = db.Column(db.String(200))

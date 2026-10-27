@@ -44,7 +44,9 @@ export interface ExamenComplementarioItemPayload {
 /** Lo que devuelve el backend al leer un examen ya guardado. */
 export interface ExamenComplementario {
   id: number;
-  registro_clinico_id: number;
+  /** null cuando el examen cuelga de una atención sin registro clínico. */
+  registro_clinico_id: number | null;
+  consulta_id?: number | null;
   categoria_id: number;
   categoria?: { id: number; nombre: string };
   // Presente cuando este examen es el resultado de un examen solicitado
@@ -61,4 +63,10 @@ export interface ExamenComplementario {
 
 export async function deleteExamenComplementario(examenId: number): Promise<void> {
   await api.delete(`/api/examenes/${examenId}`);
+}
+
+/** Exámenes de un paciente que cuelgan directamente de una atención (sin registro clínico). */
+export async function getExamenesConsultasPaciente(pacienteId: number): Promise<ExamenComplementario[]> {
+  const { data } = await api.get<ExamenComplementario[]>(`/api/examenes/paciente/${pacienteId}/consultas`);
+  return data;
 }

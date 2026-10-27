@@ -193,7 +193,9 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
   const recetaRef = useRef<RecetaHandle>(null);
   const examenesRef = useRef<ExamenesHandle>(null);
 
-  useEffect(() => { vitalRefs.current.pa_sys?.focus(); }, []);
+  // El formulario ahora empieza por "Motivo de consulta", así que el foco
+  // inicial va ahí (antes iba a la presión arterial, que era el primer campo).
+  useEffect(() => { document.getElementById('sec_motivo')?.focus(); }, []);
 
   // Catálogo de tipos de archivo (para resolver el id por nombre al subir)
   const [tiposArchivo, setTiposArchivo] = useState<TipoArchivo[]>([]);
@@ -241,11 +243,11 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
     setSecciones(prev => ({ ...prev, tratamiento: texto }));
   };
 
-  // fr (frec. respiratoria), talla y glu (glicemia) quedan fuera de esta
-  // lista a propósito: siguen siendo campos editables, pero no son
-  // obligatorios para poder guardar el registro.
+  // pa (presión arterial), fr (frec. respiratoria), talla y glu (glicemia)
+  // quedan fuera de esta lista a propósito: siguen siendo campos editables,
+  // pero no son obligatorios para poder guardar el registro. Si la presión
+  // arterial queda vacía se manda '' (el backend la acepta).
   const vitalesObligatorios: { label: string; completo: boolean }[] = [
-    { label: 'Presión arterial', completo: !!(vitales.pa_sys.trim() && vitales.pa_dia.trim()) },
     { label: 'Frecuencia cardíaca', completo: !!vitales.fc.trim() },
     { label: 'Saturación O2', completo: !!vitales.sat.trim() },
     { label: 'Temperatura', completo: !!vitales.temp.trim() },
@@ -547,6 +549,27 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
     onClose?.();
   }, [onClose, vitales, secciones, alergiasRegistro, controlNota, controlFecha, examCount, confirm]);
 
+  // Sección de texto libre editable (todas menos 'tratamiento', que es de
+  // solo lectura y tiene su propio bloque). Se invoca explícitamente en el
+  // JSX para controlar el orden en que aparecen en el formulario.
+  const renderSeccion = (key: Exclude<SectionKey, 'tratamiento'>) => {
+    const s = SECTIONS.find(sec => sec.key === key)!;
+    return (
+      <div className={`${styles.field} ${styles.fieldPlain}`} key={s.key}>
+        <div className={styles.flabel}>
+          <i className={`fas ${s.icon} ${styles.ficon}`}></i> {s.label}
+          {secciones[s.key].trim() && <span className={styles.badgeOk}>✓</span>}
+        </div>
+        <textarea
+          id={`sec_${s.key}`}
+          rows={2}
+          value={secciones[s.key]}
+          onChange={e => setSecciones(prev => ({ ...prev, [s.key]: e.target.value }))}
+        />
+      </div>
+    );
+  };
+
   return (
     <div className={styles.backdrop} onClick={() => handleCerrarTodo()}>
       <div className={styles.modalWide} onClick={(e) => e.stopPropagation()}>
@@ -602,6 +625,9 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
 
           <div className={styles.grid}>
             <div className={styles.card}>
+              {renderSeccion('motivo')}
+              {renderSeccion('enfermedad_actual')}
+
               <div className={styles.field}>
                 <div className={styles.flabel}>
                   <i className={`fas fa-heartbeat ${styles.ficon}`}></i> Signos vitales
@@ -609,7 +635,7 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                 </div>
                 <div className={styles.vitalsRow}>
                   <div className={styles.vslot}>
-                    <label>Presión arterial <span className={styles.reqAsterisk}>*</span></label>
+                    <label>Presión arterial</label>
                     <div className={styles.vinputs}>
                       <input ref={setVitalRef('pa_sys')} className={vitales.pa_sys ? styles.ok : ''} value={vitales.pa_sys}
                         onChange={e => setVital('pa_sys', e.target.value, 3)} inputMode="numeric" maxLength={3} />
@@ -690,41 +716,10 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                 )}
               </div>
 
-              {SECTIONS.filter(s => s.key !== 'tratamiento').map(s => (
-                <div className={`${styles.field} ${styles.fieldPlain}`} key={s.key}>
-                  <div className={styles.flabel}>
-                    <i className={`fas ${s.icon} ${styles.ficon}`}></i> {s.label}
-                    {secciones[s.key].trim() && <span className={styles.badgeOk}>✓</span>}
-                  </div>
-                  <textarea
-                    id={`sec_${s.key}`}
-                    rows={2}
-                    value={secciones[s.key]}
-                    onChange={e => setSecciones(prev => ({ ...prev, [s.key]: e.target.value }))}
-                  />
-                </div>
-              ))}
-
-              {/*
-                Tratamiento: campo de SOLO LECTURA.
-                Su contenido llega automáticamente desde Receta.tsx (pestaña
-                Medicamentos) vía handleTratamientoChange. No se debe permitir
-                edición manual aquí — por eso readOnly + disabled.
-              */}
-              <div className={`${styles.field} ${styles.fieldPlain}`}>
-                <div className={styles.flabel}>
-                  <i className={`fas fa-prescription-bottle-alt ${styles.ficon}`}></i> Tratamiento
-                  {secciones.tratamiento.trim() && <span className={styles.badgeOk}>✓</span>}
-                </div>
-                <textarea
-                  id="sec_tratamiento"
-                  rows={2}
-                  value={secciones.tratamiento}
-                  readOnly
-                  disabled
-                />
-                <div className={styles.subhint}>Este campo se llena solo desde “Recetar” → Medicamentos</div>
-              </div>
+              {renderSeccion('examen_fisico')}
+              {renderSeccion('hallazgos_ecograficos')}
+              {renderSeccion('diagnostico')}
+              {renderSeccion('observaciones')}
 
               <div className={`${styles.field} ${styles.fieldPlain}`}>
                 <div className={styles.flabel}>
@@ -771,6 +766,27 @@ const RegistroClinico: React.FC<RegistroClinicoProps> = ({
                     Se agenda el control sin nota de evolución (se completa después)
                   </div>
                 )}
+              </div>
+
+              {/*
+                Tratamiento: campo de SOLO LECTURA, al final del formulario.
+                Su contenido llega automáticamente desde Receta.tsx (pestaña
+                Medicamentos) vía handleTratamientoChange. No se debe permitir
+                edición manual aquí — por eso readOnly + disabled.
+              */}
+              <div className={`${styles.field} ${styles.fieldPlain}`}>
+                <div className={styles.flabel}>
+                  <i className={`fas fa-prescription-bottle-alt ${styles.ficon}`}></i> Tratamiento
+                  {secciones.tratamiento.trim() && <span className={styles.badgeOk}>✓</span>}
+                </div>
+                <textarea
+                  id="sec_tratamiento"
+                  rows={2}
+                  value={secciones.tratamiento}
+                  readOnly
+                  disabled
+                />
+                <div className={styles.subhint}>Este campo se llena solo desde “Recetar” → Medicamentos</div>
               </div>
             </div>
           </div>

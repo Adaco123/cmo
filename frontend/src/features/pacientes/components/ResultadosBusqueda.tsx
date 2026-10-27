@@ -27,7 +27,7 @@ const ResultadosBusqueda: React.FC<ResultadosBusquedaProps> = ({ resultados, onS
           <div className="patient-result-info">
             <div className="patient-result-name">{fullName}</div>
             <div className="patient-result-meta">
-              Doc. {p.documento}{p.telefono ? ` · ${p.telefono}` : ''}
+              {p.documento ? `Doc. ${p.documento}` : 'Sin documento'}{p.telefono ? ` · ${p.telefono}` : ''}
             </div>
           </div>
           <svg className="patient-result-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none">

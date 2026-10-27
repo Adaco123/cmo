@@ -27,7 +27,12 @@ class Receta(db.Model, BaseModelMixin):
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
 
-    registro_clinico_id = db.Column(db.BigInteger, db.ForeignKey('registros_clinicos.id'), nullable=False)
+    # Una receta cuelga de un registro clínico (flujo normal de "Nueva
+    # consulta") O directamente de una consulta (atenciones de "Subir
+    # archivos", que no tienen registro clínico). Al menos uno es obligatorio
+    # (ver ck_recetas_registro_o_consulta).
+    registro_clinico_id = db.Column(db.BigInteger, db.ForeignKey('registros_clinicos.id'), nullable=True)
+    consulta_id = db.Column(db.BigInteger, db.ForeignKey('consultas.id'), nullable=True)
     tipo_receta_id = db.Column(db.SmallInteger, db.ForeignKey('tipos_receta.id'), nullable=False)
     medico_id = db.Column(db.BigInteger, db.ForeignKey('medicos.id'), nullable=False)
     seguimiento_control_id = db.Column(
@@ -42,9 +47,17 @@ class Receta(db.Model, BaseModelMixin):
         db.DateTime(timezone=True), server_default=db.func.now(),
         onupdate=db.func.now(), nullable=False,
     )
+    __table_args__ = (
+        db.CheckConstraint(
+            "registro_clinico_id IS NOT NULL OR consulta_id IS NOT NULL",
+            name="ck_recetas_registro_o_consulta",
+        ),
+    )
+
     seguimiento_control = db.relationship("SeguimientoControl", back_populates="recetas")
     archivos = db.relationship("Archivo", back_populates="receta")
     registro_clinico = db.relationship("RegistroClinico", back_populates="recetas")
+    consulta = db.relationship("Consulta", back_populates="recetas")
     tipo_receta = db.relationship("TipoReceta", back_populates="recetas")
     medico = db.relationship("Medico", back_populates="recetas")
 
@@ -53,7 +66,9 @@ class Receta(db.Model, BaseModelMixin):
     examenes = db.relationship("RecetaExamen", back_populates="receta", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<Receta id={self.id} registro_clinico_id={self.registro_clinico_id}>"
+        return f"<Receta id={self.id} registro_clinico_id={self.registro_clinico_id} consulta_id={self.consulta_id}>"
+
+
 class RecetaMedicamento(db.Model, BaseModelMixin):
     __tablename__ = "receta_medicamentos"
 

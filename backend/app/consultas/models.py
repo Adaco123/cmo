@@ -31,6 +31,7 @@ class Consulta(db.Model, BaseModelMixin):
     registro_clinico = db.relationship("RegistroClinico", back_populates="consulta", uselist=False)
     cobro = db.relationship("Cobro", back_populates="consulta", uselist=False)
     archivos = db.relationship("Archivo", back_populates="consulta")
-    #recetas = db.relationship("Receta", back_populates="consulta")
+    recetas = db.relationship("Receta", back_populates="consulta")
+    examenes_complementarios = db.relationship("ExamenComplementario", back_populates="consulta")
     def __repr__(self):
         return f"<Consulta id={self.id}>"

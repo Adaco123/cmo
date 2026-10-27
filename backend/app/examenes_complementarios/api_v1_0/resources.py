@@ -9,6 +9,8 @@ from app.examenes_complementarios.models import CategoriaExamen, ExamenComplemen
 from app.examenes_complementarios.schemas import CategoriaExamenSchema, ExamenComplementarioSchema
 from app.examenes_complementarios.api_v1_0 import examenes_complementarios_bp
 from app.archivos.storage import get_upload_dir
+from app.consultas.models import Consulta
+from app.pacientes.models import Paciente
 
 categoria_schema_list = CategoriaExamenSchema(many=True)
 examen_schema = ExamenComplementarioSchema()
@@ -25,6 +27,27 @@ class CategoriaExamenList_Resource(Resource):
     def get(self):
         categorias = CategoriaExamen.get_all()
         return categoria_schema_list.dump(categorias), 200
+
+
+class ExamenesConsultasPaciente_Resource(Resource):
+    """GET /api/examenes/paciente/<id>/consultas
+
+    Exámenes de un paciente que cuelgan directamente de una consulta (las
+    atenciones sin registro clínico, p. ej. las de "Subir archivos")."""
+
+    @jwt_required()
+    def get(self, paciente_id):
+        if not Paciente.get_by_id(paciente_id):
+            return {"error": "Paciente no encontrado"}, 404
+
+        examenes = (
+            ExamenComplementario.query
+            .join(Consulta, Consulta.id == ExamenComplementario.consulta_id)
+            .filter(Consulta.paciente_id == paciente_id, ExamenComplementario.estado.is_(True))
+            .order_by(ExamenComplementario.created_at.desc())
+            .all()
+        )
+        return ExamenComplementarioSchema(many=True).dump(examenes), 200
 
 
 class ExamenComplementarioObservaciones_Resource(Resource):
@@ -81,5 +104,6 @@ class ExamenComplementario_Resource(Resource):
 
 
 api.add_resource(CategoriaExamenList_Resource, "/categorias")
+api.add_resource(ExamenesConsultasPaciente_Resource, "/paciente/<int:paciente_id>/consultas")
 api.add_resource(ExamenComplementarioObservaciones_Resource, "/<int:examen_id>/observaciones")
 api.add_resource(ExamenComplementario_Resource, "/<int:examen_id>")

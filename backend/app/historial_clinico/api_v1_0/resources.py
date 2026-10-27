@@ -3,7 +3,7 @@ from datetime import datetime
 
 from flask import request, current_app
 from flask_restful import Api, Resource
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from marshmallow import ValidationError
 from app.db import db
 from app.consultas.schemas import ConsultaSchema
@@ -21,6 +21,7 @@ from app.historial_clinico.schemas import (
 )
 from app.historial_clinico.api_v1_0 import historial_clinico_bp
 from app.pacientes.models import Paciente
+from app.usuarios.models import Usuario
 from app.pacientes.schemas import PacienteSchema
 from app.consultas.models import Consulta
 
@@ -157,13 +158,17 @@ def _validar_bloques_recetas(recetas_data: dict):
     return recetas_validated, None
 
 
-def _crear_recetas_desde_bloques(recetas_validated: dict, registro_clinico_id: int,
-                                  medico_id: int, seguimiento_control_id=None):
+def _crear_recetas_desde_bloques(recetas_validated: dict, registro_clinico_id,
+                                  medico_id: int, seguimiento_control_id=None,
+                                  consulta_id=None):
     """Crea las Receta + sus ítems dentro de la transacción activa.
 
     recetas_validated: clave -> lista de bloques; cada bloque de la lista
     se guarda como su propia fila Receta (una por cada "receta" que el
     doctor haya agregado por separado en el frontend).
+
+    Si la receta cuelga de una consulta sin registro clínico (atenciones de
+    "Subir archivos"), registro_clinico_id va None y se pasa consulta_id.
     """
     item_model_by_clave = {
         "medicamentos": RecetaMedicamento,
@@ -178,6 +183,7 @@ def _crear_recetas_desde_bloques(recetas_validated: dict, registro_clinico_id: i
         for bloque in bloques:
             receta = Receta(
                 registro_clinico_id=registro_clinico_id,
+                consulta_id=consulta_id,
                 tipo_receta_id=tipo.id,
                 medico_id=medico_id,
                 seguimiento_control_id=seguimiento_control_id,
@@ -199,6 +205,7 @@ def _crear_recetas_desde_bloques(recetas_validated: dict, registro_clinico_id: i
                     db.session.flush()  # necesita item.id
                     db.session.add(ExamenComplementario(
                         registro_clinico_id=registro_clinico_id,
+                        consulta_id=consulta_id,
                         categoria_id=item.categoria_id,
                         receta_examen_id=item.id,
                         nombre_examen=item.nombre_examen,
@@ -838,6 +845,106 @@ class SeguimientoControl_Resource(Resource):
         }, 201
 
 
+class RecetasDeConsulta_Resource(Resource):
+    """
+    POST /api/historial_clinico/consultas/<int:consulta_id>/recetas
+
+    Guarda, en una sola transacción, las recetas (medicamentos / exámenes /
+    fórmulas, cada bloque = una Receta) y los exámenes complementarios
+    directos de una Consulta SIN registro clínico: las atenciones de
+    "Subir archivos". Body: {"recetas": {...}, "examenes_complementarios":
+    [...]} — mismo formato que registro-completo. Los exámenes solicitados
+    en una receta nacen como "Pendiente" (igual que en un registro clínico).
+
+    Regla clínica: se hace UNA sola vez, al guardar la atención. Si la
+    consulta ya tiene recetas o exámenes, responde 409 (no se receta ni se
+    piden exámenes después de guardar). El médico es el del usuario con
+    sesión iniciada.
+    """
+
+    @jwt_required()
+    def post(self, consulta_id):
+        consulta = Consulta.get_by_id(consulta_id)
+        if not consulta:
+            return {"error": "Consulta no encontrada"}, 404
+
+        if consulta.registro_clinico is not None:
+            return {
+                "error": "Esta consulta tiene registro clínico: la receta se crea desde su registro."
+            }, 409
+
+        if consulta.recetas or consulta.examenes_complementarios:
+            return {
+                "error": "Esta atención ya fue guardada con su receta/exámenes y no puede modificarse."
+            }, 409
+
+        body = request.get_json(force=True) or {}
+
+        examenes_validated = []
+        for i, ex in enumerate(body.get("examenes_complementarios", []) or []):
+            categoria_nombre = ex.get("categoria")
+            if categoria_nombre not in CATEGORIAS_EXAMEN_VALIDAS:
+                return {
+                    "examenes_complementarios": {
+                        i: {"categoria": [f"Debe ser una de: {sorted(CATEGORIAS_EXAMEN_VALIDAS)}"]}
+                    }
+                }, 400
+            nombre_examen = (ex.get("nombre_examen") or "").strip()
+            if not nombre_examen:
+                return {"examenes_complementarios": {i: {"nombre_examen": ["Requerido"]}}}, 400
+            examenes_validated.append({
+                "categoria_nombre": categoria_nombre,
+                "nombre_examen": nombre_examen,
+                "resultado": (ex.get("resultado") or "").strip() or None,
+                "observaciones": (ex.get("observaciones") or "").strip() or None,
+            })
+
+        recetas_validated, error = _validar_bloques_recetas(body.get("recetas", {}) or {})
+        if error:
+            return error
+        if not recetas_validated and not examenes_validated:
+            return {"error": "Agrega al menos una receta o un examen."}, 400
+
+        medico = None
+        if recetas_validated:
+            usuario = Usuario.get_by_id(get_jwt_identity())
+            medico = usuario.empleado.medico if usuario and usuario.empleado else None
+            if not medico:
+                return {
+                    "error": "Tu usuario no tiene una ficha de médico asociada, así que no puede recetar."
+                }, 422
+
+        try:
+            examenes_creados = []
+            for ex in examenes_validated:
+                categoria = _get_or_create_categoria_examen(ex["categoria_nombre"])
+                examen = ExamenComplementario(
+                    consulta_id=consulta.id,
+                    categoria_id=categoria.id,
+                    nombre_examen=ex["nombre_examen"],
+                    resultado=ex["resultado"],
+                    observaciones=ex["observaciones"],
+                )
+                db.session.add(examen)
+                examenes_creados.append(examen)
+
+            recetas_creadas = []
+            if recetas_validated:
+                recetas_creadas = _crear_recetas_desde_bloques(
+                    recetas_validated, None, medico.id, consulta_id=consulta.id
+                )
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Error guardando recetas/exámenes de la consulta")
+            return {"error": "No se pudo guardar la receta/exámenes"}, 500
+
+        return {
+            "recetas": receta_schema.dump(recetas_creadas, many=True),
+            "examenes_complementarios": examen_complementario_schema.dump(examenes_creados, many=True),
+        }, 201
+
+
 class SeguimientoControlEditar_Resource(Resource):
     """
     PUT /api/historial_clinico/seguimientos/<int:seguimiento_id>
@@ -964,6 +1071,7 @@ class SeguimientoControlList_Resource(Resource):
         return seguimiento_schema_list.dump(seguimientos), 200
 api.add_resource(SeguimientoControlList_Resource, "/seguimientos")
 api.add_resource(SeguimientoControlEditar_Resource, "/seguimientos/<int:seguimiento_id>")
+api.add_resource(RecetasDeConsulta_Resource, "/consultas/<int:consulta_id>/recetas")
 api.add_resource(RegistroClinicoDetalleCompleto_Resource, "/registros/<int:registro_id>/completo")
 api.add_resource(RegistroClinicoCompleto_Resource, "/registro-completo")
 api.add_resource(RegistroClinicoCompletoUpdate_Resource, "/registro-completo/<int:registro_id>")
