@@ -4,6 +4,3 @@ __pycache__/
 .env
 config/
 migrations/
-serve.py
-Caddyfile
-caddy.exe
