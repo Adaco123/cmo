@@ -20,6 +20,25 @@ export async function getRegistroClinicoCompleto(registroId: number): Promise<Re
   );
   return data;
 }
+export interface SugerenciaIA {
+  sugerencia: string;
+  modelo: string;
+}
+
+/**
+ * Pide a la IA (OpenAI, desde el backend) una sugerencia de tratamiento para
+ * ESTE registro clínico. No guarda nada: solo devuelve el texto.
+ * Se usa un timeout propio porque la IA puede tardar más que una petición normal.
+ */
+export async function getSugerenciaIA(registroId: number): Promise<SugerenciaIA> {
+  const { data } = await api.post<SugerenciaIA>(
+    `/api/historial_clinico/registros/${registroId}/sugerencia-ia`,
+    {},
+    { timeout: 115000 },
+  );
+  return data;
+}
+
 export interface HistoriaClinicaPayload {
   paciente_id: number;
   estado?: boolean;

@@ -3,9 +3,12 @@ from datetime import datetime
 
 from flask import request, current_app
 from flask_restful import Api, Resource
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, current_user
 from marshmallow import ValidationError
 from app.db import db
+from app.auditoria.models import Auditoria
+from app.shared.openai_client import IAError, consultar_openai, ia_configurada
+from app.historial_clinico.ia_prompt import SYSTEM_PROMPT, construir_prompt_registro
 from app.consultas.schemas import ConsultaSchema
 from app.medicos.models import Medico
 from app.citas.models import Cita
@@ -1053,6 +1056,63 @@ class RegistroClinicoDetalleCompleto_Resource(Resource):
             "recetas": receta_schema.dump(recetas_activas, many=True),
             "seguimientos_control": seguimiento_schema_list.dump(seguimientos),
         }, 200
+class RegistroClinicoSugerenciaIA_Resource(Resource):
+    """
+    POST /api/historial_clinico/registros/<int:registro_id>/sugerencia-ia
+
+    Envía a OpenAI el contenido clínico de ESTE registro (sin datos de
+    identificación del paciente) y devuelve una sugerencia de tratamiento.
+    No guarda nada en el registro: el médico decide qué hacer con el texto.
+    """
+
+    @jwt_required()
+    def post(self, registro_id):
+        if not current_user or not current_user.estado:
+            return {"error": "Usuario inactivo"}, 401
+
+        registro = RegistroClinico.get_by_id(registro_id)
+        if not registro or (registro.consulta and not registro.consulta.estado):
+            return {"error": "Registro clínico no encontrado"}, 404
+
+        if not ia_configurada():
+            return {"error": "La IA no está configurada en el servidor (falta OPENAI_API_KEY)."}, 503
+
+        seguimientos = (
+            SeguimientoControl.query
+            .filter_by(registro_clinico_id=registro_id)
+            .order_by(SeguimientoControl.fecha.asc())
+            .all()
+        )
+        examenes = [e for e in registro.examenes_complementarios if e.estado]
+        recetas = [r for r in registro.recetas if r.estado]
+
+        prompt = construir_prompt_registro(registro, examenes, recetas, seguimientos)
+
+        try:
+            resultado = consultar_openai(SYSTEM_PROMPT, prompt)
+        except IAError as err:
+            return {"error": err.mensaje}, err.status_code
+
+        # Constancia de quién consultó la IA sobre qué registro (sin guardar
+        # el contenido clínico enviado ni la respuesta).
+        try:
+            Auditoria(
+                usuario_id=current_user.id,
+                accion="CONSULTA_IA",
+                tabla_afectada="registros_clinicos",
+                registro_id=registro_id,
+                detalle={"modelo": resultado["modelo"], "tokens": resultado["tokens"]},
+            ).save()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("No se pudo registrar la auditoría de la consulta a la IA")
+
+        return {
+            "sugerencia": resultado["texto"],
+            "modelo": resultado["modelo"],
+        }, 200
+
+
 class SeguimientoControlList_Resource(Resource):
     """
     GET /api/historial_clinico/seguimientos
@@ -1073,6 +1133,7 @@ api.add_resource(SeguimientoControlList_Resource, "/seguimientos")
 api.add_resource(SeguimientoControlEditar_Resource, "/seguimientos/<int:seguimiento_id>")
 api.add_resource(RecetasDeConsulta_Resource, "/consultas/<int:consulta_id>/recetas")
 api.add_resource(RegistroClinicoDetalleCompleto_Resource, "/registros/<int:registro_id>/completo")
+api.add_resource(RegistroClinicoSugerenciaIA_Resource, "/registros/<int:registro_id>/sugerencia-ia")
 api.add_resource(RegistroClinicoCompleto_Resource, "/registro-completo")
 api.add_resource(RegistroClinicoCompletoUpdate_Resource, "/registro-completo/<int:registro_id>")
 

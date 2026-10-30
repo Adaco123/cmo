@@ -1167,3 +1167,101 @@ section.section,
     padding: 24px 16px;
   }
 }
+/* ============================================================
+   Asistente IA — sugerencia de tratamiento
+   ============================================================ */
+.iaRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.btnIA {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-on-dark);
+  background: var(--primary-gradient);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+.btnIA:hover:not(:disabled) { opacity: 0.88; }
+.btnIA:disabled { opacity: 0.6; cursor: wait; }
+
+.iaNota {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  max-width: 420px;
+  line-height: 1.4;
+}
+
+.iaError {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12.5px;
+  color: var(--status-inactive);
+}
+
+.iaPanel {
+  margin-top: 14px;
+  background: var(--bg-card);
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+
+.iaPanelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.btnCopiarIA {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--primary-light);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.btnCopiarIA:hover { background: color-mix(in srgb, var(--primary) 24%, transparent); }
+
+.iaTexto {
+  font-size: var(--fs-sm);
+  color: var(--text-main);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+.iaAviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}

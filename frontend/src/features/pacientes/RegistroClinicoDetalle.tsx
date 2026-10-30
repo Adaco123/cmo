@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { getRegistroClinicoCompleto } from '../../api/historialClinico';
+import { getRegistroClinicoCompleto, getSugerenciaIA } from '../../api/historialClinico';
+import type { SugerenciaIA } from '../../api/historialClinico';
+import { extractErrorMessage } from '../../utils/errors';
 import type { RegistroClinicoCompletoDetalle } from '../../api/historialClinico';
 import type { Receta } from '../../api/recetas';
 import type { Paciente } from '../../api/pacientes';
@@ -12,7 +14,7 @@ import {
   faSpinner, faExclamationCircle, faFlaskVial, faPills,
   faCalendarCheck, faDownload, faXmark, faExpand, faWaveSquare,
   faNotesMedical, faTriangleExclamation, faStethoscope, faPen,
-  faCapsules, faCamera, faFilePdf,
+  faCapsules, faCamera, faFilePdf, faWandMagicSparkles, faCopy, faCheck,
 } from '@fortawesome/free-solid-svg-icons';
 import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import { buildWhatsAppUrl, formatFechaLabel, mensajeReceta } from '../../utils/recetaWhatsapp';
@@ -96,6 +98,49 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
   const [obsDrafts, setObsDrafts] = useState<Record<number, string>>({});
   const [guardandoObsId, setGuardandoObsId] = useState<number | null>(null);
   const [obsEditando, setObsEditando] = useState<Record<number, boolean>>({});
+
+  // Asistente de IA: sugerencia de tratamiento solo para ESTE registro.
+  // No se guarda nada; el médico decide si copia el texto a "Tratamiento".
+  // El resultado/error se guarda junto al registro al que pertenece; si el
+  // componente pasa a mostrar otro registro, el anterior simplemente no se ve.
+  const [iaCargando, setIaCargando] = useState(false);
+  const [iaEstado, setIaEstado] = useState<
+    { registroId: number; resultado?: SugerenciaIA; error?: string } | null
+  >(null);
+  const [iaCopiado, setIaCopiado] = useState(false);
+  const iaVisible = iaEstado?.registroId === registroId ? iaEstado : null;
+  const iaResultado = iaVisible?.resultado ?? null;
+  const iaError = iaVisible?.error ?? null;
+
+  const handleConsultarIA = async () => {
+    const idConsultado = registroId;
+    setIaCargando(true);
+    setIaEstado(null);
+    setIaCopiado(false);
+    try {
+      const resultado = await getSugerenciaIA(idConsultado);
+      setIaEstado({ registroId: idConsultado, resultado });
+    } catch (err) {
+      setIaEstado({
+        registroId: idConsultado,
+        error: extractErrorMessage(err, 'No se pudo consultar a la IA.'),
+      });
+    } finally {
+      setIaCargando(false);
+    }
+  };
+
+  const handleCopiarIA = async () => {
+    if (!iaResultado) return;
+    try {
+      await navigator.clipboard.writeText(iaResultado.sugerencia);
+      setIaCopiado(true);
+      setTimeout(() => setIaCopiado(false), 2000);
+    } catch {
+      // Sin permiso de portapapeles (p. ej. HTTP sin certificado): el texto
+      // sigue visible y se puede seleccionar a mano.
+    }
+  };
 
   const nombrePacienteCompleto = paciente ? `${paciente.nombres} ${paciente.apellidos}`.trim() : '';
 
@@ -651,6 +696,47 @@ const RegistroClinicoDetalle: React.FC<Props> = ({ registroId, paciente }) => {
               </div>
             )}
           </div>
+        </section>
+
+        {/* ---- Asistente de IA: sugerencia de tratamiento de este registro ---- */}
+        <section className={styles.section}>
+          <div className={styles.eyebrow}><FontAwesomeIcon icon={faWandMagicSparkles} /> Asistente IA</div>
+          <div className={styles.iaRow}>
+            <button
+              type="button"
+              className={styles.btnIA}
+              onClick={handleConsultarIA}
+              disabled={iaCargando}
+            >
+              <FontAwesomeIcon icon={iaCargando ? faSpinner : faWandMagicSparkles} spin={iaCargando} />{' '}
+              {iaCargando ? 'Consultando a la IA...' : iaResultado ? 'Consultar de nuevo' : 'Sugerir tratamiento con IA'}
+            </button>
+            <span className={styles.iaNota}>
+              Se envían a la IA los datos clínicos de este registro, sin nombre ni documento del paciente.
+            </span>
+          </div>
+
+          {iaError && (
+            <p className={styles.iaError} role="alert">
+              <FontAwesomeIcon icon={faExclamationCircle} /> {iaError}
+            </p>
+          )}
+
+          {iaResultado && (
+            <div className={styles.iaPanel}>
+              <div className={styles.iaPanelHead}>
+                <span>Sugerencia · {iaResultado.modelo}</span>
+                <button type="button" className={styles.btnCopiarIA} onClick={handleCopiarIA}>
+                  <FontAwesomeIcon icon={iaCopiado ? faCheck : faCopy} /> {iaCopiado ? 'Copiado' : 'Copiar'}
+                </button>
+              </div>
+              <div className={styles.iaTexto}>{iaResultado.sugerencia}</div>
+              <p className={styles.iaAviso}>
+                <FontAwesomeIcon icon={faTriangleExclamation} /> Es solo una ayuda: puede contener errores.
+                La decisión y la receta son responsabilidad del médico.
+              </p>
+            </div>
+          )}
         </section>
 
         {/* ---- Exámenes complementarios: visor tipo carrete ----
